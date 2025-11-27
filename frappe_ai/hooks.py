@@ -1,32 +1,18 @@
+from . import __version__ as app_version
+
 app_name = "frappe_ai"
-app_title = "Frappe AI "
-app_publisher = "Vyogo Technologies"
-app_description = "AI power for Awesome Bar"
-app_email = "support@vyogolabs.tech"
-app_license = "mit"
-
-# Apps
-# ------------------
-
-# required_apps = []
-
-# Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-# 	{
-# 		"name": "frappe_ai",
-# 		"logo": "/assets/frappe_ai/logo.png",
-# 		"title": "Frappe AI ",
-# 		"route": "/frappe_ai",
-# 		"has_permission": "frappe_ai.api.permission.has_app_permission"
-# 	}
-# ]
+app_title = "Frappe AI"
+app_publisher = "Frappe"
+app_description = "AI Assistant Integration for Frappe/ERPNext using MCP Server"
+app_email = "developers@frappe.io"
+app_license = "MIT"
 
 # Includes in <head>
 # ------------------
 
 # include js, css files in header of desk.html
-# app_include_css = "/assets/frappe_ai/css/frappe_ai.css"
-# app_include_js = "/assets/frappe_ai/js/frappe_ai.js"
+app_include_css = "/assets/frappe_ai/css/frappe_ai.css"
+app_include_js = "/assets/frappe_ai/js/frappe_ai.bundle.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/frappe_ai/css/frappe_ai.css"
@@ -48,11 +34,6 @@ app_license = "mit"
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 
-# Svg Icons
-# ------------------
-# include app icons in desk
-# app_include_icons = "frappe_ai/public/icons.svg"
-
 # Home Pages
 # ----------
 
@@ -61,7 +42,7 @@ app_license = "mit"
 
 # website user home page (by Role)
 # role_home_page = {
-# 	"Role": "home_page"
+#	"Role": "home_page"
 # }
 
 # Generators
@@ -75,8 +56,8 @@ app_license = "mit"
 
 # add methods and filters to jinja environment
 # jinja = {
-# 	"methods": "frappe_ai.utils.jinja_methods",
-# 	"filters": "frappe_ai.utils.jinja_filters"
+#	"methods": "frappe_ai.utils.jinja_methods",
+#	"filters": "frappe_ai.utils.jinja_filters"
 # }
 
 # Installation
@@ -91,22 +72,6 @@ app_license = "mit"
 # before_uninstall = "frappe_ai.uninstall.before_uninstall"
 # after_uninstall = "frappe_ai.uninstall.after_uninstall"
 
-# Integration Setup
-# ------------------
-# To set up dependencies/integrations with other apps
-# Name of the app being installed is passed as an argument
-
-# before_app_install = "frappe_ai.utils.before_app_install"
-# after_app_install = "frappe_ai.utils.after_app_install"
-
-# Integration Cleanup
-# -------------------
-# To clean up dependencies/integrations with other apps
-# Name of the app being uninstalled is passed as an argument
-
-# before_app_uninstall = "frappe_ai.utils.before_app_uninstall"
-# after_app_uninstall = "frappe_ai.utils.after_app_uninstall"
-
 # Desk Notifications
 # ------------------
 # See frappe.core.notifications.get_notification_config
@@ -118,11 +83,11 @@ app_license = "mit"
 # Permissions evaluated in scripted ways
 
 # permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
+#	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
 # }
 #
 # has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
+#	"Event": "frappe.desk.doctype.event.event.has_permission",
 # }
 
 # DocType Class
@@ -130,7 +95,7 @@ app_license = "mit"
 # Override standard doctype classes
 
 # override_doctype_class = {
-# 	"ToDo": "custom_app.overrides.CustomToDo"
+#	"ToDo": "custom_app.overrides.CustomToDo"
 # }
 
 # Document Events
@@ -138,32 +103,32 @@ app_license = "mit"
 # Hook on document methods and events
 
 # doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
+#	"*": {
+#		"on_update": "method",
+#		"on_cancel": "method",
+#		"on_trash": "method"
+#	}
 # }
 
 # Scheduled Tasks
 # ---------------
 
 # scheduler_events = {
-# 	"all": [
-# 		"frappe_ai.tasks.all"
-# 	],
-# 	"daily": [
-# 		"frappe_ai.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"frappe_ai.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"frappe_ai.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"frappe_ai.tasks.monthly"
-# 	],
+#	"all": [
+#		"frappe_ai.tasks.all"
+#	],
+#	"daily": [
+#		"frappe_ai.tasks.daily"
+#	],
+#	"hourly": [
+#		"frappe_ai.tasks.hourly"
+#	],
+#	"weekly": [
+#		"frappe_ai.tasks.weekly"
+#	],
+#	"monthly": [
+#		"frappe_ai.tasks.monthly"
+#	],
 # }
 
 # Testing
@@ -174,15 +139,15 @@ app_license = "mit"
 # Overriding Methods
 # ------------------------------
 #
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "frappe_ai.event.get_events"
-# }
+override_whitelisted_methods = {
+	"frappe.utils.global_search.search": "frappe_ai.search.search"
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
 # along with any modifications made in other Frappe apps
 # override_doctype_dashboards = {
-# 	"Task": "frappe_ai.task.get_dashboard_data"
+#	"Task": "frappe_ai.task.get_dashboard_data"
 # }
 
 # exempt linked doctypes from being automatically cancelled
@@ -208,37 +173,30 @@ app_license = "mit"
 # --------------------
 
 # user_data_fields = [
-# 	{
-# 		"doctype": "{doctype_1}",
-# 		"filter_by": "{filter_by}",
-# 		"redact_fields": ["{field_1}", "{field_2}"],
-# 		"partial": 1,
-# 	},
-# 	{
-# 		"doctype": "{doctype_2}",
-# 		"filter_by": "{filter_by}",
-# 		"partial": 1,
-# 	},
-# 	{
-# 		"doctype": "{doctype_3}",
-# 		"strict": False,
-# 	},
-# 	{
-# 		"doctype": "{doctype_4}"
-# 	}
+#	{
+#		"doctype": "{doctype_1}",
+#		"filter_by": "{filter_by}",
+#		"redact_fields": ["{field_1}", "{field_2}"],
+#		"partial": 1,
+#	},
+#	{
+#		"doctype": "{doctype_2}",
+#		"filter_by": "{filter_by}",
+#		"partial": 1,
+#	},
+#	{
+#		"doctype": "{doctype_3}",
+#		"strict": False,
+#	},
+#	{
+#		"doctype": "{doctype_4}"
+#	}
 # ]
 
 # Authentication and authorization
 # --------------------------------
 
 # auth_hooks = [
-# 	"frappe_ai.auth.validate"
+#	"frappe_ai.auth.validate"
 # ]
-
-# Automatically update python controller files with type annotations for this app.
-# export_python_type_annotations = True
-
-# default_log_clearing_doctypes = {
-# 	"Logging DocType Name": 30  # days to retain logs
-# }
 

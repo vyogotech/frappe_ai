@@ -1,0 +1,117 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-01-01 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "mcp_server_url",
+  "section_oauth",
+  "frappe_base_url",
+  "oauth_client_id",
+  "oauth_client_secret",
+  "section_settings",
+  "timeout",
+  "section_advanced",
+  "cache_ttl",
+  "validate_remote"
+ ],
+ "fields": [
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "description": "URL of the MCP server (e.g., http://localhost:8080)",
+   "fieldname": "mcp_server_url",
+   "fieldtype": "Data",
+   "label": "MCP Server URL",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_oauth",
+   "fieldtype": "Section Break",
+   "label": "OAuth2 Configuration"
+  },
+  {
+   "description": "OAuth2 server URL (this Frappe instance)",
+   "fieldname": "frappe_base_url",
+   "fieldtype": "Data",
+   "label": "Frappe Base URL",
+   "reqd": 1
+  },
+  {
+   "description": "Registered OAuth2 client ID for MCP server authentication",
+   "fieldname": "oauth_client_id",
+   "fieldtype": "Data",
+   "label": "OAuth Client ID",
+   "reqd": 1
+  },
+  {
+   "fieldname": "oauth_client_secret",
+   "fieldtype": "Password",
+   "label": "OAuth Client Secret",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_settings",
+   "fieldtype": "Section Break",
+   "label": "Connection Settings"
+  },
+  {
+   "default": "30",
+   "description": "HTTP request timeout in seconds",
+   "fieldname": "timeout",
+   "fieldtype": "Int",
+   "label": "Timeout (seconds)"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_advanced",
+   "fieldtype": "Section Break",
+   "label": "Advanced Settings"
+  },
+  {
+   "default": "300",
+   "description": "Token cache time-to-live in seconds",
+   "fieldname": "cache_ttl",
+   "fieldtype": "Int",
+   "label": "Cache TTL (seconds)"
+  },
+  {
+   "default": "1",
+   "description": "Validate tokens with OAuth server (recommended)",
+   "fieldname": "validate_remote",
+   "fieldtype": "Check",
+   "label": "Validate Remote"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2024-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "AI Assistant",
+ "name": "MCP Server Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
+
