@@ -8,15 +8,11 @@
  "field_order": [
   "enabled",
   "mcp_server_url",
-  "section_oauth",
-  "frappe_base_url",
-  "oauth_client_id",
-  "oauth_client_secret",
   "section_settings",
   "timeout",
-  "section_advanced",
-  "cache_ttl",
-  "validate_remote"
+  "section_ui",
+  "sidebar_width",
+  "keyboard_shortcut"
  ],
  "fields": [
   {
@@ -33,31 +29,6 @@
    "reqd": 1
   },
   {
-   "fieldname": "section_oauth",
-   "fieldtype": "Section Break",
-   "label": "OAuth2 Configuration"
-  },
-  {
-   "description": "OAuth2 server URL (this Frappe instance)",
-   "fieldname": "frappe_base_url",
-   "fieldtype": "Data",
-   "label": "Frappe Base URL",
-   "reqd": 1
-  },
-  {
-   "description": "Registered OAuth2 client ID for MCP server authentication",
-   "fieldname": "oauth_client_id",
-   "fieldtype": "Data",
-   "label": "OAuth Client ID",
-   "reqd": 1
-  },
-  {
-   "fieldname": "oauth_client_secret",
-   "fieldtype": "Password",
-   "label": "OAuth Client Secret",
-   "reqd": 1
-  },
-  {
    "fieldname": "section_settings",
    "fieldtype": "Section Break",
    "label": "Connection Settings"
@@ -70,24 +41,23 @@
    "label": "Timeout (seconds)"
   },
   {
-   "collapsible": 1,
-   "fieldname": "section_advanced",
+   "fieldname": "section_ui",
    "fieldtype": "Section Break",
-   "label": "Advanced Settings"
+   "label": "Sidebar Settings"
   },
   {
-   "default": "300",
-   "description": "Token cache time-to-live in seconds",
-   "fieldname": "cache_ttl",
+   "default": "380",
+   "description": "Width of the AI sidebar in pixels (300-600)",
+   "fieldname": "sidebar_width",
    "fieldtype": "Int",
-   "label": "Cache TTL (seconds)"
+   "label": "Sidebar Width"
   },
   {
-   "default": "1",
-   "description": "Validate tokens with OAuth server (recommended)",
-   "fieldname": "validate_remote",
-   "fieldtype": "Check",
-   "label": "Validate Remote"
+   "default": "Ctrl+/",
+   "description": "Keyboard shortcut to toggle the AI sidebar",
+   "fieldname": "keyboard_shortcut",
+   "fieldtype": "Data",
+   "label": "Keyboard Shortcut"
   }
  ],
  "index_web_pages_for_search": 1,

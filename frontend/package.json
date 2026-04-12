@@ -1,0 +1,29 @@
+{
+  "name": "frappe-ai-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/update-hooks.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "echarts": "^5.6.0",
+    "markdown-it": "^14.1.0",
+    "vue": "^3.4",
+    "vue-echarts": "^7.0.3"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
+    "@vitejs/plugin-vue": "^5.0",
+    "@vue/test-utils": "^2.4.6",
+    "autoprefixer": "^10.4",
+    "happy-dom": "^20.8.9",
+    "postcss": "^8.4",
+    "typescript": "^5.7",
+    "vite": "^5.4",
+    "vitest": "^4.1.2"
+  }
+}
