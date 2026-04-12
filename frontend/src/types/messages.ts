@@ -27,4 +27,8 @@ export interface Message {
   toolCall?: ToolCall;
   error?: ErrorInfo;
   timestamp: Date;
+  /** SSE-only: transient metadata (thinking status, etc.) */
+  metadata?: {
+    statusText?: string;
+  };
 }
