@@ -841,3 +841,28 @@
 #frappe-ai-sidebar-root .frappe-ai-fade-leave-to {
   opacity: 0;
 }
+
+/* ─── SSE Streaming: thinking indicator ─────────────────────────────────── */
+#frappe-ai-sidebar-root .frappe-ai-thinking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted, #8d99a6);
+  font-size: 13px;
+  font-style: italic;
+  padding: 4px 0;
+}
+
+#frappe-ai-sidebar-root .frappe-ai-thinking-dots {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: frappe-ai-pulse 1s ease-in-out infinite;
+}
+
+@keyframes frappe-ai-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50%       { opacity: 1;   transform: scale(1.1); }
+}

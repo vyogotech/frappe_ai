@@ -2,6 +2,7 @@
 
 import { createApp } from "vue";
 import App from "./App.vue";
+import { setMcpServerUrl } from "./composables/useChat";
 
 declare const frappe: any;
 declare const $: any;
@@ -31,6 +32,10 @@ async function loadSettings(): Promise<void> {
       state.mcpServerUrl = settings.mcp_server_url || "http://localhost:8080";
       state.sidebarWidth = settings.sidebar_width || 380;
       state.keyboardShortcut = settings.keyboard_shortcut || "Ctrl+/";
+      // Make the MCP server URL available to useChat for SSE streaming.
+      if (state.mcpServerUrl) {
+        setMcpServerUrl(state.mcpServerUrl);
+      }
     }
   } catch (err) {
     console.warn("[Frappe AI] Could not load settings:", err);

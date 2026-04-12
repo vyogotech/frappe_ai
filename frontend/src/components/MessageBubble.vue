@@ -39,7 +39,12 @@ const timeStr = computed(() =>
 
     <!-- Assistant message -->
     <div v-else-if="message.role === 'assistant'" class="frappe-ai-bubble-content">
-      <div v-if="renderError" class="frappe-ai-error frappe-ai-error--info">
+      <!-- Streaming: show status text while content is arriving -->
+      <div v-if="message.metadata?.statusText && !message.content" class="frappe-ai-thinking">
+        <span class="frappe-ai-thinking-dots" />
+        {{ message.metadata.statusText }}
+      </div>
+      <div v-else-if="renderError" class="frappe-ai-error frappe-ai-error--info">
         <div class="frappe-ai-error-message">Could not render response</div>
       </div>
       <template v-else-if="message.blocks && message.blocks.length > 0">

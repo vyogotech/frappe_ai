@@ -1,24 +1,24 @@
-/** Load Copilot Settings from the Frappe backend. */
+/** Load Frappe AI Settings from the backend. */
 
 import { ref, readonly, type Ref } from "vue";
 
 declare const frappe: any;
 
-export interface CopilotSettings {
+export interface FrappeAISettings {
   enabled: boolean;
-  agentUrl: string;
+  mcpServerUrl: string;
   sidebarWidth: number;
   keyboardShortcut: string;
 }
 
-const DEFAULT_SETTINGS: CopilotSettings = {
+const DEFAULT_SETTINGS: FrappeAISettings = {
   enabled: false,
-  agentUrl: "ws://localhost:8484",
+  mcpServerUrl: "",
   sidebarWidth: 380,
   keyboardShortcut: "Ctrl+/",
 };
 
-const settings: Ref<CopilotSettings> = ref({ ...DEFAULT_SETTINGS });
+const settings: Ref<FrappeAISettings> = ref({ ...DEFAULT_SETTINGS });
 const loaded = ref(false);
 
 export function useSettings() {
@@ -30,10 +30,10 @@ export function useSettings() {
       });
       if (result?.message) {
         settings.value = {
-          enabled: result.message.enabled,
-          agentUrl: result.message.agent_url,
-          sidebarWidth: result.message.sidebar_width,
-          keyboardShortcut: result.message.keyboard_shortcut,
+          enabled: result.message.enabled ?? false,
+          mcpServerUrl: result.message.mcp_server_url ?? "",
+          sidebarWidth: result.message.sidebar_width ?? 380,
+          keyboardShortcut: result.message.keyboard_shortcut ?? "Ctrl+/",
         };
       }
       loaded.value = true;
