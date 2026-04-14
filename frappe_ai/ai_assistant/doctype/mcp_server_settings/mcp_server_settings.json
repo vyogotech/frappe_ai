@@ -7,7 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "enabled",
-  "mcp_server_url",
+  "agent_url",
   "section_settings",
   "timeout",
   "section_ui",
@@ -22,10 +22,10 @@
    "label": "Enabled"
   },
   {
-   "description": "URL of the MCP server (e.g., http://localhost:8080)",
-   "fieldname": "mcp_server_url",
+   "description": "URL of the AI agent (e.g., http://localhost:8080)",
+   "fieldname": "agent_url",
    "fieldtype": "Data",
-   "label": "MCP Server URL",
+   "label": "Agent URL",
    "reqd": 1
   },
   {

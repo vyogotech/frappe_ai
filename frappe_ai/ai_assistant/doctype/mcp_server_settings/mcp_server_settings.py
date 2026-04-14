@@ -15,8 +15,8 @@ class MCPServerSettings(Document):
 	
 	def validate_urls(self):
 		"""Validate that URLs are properly formatted"""
-		if self.mcp_server_url:
-			self.mcp_server_url = self.mcp_server_url.rstrip('/')
+		if self.agent_url:
+			self.agent_url = self.agent_url.rstrip('/')
 		
 		if self.frappe_base_url:
 			self.frappe_base_url = self.frappe_base_url.rstrip('/')
