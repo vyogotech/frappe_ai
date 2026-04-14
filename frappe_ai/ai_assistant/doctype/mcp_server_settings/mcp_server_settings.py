@@ -17,9 +17,6 @@ class MCPServerSettings(Document):
 		"""Validate that URLs are properly formatted"""
 		if self.agent_url:
 			self.agent_url = self.agent_url.rstrip('/')
-		
-		if self.frappe_base_url:
-			self.frappe_base_url = self.frappe_base_url.rstrip('/')
 	
 	def validate_timeout(self):
 		"""Validate timeout value"""
