@@ -291,6 +291,103 @@
   color: var(--primary-dark, var(--primary));
 }
 
+#frappe-ai-sidebar-root .frappe-ai-markdown p {
+  margin: 0 0 8px;
+}
+
+#frappe-ai-sidebar-root .frappe-ai-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+#frappe-ai-sidebar-root .frappe-ai-markdown ul,
+#frappe-ai-sidebar-root .frappe-ai-markdown ol {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+}
+
+#frappe-ai-sidebar-root .frappe-ai-markdown li {
+  margin-bottom: 2px;
+}
+
+#frappe-ai-sidebar-root .frappe-ai-markdown h1,
+#frappe-ai-sidebar-root .frappe-ai-markdown h2,
+#frappe-ai-sidebar-root .frappe-ai-markdown h3,
+#frappe-ai-sidebar-root .frappe-ai-markdown h4 {
+  font-weight: 600;
+  margin: 12px 0 6px;
+  line-height: 1.3;
+}
+
+#frappe-ai-sidebar-root .frappe-ai-markdown h1 { font-size: 16px; }
+#frappe-ai-sidebar-root .frappe-ai-markdown h2 { font-size: 15px; }
+#frappe-ai-sidebar-root .frappe-ai-markdown h3,
+#frappe-ai-sidebar-root .frappe-ai-markdown h4 { font-size: 13px; }
+
+#frappe-ai-sidebar-root .frappe-ai-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin: 8px 0;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: var(--border-radius-sm, 6px);
+  overflow: hidden;
+}
+
+#frappe-ai-sidebar-root .frappe-ai-markdown th,
+#frappe-ai-sidebar-root .frappe-ai-markdown td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+#frappe-ai-sidebar-root .frappe-ai-markdown th {
+  background: var(--gray-100, #f3f4f6);
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+#frappe-ai-sidebar-root .frappe-ai-markdown tr:last-child td {
+  border-bottom: none;
+}
+
+#frappe-ai-sidebar-root .frappe-ai-markdown blockquote {
+  margin: 8px 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--border-color, #e5e7eb);
+  color: var(--text-muted);
+}
+
+#frappe-ai-sidebar-root .frappe-ai-markdown hr {
+  border: none;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  margin: 12px 0;
+}
+
+#frappe-ai-sidebar-root .frappe-ai-markdown code {
+  background: var(--gray-200, #e5e7eb);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: var(--font-stack-monospace, Menlo, Consolas, monospace);
+}
+
+#frappe-ai-sidebar-root .frappe-ai-markdown pre {
+  background: var(--gray-900, #111827);
+  color: var(--gray-100, #f3f4f6);
+  border-radius: var(--border-radius-md, 8px);
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+#frappe-ai-sidebar-root .frappe-ai-markdown pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
 /* ─── Code blocks ─── */
 
 #frappe-ai-sidebar-root .frappe-ai-code-block {

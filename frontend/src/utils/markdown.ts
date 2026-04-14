@@ -1,41 +1,37 @@
-/** Shared markdown-to-HTML renderer. */
+/** Shared markdown-to-HTML renderer backed by markdown-it.
+ *
+ * Used by MessageBubble for plain-text assistant responses (when the LLM
+ * didn't wrap anything in <copilot-block> tags). Supports the common
+ * commonmark surface plus GFM-style pipe tables and task lists.
+ *
+ * Structured responses (charts, KPIs, typed tables) flow through the
+ * server-side block parser → content_block SSE events → the dedicated
+ * block components in components/blocks/, not this renderer.
+ */
 
-/** Escape HTML entities using DOM API. */
-function escapeHtml(str: string): string {
-  const div = document.createElement("div");
-  div.appendChild(document.createTextNode(str));
-  return div.innerHTML;
-}
+import MarkdownIt from "markdown-it";
 
-/** Render a markdown string to HTML. */
+const md = new MarkdownIt({
+  html: false,
+  linkify: true,
+  breaks: true,
+  typographer: true,
+});
+
+// Open all rendered links in a new tab so the sidebar doesn't navigate away.
+const defaultLinkOpen =
+  md.renderer.rules.link_open ||
+  function (tokens: any, idx: any, options: any, _env: any, self: any) {
+    return self.renderToken(tokens, idx, options);
+  };
+
+md.renderer.rules.link_open = function (tokens: any, idx: any, options: any, env: any, self: any) {
+  tokens[idx].attrSet("target", "_blank");
+  tokens[idx].attrSet("rel", "noopener");
+  return defaultLinkOpen(tokens, idx, options, env, self);
+};
+
 export function renderMarkdown(text: string): string {
   if (!text) return "";
-
-  let html = escapeHtml(text);
-
-  // Code blocks (```lang\ncode\n```)
-  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, lang, code) => {
-    const langLabel = lang ? `<span class="frappe-ai-code-lang">${lang}</span>` : "";
-    return `<div class="frappe-ai-code-block">${langLabel}<pre><code>${code.trim()}</code></pre></div>`;
-  });
-
-  // Inline code
-  html = html.replace(/`([^`]+)`/g, '<code class="frappe-ai-inline-code">$1</code>');
-
-  // Bold
-  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-
-  // Italic
-  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
-
-  // Links
-  html = html.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener">$1</a>',
-  );
-
-  // Line breaks
-  html = html.replace(/\n/g, "<br>");
-
-  return html;
+  return md.render(text);
 }
