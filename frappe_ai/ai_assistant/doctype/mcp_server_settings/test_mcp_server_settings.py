@@ -14,7 +14,7 @@ class TestMCPServerSettings(unittest.TestCase):
 			doc = frappe.get_doc({
 				"doctype": "MCP Server Settings",
 				"enabled": 1,
-				"mcp_server_url": "http://localhost:8080",
+				"agent_url": "http://localhost:8080",
 				"frappe_base_url": "http://localhost:8000",
 				"oauth_client_id": "test-client",
 				"oauth_client_secret": "test-secret",
@@ -25,12 +25,12 @@ class TestMCPServerSettings(unittest.TestCase):
 	def test_url_validation(self):
 		"""Test that URLs are properly formatted"""
 		settings = frappe.get_single("MCP Server Settings")
-		settings.mcp_server_url = "http://localhost:8080/"
+		settings.agent_url = "http://localhost:8080/"
 		settings.frappe_base_url = "http://localhost:8000/"
 		settings.save()
 		
 		# URLs should have trailing slashes removed
-		self.assertEqual(settings.mcp_server_url, "http://localhost:8080")
+		self.assertEqual(settings.agent_url, "http://localhost:8080")
 		self.assertEqual(settings.frappe_base_url, "http://localhost:8000")
 	
 	def test_timeout_validation(self):

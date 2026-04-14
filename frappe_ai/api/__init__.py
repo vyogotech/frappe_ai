@@ -9,7 +9,7 @@ def get_settings() -> dict:
     settings = frappe.get_single("MCP Server Settings")
     return {
         "enabled": bool(settings.enabled),
-        "mcp_server_url": settings.mcp_server_url,
+        "agent_url": settings.agent_url,
         "sidebar_width": getattr(settings, "sidebar_width", None) or 380,
         "keyboard_shortcut": getattr(settings, "keyboard_shortcut", None) or "Ctrl+/",
     }

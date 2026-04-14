@@ -1,4 +1,5 @@
 # List of patches
 # Format: module_name.patch_file_name
 # Example: frappe_ai.patches.v1_0.update_settings
+frappe_ai.patches.rename_mcp_server_url_to_agent_url
 

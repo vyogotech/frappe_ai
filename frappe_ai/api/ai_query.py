@@ -44,7 +44,7 @@ def query(message):
 
     try:
         response = requests.post(
-            f"{settings.mcp_server_url}/api/v1/chat",
+            f"{settings.agent_url}/api/v1/chat",
             json=payload,
             cookies={"sid": sid},
             headers={"Content-Type": "application/json"},
@@ -83,7 +83,7 @@ def test_connection():
         sid = frappe.session.sid
 
         health_response = requests.get(
-            f"{settings.mcp_server_url}/health",
+            f"{settings.agent_url}/health",
             cookies={"sid": sid},
             timeout=10,
         )
@@ -105,7 +105,7 @@ def test_connection():
         }
 
         query_response = requests.post(
-            f"{settings.mcp_server_url}/api/v1/chat",
+            f"{settings.agent_url}/api/v1/chat",
             json=test_query,
             cookies={"sid": sid},
             headers={"Content-Type": "application/json"},
