@@ -6,5 +6,6 @@ tags
 node_modules
 __pycache__
 frappe_ai/public/frontend/dist/
-frontend/node_modules/uv.lock
+frontend/node_modules/
+uv.lock
 .venv/
