@@ -102,7 +102,6 @@ export function useChat() {
         headers: {
           "Content-Type": "application/json",
           Accept: "text/event-stream",
-          "Cache-Control": "no-cache",
         },
         credentials: "include",
         body,
