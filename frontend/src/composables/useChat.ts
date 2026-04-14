@@ -9,11 +9,12 @@
  *   2. Otherwise fall back to frappe.call() (non-streaming).
  *
  * SSE event types from /api/v1/chat:
- *   {type:"status",    message:"..."}       – thinking / tool status
- *   {type:"tool_call", name:"...", arguments:{}} – tool invocation
- *   {type:"content",   text:"token"}        – LLM token
- *   {type:"done",      tools_called:[], data_quality:"high"}
- *   {type:"error",     message:"..."}
+ *   {type:"status",        message:"..."}           – thinking / tool status
+ *   {type:"tool_call",     name:"...", arguments:{}} – tool invocation
+ *   {type:"content",       text:"..."}              – plain-text chunk
+ *   {type:"content_block", block:{type:"...",...}}  – structured block
+ *   {type:"done",          tools_called:[], data_quality:"high"}
+ *   {type:"error",         message:"..."}
  */
 
 import { ref, readonly } from "vue";
@@ -186,6 +187,21 @@ export function useChat() {
         if (ev.text) {
           _updateMessage(assistantId, (m) => {
             m.content += ev.text;
+          });
+        }
+        break;
+
+      case "content_block":
+        // Structured blocks: tables, charts, KPIs, status lists, and
+        // text blocks for prose between them. The server parses
+        // <copilot-block> tags out of the LLM output and emits one
+        // content_block event per block, preserving order.
+        if (ev.block && isValidBlock(ev.block)) {
+          _updateMessage(assistantId, (m) => {
+            if (!m.blocks) {
+              m.blocks = [];
+            }
+            m.blocks.push(ev.block as ContentBlock);
           });
         }
         break;

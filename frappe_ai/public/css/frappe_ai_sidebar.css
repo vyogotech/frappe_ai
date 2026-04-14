@@ -223,14 +223,15 @@
 #frappe-ai-sidebar-root .frappe-ai-bubble {
   margin-bottom: 12px;
   display: flex;
+  flex-direction: column;
 }
 
 #frappe-ai-sidebar-root .frappe-ai-bubble--user {
-  justify-content: flex-end;
+  align-items: flex-end;
 }
 
 #frappe-ai-sidebar-root .frappe-ai-bubble--assistant {
-  justify-content: flex-start;
+  align-items: stretch;
 }
 
 #frappe-ai-sidebar-root .frappe-ai-bubble-content {
@@ -245,6 +246,8 @@
 }
 
 #frappe-ai-sidebar-root .frappe-ai-bubble--assistant .frappe-ai-bubble-content {
+  width: 100%;
+  max-width: 100%;
   background: transparent;
   color: var(--text-color);
   padding-left: 0;

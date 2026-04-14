@@ -39,24 +39,35 @@ const timeStr = computed(() =>
 
     <!-- Assistant message -->
     <div v-else-if="message.role === 'assistant'" class="frappe-ai-bubble-content">
-      <!-- Streaming: show status text while content is arriving -->
-      <div v-if="message.metadata?.statusText && !message.content" class="frappe-ai-thinking">
+      <!-- Streaming: show status text while nothing has arrived yet -->
+      <div
+        v-if="message.metadata?.statusText && !message.content && !(message.blocks && message.blocks.length > 0)"
+        class="frappe-ai-thinking"
+      >
         <span class="frappe-ai-thinking-dots" />
         {{ message.metadata.statusText }}
       </div>
       <div v-else-if="renderError" class="frappe-ai-error frappe-ai-error--info">
         <div class="frappe-ai-error-message">Could not render response</div>
       </div>
-      <template v-else-if="message.blocks && message.blocks.length > 0">
-        <component
-          v-for="(block, i) in message.blocks"
-          :key="i"
-          :is="getBlockComponent(block.type)"
-          :block="block"
+      <template v-else>
+        <!-- Structured blocks take priority, rendered in arrival order. -->
+        <template v-if="message.blocks && message.blocks.length > 0">
+          <component
+            v-for="(block, i) in message.blocks"
+            :key="i"
+            :is="getBlockComponent(block.type)"
+            :block="block"
+          />
+        </template>
+        <!-- Plain-text path for simple answers without any blocks. -->
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <div
+          v-else-if="message.content"
+          class="frappe-ai-markdown"
+          v-html="renderMarkdown(message.content)"
         />
       </template>
-      <!-- eslint-disable-next-line vue/no-v-html -->
-      <div v-else-if="message.content" class="frappe-ai-markdown" v-html="renderMarkdown(message.content)" />
     </div>
 
     <!-- Error message -->
