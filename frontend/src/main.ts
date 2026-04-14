@@ -2,7 +2,7 @@
 
 import { createApp } from "vue";
 import App from "./App.vue";
-import { setMcpServerUrl } from "./composables/useChat";
+import { setAgentUrl } from "./composables/useChat";
 
 declare const frappe: any;
 declare const $: any;
@@ -12,7 +12,7 @@ const CONTAINER_ID = "frappe-ai-sidebar-root";
 
 const state = {
   enabled: false,
-  mcpServerUrl: "http://localhost:8080",
+  agentUrl: "http://localhost:8484",
   sidebarWidth: 380,
   keyboardShortcut: "Ctrl+/",
   ready: false,
@@ -29,12 +29,12 @@ async function loadSettings(): Promise<void> {
     });
     if (settings) {
       state.enabled = Boolean(settings.enabled);
-      state.mcpServerUrl = settings.mcp_server_url || "http://localhost:8080";
+      state.agentUrl = settings.agent_url || "http://localhost:8484";
       state.sidebarWidth = settings.sidebar_width || 380;
       state.keyboardShortcut = settings.keyboard_shortcut || "Ctrl+/";
-      // Make the MCP server URL available to useChat for SSE streaming.
-      if (state.mcpServerUrl) {
-        setMcpServerUrl(state.mcpServerUrl);
+      // Make the agent URL available to useChat for SSE streaming.
+      if (state.agentUrl) {
+        setAgentUrl(state.agentUrl);
       }
     }
   } catch (err) {
