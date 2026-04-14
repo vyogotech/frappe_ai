@@ -37,17 +37,11 @@ const timeStr = computed(() =>
       {{ message.content }}
     </div>
 
-    <!-- Assistant message -->
+    <!-- Assistant message. The global "Thinking…" indicator lives in
+         ChatHeader; we intentionally render no in-bubble spinner so the
+         user sees a single status cue instead of two. -->
     <div v-else-if="message.role === 'assistant'" class="frappe-ai-bubble-content">
-      <!-- Streaming: show status text while nothing has arrived yet -->
-      <div
-        v-if="message.metadata?.statusText && !message.content && !(message.blocks && message.blocks.length > 0)"
-        class="frappe-ai-thinking"
-      >
-        <span class="frappe-ai-thinking-dots" />
-        {{ message.metadata.statusText }}
-      </div>
-      <div v-else-if="renderError" class="frappe-ai-error frappe-ai-error--info">
+      <div v-if="renderError" class="frappe-ai-error frappe-ai-error--info">
         <div class="frappe-ai-error-message">Could not render response</div>
       </div>
       <template v-else>
