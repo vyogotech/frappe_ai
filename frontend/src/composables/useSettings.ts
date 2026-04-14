@@ -6,14 +6,14 @@ declare const frappe: any;
 
 export interface FrappeAISettings {
   enabled: boolean;
-  mcpServerUrl: string;
+  agentUrl: string;
   sidebarWidth: number;
   keyboardShortcut: string;
 }
 
 const DEFAULT_SETTINGS: FrappeAISettings = {
   enabled: false,
-  mcpServerUrl: "",
+  agentUrl: "",
   sidebarWidth: 380,
   keyboardShortcut: "Ctrl+/",
 };
@@ -31,7 +31,7 @@ export function useSettings() {
       if (result?.message) {
         settings.value = {
           enabled: result.message.enabled ?? false,
-          mcpServerUrl: result.message.mcp_server_url ?? "",
+          agentUrl: result.message.agent_url ?? "",
           sidebarWidth: result.message.sidebar_width ?? 380,
           keyboardShortcut: result.message.keyboard_shortcut ?? "Ctrl+/",
         };

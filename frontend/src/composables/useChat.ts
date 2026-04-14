@@ -2,8 +2,10 @@
  * Message state with SSE streaming support.
  *
  * Flow:
- *   1. If mcpServerUrl is set, POST directly to MCP server with
- *      Accept: text/event-stream and stream tokens as they arrive.
+ *   1. If agentUrl is set, POST directly to the frappe-ai-agent with
+ *      Accept: text/event-stream and stream tokens as they arrive. The
+ *      Frappe session cookie is forwarded via credentials: "include"; the
+ *      agent uses that sid for every downstream MCP tool call.
  *   2. Otherwise fall back to frappe.call() (non-streaming).
  *
  * SSE event types from /api/v1/chat:
@@ -26,10 +28,10 @@ function isValidBlock(block: Record<string, unknown>): boolean {
   return typeof block.type === "string" && VALID_BLOCK_TYPES.has(block.type);
 }
 
-// Shared (module-level) MCP server URL fetched once after settings load.
-let _mcpServerUrl = "";
-export function setMcpServerUrl(url: string): void {
-  _mcpServerUrl = url.replace(/\/$/, ""); // strip trailing slash
+// Shared (module-level) agent URL fetched once after settings load.
+let _agentUrl = "";
+export function setAgentUrl(url: string): void {
+  _agentUrl = url.replace(/\/$/, ""); // strip trailing slash
 }
 
 export function useChat() {
@@ -54,7 +56,7 @@ export function useChat() {
     isLoading.value = true;
     lastError.value = null;
 
-    if (_mcpServerUrl) {
+    if (_agentUrl) {
       _sendSSE(content);
     } else {
       _sendFallback(content);
@@ -68,7 +70,7 @@ export function useChat() {
   }
 
   // --------------------------------------------------------------------------
-  // SSE path – fetch() streaming directly to the MCP server
+  // SSE path – fetch() streaming directly to the frappe-ai-agent
   // --------------------------------------------------------------------------
 
   async function _sendSSE(content: string): Promise<void> {
@@ -95,13 +97,14 @@ export function useChat() {
     messages.value = [...messages.value];
 
     try {
-      const resp = await fetch(`${_mcpServerUrl}/api/v1/chat`, {
+      const resp = await fetch(`${_agentUrl}/api/v1/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Accept: "text/event-stream",
           "Cache-Control": "no-cache",
         },
+        credentials: "include",
         body,
       });
 
