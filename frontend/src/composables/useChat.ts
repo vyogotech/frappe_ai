@@ -9,6 +9,7 @@
  *   2. Otherwise fall back to frappe.call() (non-streaming).
  *
  * SSE event types from /api/v1/chat:
+ *   {type:"session",       id:"AICS-0001"}          – server session id
  *   {type:"status",        message:"..."}           – thinking / tool status
  *   {type:"tool_call",     name:"...", arguments:{}} – tool invocation
  *   {type:"content",       text:"..."}              – plain-text chunk
@@ -39,6 +40,11 @@ export function useChat() {
   const messages = ref<Message[]>([]);
   const isLoading = ref(false);
   const lastError = ref<string | null>(null);
+  // Server-assigned session id. Sent back on every follow-up message so
+  // the agent writes history into the SAME AI Chat Session row instead
+  // of creating a new one per turn. Populated on the first reply via
+  // the SSE `session` event; cleared by clearMessages.
+  const sessionId = ref<string | null>(null);
 
   // --------------------------------------------------------------------------
   // Public API
@@ -68,6 +74,7 @@ export function useChat() {
     messages.value = [];
     isLoading.value = false;
     lastError.value = null;
+    sessionId.value = null;
   }
 
   // --------------------------------------------------------------------------
@@ -78,6 +85,7 @@ export function useChat() {
     const ctx = getPageContext();
     const body = JSON.stringify({
       message: content,
+      session_id: sessionId.value,
       context: {
         user_id: frappe.session?.user ?? "",
         user_email: frappe.session?.user ?? "",
@@ -150,6 +158,15 @@ export function useChat() {
 
   function _handleSSEEvent(ev: any, assistantId: string): void {
     switch (ev.type) {
+      case "session":
+        // Server-assigned id for this conversation. Remember it so the
+        // next sendMessage() sends it back in the request body, keeping
+        // follow-up messages inside the same AI Chat Session row.
+        if (typeof ev.id === "string" && ev.id) {
+          sessionId.value = ev.id;
+        }
+        break;
+
       case "status":
         // Update the placeholder assistant message with thinking text.
         _updateMessage(assistantId, (m) => {
