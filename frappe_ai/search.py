@@ -17,8 +17,12 @@ def search(text, start=0, limit=20, doctype=""):
 	if text and text.lower().startswith('@ai'):
 		return handle_ai_search(text, start, limit)
 	
-	# Call original search for non-@ai queries
-	return frappe.utils.global_search.web_search(text, start, limit, doctype)
+	# Call original search for non-@ai queries.
+	# frappe.utils.global_search.web_search(text, scope=None, start=0, limit=20)
+	# has no `doctype` parameter — we map `doctype` (if given) onto `scope`,
+	# and use keyword arguments so positional drift can't bite us again.
+	scope = doctype or None
+	return frappe.utils.global_search.web_search(text, scope=scope, start=start, limit=limit)
 
 
 def handle_ai_search(text, start=0, limit=20):
