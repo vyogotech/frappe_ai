@@ -1,8 +1,10 @@
 /**
  * Test helper: a controllable mock for `globalThis.fetch` that emits
- * SSE-formatted chunks on demand. Supports abort — when the caller
+ * SSE-formatted chunks on demand. Supports abort — if the caller
  * aborts the AbortSignal it passed to `fetch`, any in-flight `read()`
- * promise rejects with AbortError, matching real browser behavior.
+ * promise rejects with AbortError, and any subsequent `read()` entered
+ * after the signal has already fired also rejects immediately. This
+ * mirrors real-browser `ReadableStreamDefaultReader.read()` behavior.
  */
 
 import { vi, type Mock } from "vitest";
@@ -21,6 +23,7 @@ export function mockSSEFetch(): SSEMock {
   const pending: Uint8Array[] = [];
   let finished = false;
   let wasAborted = false;
+  let abortSignal: AbortSignal | null = null;
   let resolveNext:
     | ((v: { value?: Uint8Array; done: boolean }) => void)
     | null = null;
@@ -29,6 +32,13 @@ export function mockSSEFetch(): SSEMock {
   const reader = {
     read: () =>
       new Promise<{ value?: Uint8Array; done: boolean }>((resolve, reject) => {
+        // Match real-browser behavior: if the signal already fired
+        // before this read() was entered, reject immediately instead
+        // of waiting for data that will never come.
+        if (abortSignal?.aborted) {
+          reject(new DOMException("aborted", "AbortError"));
+          return;
+        }
         if (pending.length) {
           resolve({ value: pending.shift()!, done: false });
           return;
@@ -45,9 +55,9 @@ export function mockSSEFetch(): SSEMock {
   };
 
   const fetchMock = vi.fn(async (_url: string, opts: RequestInit = {}) => {
-    const signal = opts.signal;
-    if (signal) {
-      signal.addEventListener("abort", () => {
+    abortSignal = opts.signal ?? null;
+    if (abortSignal) {
+      abortSignal.addEventListener("abort", () => {
         wasAborted = true;
         if (rejectNext) {
           const err = new DOMException("aborted", "AbortError");

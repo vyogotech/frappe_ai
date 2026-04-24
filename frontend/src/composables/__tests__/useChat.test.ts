@@ -79,9 +79,7 @@ describe("useChat — placeholder pending lifecycle", () => {
     const { fetchMock, emit } = mockSSEFetch();
     vi.stubGlobal("fetch", fetchMock);
 
-    const chat = useChat() as ReturnType<typeof useChat> & {
-      cancelMessage: () => void;
-    };
+    const chat = useChat();
     chat.sendMessage("hi");
     await flush();
 
@@ -102,9 +100,7 @@ describe("useChat — placeholder pending lifecycle", () => {
     const { fetchMock, emit } = mockSSEFetch();
     vi.stubGlobal("fetch", fetchMock);
 
-    const chat = useChat() as ReturnType<typeof useChat> & {
-      cancelMessage: () => void;
-    };
+    const chat = useChat();
     chat.sendMessage("hi");
     await flush();
 
@@ -126,9 +122,7 @@ describe("useChat — placeholder pending lifecycle", () => {
     const { fetchMock, emit } = mockSSEFetch();
     vi.stubGlobal("fetch", fetchMock);
 
-    const chat = useChat() as ReturnType<typeof useChat> & {
-      cancelMessage: () => void;
-    };
+    const chat = useChat();
     chat.sendMessage("update a doc");
     await flush();
 
