@@ -127,46 +127,6 @@
   height: 16px;
 }
 
-/* ─── Connection indicator ─── */
-
-#frappe-ai-sidebar-root .frappe-ai-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 99px;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1;
-}
-
-#frappe-ai-sidebar-root .frappe-ai-indicator--connected {
-  background: var(--green-50, #ecfdf5);
-  color: var(--green-600, #16a34a);
-}
-
-#frappe-ai-sidebar-root .frappe-ai-indicator--connecting {
-  background: var(--yellow-50, #fefce8);
-  color: var(--yellow-600, #ca8a04);
-}
-
-#frappe-ai-sidebar-root .frappe-ai-indicator--error {
-  background: var(--red-50, #fef2f2);
-  color: var(--red-600, #dc2626);
-}
-
-#frappe-ai-sidebar-root .frappe-ai-indicator--offline {
-  background: var(--gray-100);
-  color: var(--text-muted);
-}
-
-#frappe-ai-sidebar-root .frappe-ai-indicator-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
 /* ─── Messages area ─── */
 
 #frappe-ai-sidebar-root .frappe-ai-messages {
@@ -419,36 +379,6 @@
   font-size: 12px;
 }
 
-/* ─── Streaming indicator ─── */
-
-#frappe-ai-sidebar-root .frappe-ai-streaming {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 0 8px 4px;
-}
-
-#frappe-ai-sidebar-root .frappe-ai-streaming-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  animation: frappe-ai-pulse 1.2s ease-in-out infinite;
-}
-
-#frappe-ai-sidebar-root .frappe-ai-streaming-dot:nth-child(2) {
-  animation-delay: 150ms;
-}
-
-#frappe-ai-sidebar-root .frappe-ai-streaming-dot:nth-child(3) {
-  animation-delay: 300ms;
-}
-
-@keyframes frappe-ai-pulse {
-  0%, 80%, 100% { opacity: 0.3; }
-  40% { opacity: 1; }
-}
-
 /* ─── Input area ─── */
 
 #frappe-ai-sidebar-root .frappe-ai-input-area {
@@ -536,12 +466,6 @@
 #frappe-ai-sidebar-root .frappe-ai-send-btn svg {
   width: 16px;
   height: 16px;
-}
-
-#frappe-ai-sidebar-root .frappe-ai-input-hint {
-  font-size: 10px;
-  color: var(--text-muted);
-  margin-top: 4px;
 }
 
 /* ─── Tool call card ─── */
@@ -965,4 +889,66 @@
 @keyframes frappe-ai-pulse {
   0%, 100% { opacity: 0.3; transform: scale(0.8); }
   50%       { opacity: 1;   transform: scale(1.1); }
+}
+
+/* ─── In-bubble status block (replaces header "Thinking…" pill
+       and the standalone streaming-dots row) ─── */
+
+#frappe-ai-sidebar-root .frappe-ai-bubble-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  line-height: 1.5;
+}
+
+#frappe-ai-sidebar-root .frappe-ai-bubble-status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #9ca3af;
+  display: inline-block;
+  animation: frappe-ai-status-bounce 1.2s infinite ease-in-out;
+}
+
+#frappe-ai-sidebar-root .frappe-ai-bubble-status-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+#frappe-ai-sidebar-root .frappe-ai-bubble-status-dot:nth-child(3) {
+  animation-delay: 0.30s;
+}
+
+#frappe-ai-sidebar-root .frappe-ai-bubble-status-text {
+  font-size: 12px;
+  font-style: italic;
+  color: #6b7280;
+}
+
+@keyframes frappe-ai-status-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-2px);
+    opacity: 1;
+  }
+}
+
+/* ─── Stop variant of the send button (active during an in-flight
+       SSE turn; same 36×36 footprint as the default send button) ─── */
+
+#frappe-ai-sidebar-root .frappe-ai-send-btn--stop {
+  color: var(--primary);
+}
+
+#frappe-ai-sidebar-root .frappe-ai-send-btn--stop .frappe-ai-stop-icon {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  background: currentColor;
+  border-radius: 2px;
 }
