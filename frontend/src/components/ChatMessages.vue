@@ -15,7 +15,6 @@ function frappeIcon(name: string, size: string): string {
 
 const props = defineProps<{
   messages: readonly Message[];
-  isStreaming: boolean;
 }>();
 
 const container = ref<HTMLElement>();
@@ -53,11 +52,5 @@ watch(
       />
       <MessageBubble v-else :message="msg" />
     </template>
-
-    <div v-if="isStreaming" class="frappe-ai-streaming">
-      <span class="frappe-ai-streaming-dot"></span>
-      <span class="frappe-ai-streaming-dot"></span>
-      <span class="frappe-ai-streaming-dot"></span>
-    </div>
   </div>
 </template>
