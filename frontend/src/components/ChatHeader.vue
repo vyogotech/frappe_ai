@@ -1,8 +1,4 @@
 <script setup lang="ts">
-defineProps<{
-  isLoading: boolean;
-}>();
-
 const emit = defineEmits<{
   clear: [];
   close: [];
@@ -25,13 +21,6 @@ declare const frappe: any;
       <!-- eslint-disable-next-line vue/no-v-html -->
       <span v-html="frappeIcon('message-square-text', 'sm')" />
       <span class="frappe-ai-header-title">Frappe AI</span>
-      <span
-        v-if="isLoading"
-        class="frappe-ai-indicator frappe-ai-indicator--connecting"
-      >
-        <span class="frappe-ai-indicator-dot" />
-        Thinking…
-      </span>
     </div>
     <div class="frappe-ai-header-actions">
       <button class="frappe-ai-icon-btn" title="New conversation" @click="emit('clear')">
