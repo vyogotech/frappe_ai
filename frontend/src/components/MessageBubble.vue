@@ -28,6 +28,14 @@ const errorSeverity = computed(() => {
 const timeStr = computed(() =>
   props.message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
 );
+
+const isPendingEmpty = computed(
+  () =>
+    props.message.role === "assistant" &&
+    !!props.message.pending &&
+    !props.message.content &&
+    (!props.message.blocks || props.message.blocks.length === 0),
+);
 </script>
 
 <template>
@@ -37,13 +45,24 @@ const timeStr = computed(() =>
       {{ message.content }}
     </div>
 
-    <!-- Assistant message. The global "Thinking…" indicator lives in
-         ChatHeader; we intentionally render no in-bubble spinner so the
-         user sees a single status cue instead of two. -->
+    <!-- Assistant message. When pending and still empty, show the
+         in-bubble "Thinking…" / contextual-status block. As soon as
+         content or blocks arrive, fall through to the normal render
+         paths. -->
     <div v-else-if="message.role === 'assistant'" class="frappe-ai-bubble-content">
       <div v-if="renderError" class="frappe-ai-error frappe-ai-error--info">
         <div class="frappe-ai-error-message">Could not render response</div>
       </div>
+      <template v-else-if="isPendingEmpty">
+        <div class="frappe-ai-bubble-status">
+          <span class="frappe-ai-bubble-status-dot"></span>
+          <span class="frappe-ai-bubble-status-dot"></span>
+          <span class="frappe-ai-bubble-status-dot"></span>
+          <span class="frappe-ai-bubble-status-text">
+            {{ message.metadata?.statusText || "Thinking…" }}
+          </span>
+        </div>
+      </template>
       <template v-else>
         <!-- Structured blocks take priority, rendered in arrival order. -->
         <template v-if="message.blocks && message.blocks.length > 0">
@@ -75,6 +94,6 @@ const timeStr = computed(() =>
       </div>
     </div>
 
-    <div class="frappe-ai-bubble-time">{{ timeStr }}</div>
+    <div v-if="!isPendingEmpty" class="frappe-ai-bubble-time">{{ timeStr }}</div>
   </div>
 </template>
