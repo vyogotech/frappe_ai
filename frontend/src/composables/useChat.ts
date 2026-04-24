@@ -177,8 +177,8 @@ export function useChat() {
         if (idx >= 0) {
           const placeholder = messages.value[idx];
           const hasContent =
-            (placeholder.content && placeholder.content.length > 0) ||
-            (placeholder.blocks && placeholder.blocks.length > 0);
+            (placeholder.content?.length ?? 0) > 0 ||
+            (placeholder.blocks?.length ?? 0) > 0;
           if (hasContent) {
             _updateMessage(assistantId, (m) => {
               m.pending = false;
