@@ -36,9 +36,17 @@ export function setAgentUrl(url: string): void {
   _agentUrl = url.replace(/\/$/, ""); // strip trailing slash
 }
 
+// Module-level so cancelMessage() can abort the currently-running
+// request regardless of which composable instance initiated it.
+let _currentAbort: AbortController | null = null;
+
 export function useChat() {
   const messages = ref<Message[]>([]);
   const isLoading = ref(false);
+  // True only while an SSE request is in flight (AbortController
+  // exists). Fallback mode (frappe.call()) stays false so ChatInput
+  // keeps Send disabled instead of showing a Stop it can't honor.
+  const canCancel = ref(false);
   const lastError = ref<string | null>(null);
   // Server-assigned session id. Sent back on every follow-up message so
   // the agent writes history into the SAME AI Chat Session row instead
@@ -77,6 +85,10 @@ export function useChat() {
     sessionId.value = null;
   }
 
+  function cancelMessage(): void {
+    _currentAbort?.abort();
+  }
+
   // --------------------------------------------------------------------------
   // SSE path – fetch() streaming directly to the frappe-ai-agent
   // --------------------------------------------------------------------------
@@ -109,6 +121,9 @@ export function useChat() {
     });
     messages.value = [...messages.value];
 
+    _currentAbort = new AbortController();
+    canCancel.value = true;
+
     try {
       const resp = await fetch(`${_agentUrl}/api/v1/chat`, {
         method: "POST",
@@ -118,6 +133,7 @@ export function useChat() {
         },
         credentials: "include",
         body,
+        signal: _currentAbort.signal,
       });
 
       if (!resp.ok || !resp.body) {
@@ -153,9 +169,41 @@ export function useChat() {
         }
       }
     } catch (err: any) {
-      _removeMessage(assistantId);
-      _addErrorMessage(err?.message ?? "Stream failed");
+      if (err?.name === "AbortError") {
+        // User-initiated cancel. Keep whatever streamed, drop an
+        // empty placeholder, mark any running tool_calls as cancelled,
+        // and don't surface an error bubble.
+        const idx = messages.value.findIndex((m) => m.id === assistantId);
+        if (idx >= 0) {
+          const placeholder = messages.value[idx];
+          const hasContent =
+            (placeholder.content && placeholder.content.length > 0) ||
+            (placeholder.blocks && placeholder.blocks.length > 0);
+          if (hasContent) {
+            _updateMessage(assistantId, (m) => {
+              m.pending = false;
+              m.metadata = { ...m.metadata, statusText: undefined };
+            });
+          } else {
+            _removeMessage(assistantId);
+          }
+        }
+        messages.value = messages.value.map((m) => {
+          if (m.role === "tool_call" && m.toolCall?.status === "running") {
+            return {
+              ...m,
+              toolCall: { ...m.toolCall, status: "cancelled" as const },
+            };
+          }
+          return m;
+        });
+      } else {
+        _removeMessage(assistantId);
+        _addErrorMessage(err?.message ?? "Stream failed");
+      }
     } finally {
+      _currentAbort = null;
+      canCancel.value = false;
       isLoading.value = false;
     }
   }
@@ -361,8 +409,10 @@ export function useChat() {
   return {
     messages: readonly(messages),
     isLoading: readonly(isLoading),
+    canCancel: readonly(canCancel),
     lastError: readonly(lastError),
     sendMessage,
+    cancelMessage,
     clearMessages,
   };
 }
