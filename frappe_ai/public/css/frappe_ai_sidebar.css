@@ -423,12 +423,6 @@
   box-shadow: 0 0 0 1px var(--primary);
 }
 
-#frappe-ai-sidebar-root .frappe-ai-textarea:disabled {
-  cursor: not-allowed;
-  background: var(--gray-50, #f9fafb);
-  color: var(--text-muted);
-}
-
 #frappe-ai-sidebar-root .frappe-ai-send-btn {
   display: flex;
   align-items: center;
@@ -533,6 +527,10 @@
 
 #frappe-ai-sidebar-root .frappe-ai-tool-status--error {
   background: var(--red-500, #ef4444);
+}
+
+#frappe-ai-sidebar-root .frappe-ai-tool-status--cancelled {
+  background: var(--gray-400, #9ca3af);
 }
 
 #frappe-ai-sidebar-root .frappe-ai-tool-name {
@@ -864,26 +862,6 @@
 #frappe-ai-sidebar-root .frappe-ai-fade-enter-from,
 #frappe-ai-sidebar-root .frappe-ai-fade-leave-to {
   opacity: 0;
-}
-
-/* ─── SSE Streaming: thinking indicator ─────────────────────────────────── */
-#frappe-ai-sidebar-root .frappe-ai-thinking {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-muted, #8d99a6);
-  font-size: 13px;
-  font-style: italic;
-  padding: 4px 0;
-}
-
-#frappe-ai-sidebar-root .frappe-ai-thinking-dots {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-  animation: frappe-ai-pulse 1s ease-in-out infinite;
 }
 
 @keyframes frappe-ai-pulse {
