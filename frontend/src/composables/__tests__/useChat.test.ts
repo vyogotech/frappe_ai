@@ -137,6 +137,47 @@ describe("useChat — placeholder pending lifecycle", () => {
     expect(toolMsgs[0].toolCall?.status).toBe("cancelled");
   });
 
+  it("is safe when cancelMessage fires between the last content and done", async () => {
+    // Spec §199-201 flagged this race: the user may click Stop in the
+    // small window between the final content event and the done event.
+    // Both the abort and the done handler touch the placeholder. The
+    // final state must be consistent (pending=false, content preserved,
+    // no error bubble, isLoading=false) regardless of ordering.
+    const { fetchMock, emit, finish } = mockSSEFetch();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const chat = useChat();
+    chat.sendMessage("hi");
+    await flush();
+
+    emit({ type: "content", text: "Almost done" });
+    await flush();
+
+    // Fire the abort first — the fetch loop is still awaiting the next
+    // read, which will reject with AbortError and enter the catch block.
+    chat.cancelMessage();
+
+    // The mock doesn't deliver events after abort (the read promise has
+    // been rejected). Emitting `done` here is a no-op at the transport
+    // layer — it would be dropped by the reader. Calling finish() also
+    // a no-op (stream already in the abort path).
+    emit({ type: "done" });
+    finish();
+    await flush();
+
+    const assistants = chat.messages.value.filter((m) => m.role === "assistant");
+    expect(assistants).toHaveLength(1);
+    expect(assistants[0].content).toBe("Almost done");
+    expect(assistants[0].pending).toBe(false);
+    expect(chat.isLoading.value).toBe(false);
+    expect(chat.canCancel.value).toBe(false);
+    expect(chat.lastError.value).toBeNull();
+    // No error bubble from either path.
+    expect(
+      chat.messages.value.some((m) => m.role === "error"),
+    ).toBe(false);
+  });
+
   it("canCancel is true only while the SSE request is in flight", async () => {
     const { fetchMock, emit, finish } = mockSSEFetch();
     vi.stubGlobal("fetch", fetchMock);
