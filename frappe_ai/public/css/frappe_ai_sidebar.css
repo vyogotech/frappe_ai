@@ -884,7 +884,7 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #9ca3af;
+  background: var(--text-muted, #9ca3af);
   display: inline-block;
   animation: frappe-ai-status-bounce 1.2s infinite ease-in-out;
 }
@@ -900,7 +900,7 @@
 #frappe-ai-sidebar-root .frappe-ai-bubble-status-text {
   font-size: 12px;
   font-style: italic;
-  color: #6b7280;
+  color: var(--text-muted, #6b7280);
 }
 
 @keyframes frappe-ai-status-bounce {
@@ -913,6 +913,16 @@
   30% {
     transform: translateY(-2px);
     opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #frappe-ai-sidebar-root .frappe-ai-bubble-status-dot {
+    animation: none;
+    opacity: 0.7;
+  }
+  #frappe-ai-sidebar-root .frappe-ai-tool-status--running {
+    animation: none;
   }
 }
 
