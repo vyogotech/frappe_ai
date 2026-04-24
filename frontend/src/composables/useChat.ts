@@ -237,8 +237,11 @@ export function useChat() {
           }
           return m;
         });
-        // Clear the "thinking" indicator from the assistant message.
+        // Finalize the assistant placeholder — clear any transient
+        // status and the pending flag so MessageBubble stops showing
+        // the in-bubble dots + "Thinking…" block.
         _updateMessage(assistantId, (m) => {
+          m.pending = false;
           m.metadata = { ...m.metadata, statusText: undefined };
         });
         break;
