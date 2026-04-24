@@ -10,7 +10,7 @@ export interface ToolCall {
   arguments: Record<string, unknown>;
   result?: string;
   success?: boolean;
-  status: "running" | "done" | "error";
+  status: "running" | "done" | "error" | "cancelled";
 }
 
 export interface ErrorInfo {
@@ -27,6 +27,13 @@ export interface Message {
   toolCall?: ToolCall;
   error?: ErrorInfo;
   timestamp: Date;
+  /**
+   * True while the assistant placeholder is waiting for content.
+   * Flipped to false on first content chunk, `done`, error, or abort.
+   * Used by MessageBubble to render the in-bubble "Thinking…" /
+   * contextual-status block.
+   */
+  pending?: boolean;
   /** SSE-only: transient metadata (thinking status, etc.) */
   metadata?: {
     statusText?: string;
