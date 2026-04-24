@@ -55,4 +55,23 @@ describe("useChat — placeholder pending lifecycle", () => {
     finish();
     await flush();
   });
+
+  it("clears pending on `done` even when no content chunks arrived", async () => {
+    const { fetchMock, emit, finish } = mockSSEFetch();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const chat = useChat();
+    chat.sendMessage("run a tool and say nothing");
+    await flush();
+
+    emit({ type: "status", message: "Thinking" });
+    emit({ type: "done" });
+    finish();
+    await flush();
+
+    const placeholder = chat.messages.value.find((m) => m.role === "assistant")!;
+    expect(placeholder.pending).toBe(false);
+    expect(placeholder.metadata?.statusText).toBeUndefined();
+    expect(chat.isLoading.value).toBe(false);
+  });
 });
