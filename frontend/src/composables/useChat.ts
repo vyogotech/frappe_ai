@@ -36,10 +36,6 @@ export function setAgentUrl(url: string): void {
   _agentUrl = url.replace(/\/$/, ""); // strip trailing slash
 }
 
-// Module-level so cancelMessage() can abort the currently-running
-// request regardless of which composable instance initiated it.
-let _currentAbort: AbortController | null = null;
-
 export function useChat() {
   const messages = ref<Message[]>([]);
   const isLoading = ref(false);
@@ -48,6 +44,10 @@ export function useChat() {
   // keeps Send disabled instead of showing a Stop it can't honor.
   const canCancel = ref(false);
   const lastError = ref<string | null>(null);
+  // Per-composable-instance so two independent useChat() call sites
+  // don't share an abort controller. The `isLoading` guard still
+  // prevents a single instance from starting a concurrent send.
+  let currentAbort: AbortController | null = null;
   // Server-assigned session id. Sent back on every follow-up message so
   // the agent writes history into the SAME AI Chat Session row instead
   // of creating a new one per turn. Populated on the first reply via
@@ -86,7 +86,7 @@ export function useChat() {
   }
 
   function cancelMessage(): void {
-    _currentAbort?.abort();
+    currentAbort?.abort();
   }
 
   // --------------------------------------------------------------------------
@@ -121,7 +121,7 @@ export function useChat() {
     });
     messages.value = [...messages.value];
 
-    _currentAbort = new AbortController();
+    currentAbort = new AbortController();
     canCancel.value = true;
 
     try {
@@ -133,7 +133,7 @@ export function useChat() {
         },
         credentials: "include",
         body,
-        signal: _currentAbort.signal,
+        signal: currentAbort.signal,
       });
 
       if (!resp.ok || !resp.body) {
@@ -202,7 +202,7 @@ export function useChat() {
         _addErrorMessage(err?.message ?? "Stream failed");
       }
     } finally {
-      _currentAbort = null;
+      currentAbort = null;
       canCancel.value = false;
       isLoading.value = false;
     }
