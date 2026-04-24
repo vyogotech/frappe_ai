@@ -94,7 +94,10 @@ export function useChat() {
       },
     });
 
-    // Placeholder assistant message that we stream tokens into.
+    // Placeholder assistant message that we stream tokens into. It
+    // carries `pending: true` so MessageBubble renders the in-bubble
+    // "Thinking…" / contextual-status block until the first content
+    // chunk arrives (or the stream ends / is aborted).
     const assistantId = crypto.randomUUID();
     messages.value.push({
       id: assistantId,
@@ -102,6 +105,7 @@ export function useChat() {
       content: "",
       blocks: [],
       timestamp: new Date(),
+      pending: true,
     });
     messages.value = [...messages.value];
 
@@ -204,6 +208,7 @@ export function useChat() {
         if (ev.text) {
           _updateMessage(assistantId, (m) => {
             m.content += ev.text;
+            m.pending = false;
           });
         }
         break;
@@ -219,6 +224,7 @@ export function useChat() {
               m.blocks = [];
             }
             m.blocks.push(ev.block as ContentBlock);
+            m.pending = false;
           });
         }
         break;
