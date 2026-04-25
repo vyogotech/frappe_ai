@@ -22,7 +22,7 @@
    "label": "Enabled"
   },
   {
-   "description": "Browser-reachable URL of the AI agent (e.g. http://localhost:8484). The chat sidebar in the user's browser POSTs directly to this URL to stream responses, so it must resolve from the user's machine. Server-to-server traffic from this site to the agent is configured separately via the AI_AGENT_INTERNAL_URL environment variable.",
+   "description": "URL of the AI agent as reachable from the user's browser (e.g. http://localhost:8484).",
    "fieldname": "agent_url",
    "fieldtype": "Data",
    "label": "Agent URL",
