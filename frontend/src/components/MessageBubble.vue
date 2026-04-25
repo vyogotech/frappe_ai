@@ -67,7 +67,18 @@ const isPendingEmpty = computed(
         </div>
       </template>
       <template v-else>
-        <!-- Structured blocks take priority, rendered in arrival order. -->
+        <!-- Streamed prose first. The agent's BlockStreamSplitter holds
+             back `<ai-block>` markup so this path never renders raw HTML;
+             markdown tables, lists, code, and prose all flow through here. -->
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <div
+          v-if="message.content"
+          class="frappe-ai-markdown"
+          v-html="renderMarkdown(message.content)"
+        />
+        <!-- Structured blocks (KPI cards, charts, tables-as-data, status
+             lists). Appended after content because the agent emits them
+             as discrete events once their `<ai-block>` markup is complete. -->
         <template v-if="message.blocks && message.blocks.length > 0">
           <component
             v-for="(block, i) in message.blocks"
@@ -76,13 +87,6 @@ const isPendingEmpty = computed(
             :block="block"
           />
         </template>
-        <!-- Plain-text path for simple answers without any blocks. -->
-        <!-- eslint-disable-next-line vue/no-v-html -->
-        <div
-          v-else-if="message.content"
-          class="frappe-ai-markdown"
-          v-html="renderMarkdown(message.content)"
-        />
       </template>
     </div>
 
