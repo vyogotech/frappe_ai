@@ -5,8 +5,8 @@ import frappe
 
 @frappe.whitelist()
 def get_settings() -> dict:
-    """Return MCP Server Settings for the frontend sidebar."""
-    settings = frappe.get_single("MCP Server Settings")
+    """Return AI Assistant Settings for the frontend sidebar."""
+    settings = frappe.get_single("AI Assistant Settings")
     return {
         "enabled": bool(settings.enabled),
         "agent_url": settings.agent_url,
