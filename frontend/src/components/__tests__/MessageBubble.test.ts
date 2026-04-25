@@ -14,14 +14,14 @@ function assistant(partial: Partial<Message>): Message {
 }
 
 describe("MessageBubble — pending placeholder", () => {
-  it("shows the status block with default text when pending and empty", () => {
+  it("shows just the three bouncing dots when pending and no statusText", () => {
     const wrapper = mount(MessageBubble, {
       props: { message: assistant({ pending: true }) },
     });
     const status = wrapper.find(".frappe-ai-bubble-status");
     expect(status.exists()).toBe(true);
-    expect(status.text()).toContain("Thinking");
-    // three dots
+    // No status-text span when statusText is unset — just dots.
+    expect(wrapper.find(".frappe-ai-bubble-status-text").exists()).toBe(false);
     expect(wrapper.findAll(".frappe-ai-bubble-status-dot")).toHaveLength(3);
   });
 
