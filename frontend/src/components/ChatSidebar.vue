@@ -40,7 +40,7 @@ function handleClose() {
 
 <template>
   <div
-    v-if="visible"
+    v-show="visible"
     class="frappe-ai-sidebar"
     :style="{ width: sidebarWidth + 'px' }"
   >
