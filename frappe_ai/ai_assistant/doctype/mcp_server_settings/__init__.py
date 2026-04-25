@@ -1,2 +1,0 @@
-# MCP Server Settings DocType
-

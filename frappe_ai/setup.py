@@ -40,7 +40,7 @@ def create_oauth_client():
 	print(f"Client ID: {oauth_client.client_id}")
 	print(f"Client Secret: {oauth_client.client_secret}")
 	print("=" * 60)
-	print("Please save these credentials in MCP Server Settings")
+	print("Please save these credentials in AI Assistant Settings")
 	print("=" * 60)
 	
 	return oauth_client
@@ -55,7 +55,7 @@ def after_install():
 	print("=" * 60)
 	print("Next steps:")
 	print("1. Create OAuth Client: bench --site your-site execute frappe_ai.setup.create_oauth_client")
-	print("2. Configure MCP Server Settings at /app/mcp-server-settings")
+	print("2. Configure AI Assistant Settings at /app/ai-assistant-settings")
 	print("3. Test the integration using Awesome Bar")
 	print("=" * 60)
 
