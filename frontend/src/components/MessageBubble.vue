@@ -58,8 +58,11 @@ const isPendingEmpty = computed(
           <span class="frappe-ai-bubble-status-dot"></span>
           <span class="frappe-ai-bubble-status-dot"></span>
           <span class="frappe-ai-bubble-status-dot"></span>
-          <span class="frappe-ai-bubble-status-text">
-            {{ message.metadata?.statusText || "Thinking…" }}
+          <span
+            v-if="message.metadata?.statusText"
+            class="frappe-ai-bubble-status-text"
+          >
+            {{ message.metadata.statusText }}
           </span>
         </div>
       </template>
