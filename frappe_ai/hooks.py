@@ -139,8 +139,6 @@ app_include_js = "/assets/frappe_ai/frontend/dist/js/frappe_ai.js?v=9c81d0d1"
 # Overriding Methods
 # ------------------------------
 #
-override_whitelisted_methods = {"frappe.utils.global_search.search": "frappe_ai.search.search"}
-#
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
 # along with any modifications made in other Frappe apps
