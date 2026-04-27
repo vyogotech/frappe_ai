@@ -18,12 +18,10 @@ def search(text, start=0, limit=20, doctype=""):
 	if text and text.lower().startswith("@ai"):
 		return handle_ai_search(text, start, limit)
 
-	# Call original search for non-@ai queries.
-	# frappe.utils.global_search.web_search(text, scope=None, start=0, limit=20)
-	# has no `doctype` parameter — we map `doctype` (if given) onto `scope`,
-	# and use keyword arguments so positional drift can't bite us again.
-	scope = doctype or None
-	return frappe.utils.global_search.web_search(text, scope=scope, start=start, limit=limit)
+	# Call the original desk awesome-bar search for non-@ai queries.
+	# `override_whitelisted_methods` only intercepts API dispatch, so a direct
+	# Python call here bypasses our override and hits the real implementation.
+	return frappe.utils.global_search.search(text, start=start, limit=limit, doctype=doctype)
 
 
 def handle_ai_search(text, start=0, limit=20):
@@ -55,7 +53,7 @@ def handle_ai_search(text, start=0, limit=20):
 			{
 				"doctype": "AI Assistant",
 				"name": f"@ai {query}",
-				"title": __("Ask AI: {0}", [query]),
+				"title": __("Ask AI: {0}").format(query),
 				"content": __("Query AI assistant about your data"),
 				"route": f"/ai-chat#query:{quote(query)}",
 			}
