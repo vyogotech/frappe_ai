@@ -26,4 +26,5 @@ export type {
   ToolCall,
   ErrorInfo,
   Message,
+  MessagePart,
 } from "./messages";

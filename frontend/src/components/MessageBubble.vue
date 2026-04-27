@@ -26,7 +26,9 @@ const errorSeverity = computed(() => {
 });
 
 const timeStr = computed(() =>
-  props.message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+  props.message.timestamp
+    ? props.message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : "",
 );
 
 const isPendingEmpty = computed(
@@ -34,7 +36,8 @@ const isPendingEmpty = computed(
     props.message.role === "assistant" &&
     !!props.message.pending &&
     !props.message.content &&
-    (!props.message.blocks || props.message.blocks.length === 0),
+    (!props.message.blocks || props.message.blocks.length === 0) &&
+    (!props.message.parts || props.message.parts.length === 0),
 );
 </script>
 
@@ -67,25 +70,50 @@ const isPendingEmpty = computed(
         </div>
       </template>
       <template v-else>
-        <!-- Streamed prose first. The agent's BlockStreamSplitter holds
-             back `<ai-block>` markup so this path never renders raw HTML;
-             markdown tables, lists, code, and prose all flow through here. -->
-        <!-- eslint-disable-next-line vue/no-v-html -->
-        <div
-          v-if="message.content"
-          class="frappe-ai-markdown"
-          v-html="renderMarkdown(message.content)"
-        />
-        <!-- Structured blocks (KPI cards, charts, tables-as-data, status
-             lists). Appended after content because the agent emits them
-             as discrete events once their `<ai-block>` markup is complete. -->
-        <template v-if="message.blocks && message.blocks.length > 0">
-          <component
-            v-for="(block, i) in message.blocks"
-            :key="i"
-            :is="getBlockComponent(block.type)"
-            :block="block"
+        <!-- Parts-based rendering: preserves the interleaved arrival order
+             of text tokens and structured blocks. Falls back to legacy
+             content+blocks rendering when parts is absent or empty (e.g.
+             non-SSE fallback messages or persisted history). -->
+        <template v-if="message.parts && message.parts.length > 0">
+          <template v-for="(part, i) in message.parts" :key="i">
+            <!-- Text part — rendered as markdown -->
+            <!-- eslint-disable-next-line vue/no-v-html -->
+            <div
+              v-if="part.kind === 'text'"
+              class="frappe-ai-markdown"
+              v-html="renderMarkdown(part.text)"
+            />
+            <!-- Block part — rendered via the block component registry -->
+            <component
+              v-else-if="part.kind === 'block'"
+              :is="getBlockComponent(part.block.type)"
+              :block="part.block"
+            />
+          </template>
+        </template>
+        <template v-else>
+          <!-- Legacy path: used when parts is absent (fallback / persisted
+               history). Streamed prose before blocks. The agent's
+               BlockStreamSplitter holds back `<ai-block>` markup so this
+               path never renders raw HTML; markdown tables, lists, code,
+               and prose all flow through here. -->
+          <!-- eslint-disable-next-line vue/no-v-html -->
+          <div
+            v-if="message.content"
+            class="frappe-ai-markdown"
+            v-html="renderMarkdown(message.content)"
           />
+          <!-- Structured blocks (KPI cards, charts, tables-as-data, status
+               lists). Appended after content because the agent emits them
+               as discrete events once their `<ai-block>` markup is complete. -->
+          <template v-if="message.blocks && message.blocks.length > 0">
+            <component
+              v-for="(block, i) in message.blocks"
+              :key="i"
+              :is="getBlockComponent(block.type)"
+              :block="block"
+            />
+          </template>
         </template>
       </template>
     </div>
@@ -101,6 +129,23 @@ const isPendingEmpty = computed(
       </div>
     </div>
 
-    <div v-if="!isPendingEmpty" class="frappe-ai-bubble-time">{{ timeStr }}</div>
+    <div v-if="!isPendingEmpty && message.timestamp" class="frappe-ai-bubble-time">{{ timeStr }}</div>
   </div>
 </template>
+
+<style scoped>
+/* Fix 1c — Markdown-rendered tables should scroll horizontally inside the
+   sidebar rather than pushing it wider. :deep() is required because content
+   rendered via v-html is not covered by Vue's scoped style transformer. */
+.frappe-ai-markdown :deep(table) {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+  border-collapse: collapse;
+}
+.frappe-ai-markdown :deep(thead),
+.frappe-ai-markdown :deep(tbody),
+.frappe-ai-markdown :deep(tr) {
+  width: 100%;
+}
+</style>

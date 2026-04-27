@@ -197,3 +197,123 @@ describe("useChat — placeholder pending lifecycle", () => {
     expect(chat.canCancel.value).toBe(false);
   });
 });
+
+describe("useChat — Fix 3a: timestamp set at done, not creation", () => {
+  it("timestamp is null while streaming and set after done", async () => {
+    const { fetchMock, emit, finish } = mockSSEFetch();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const chat = useChat();
+    chat.sendMessage("hi");
+    await flush();
+
+    // Placeholder should have null timestamp while still pending
+    const placeholder = chat.messages.value.find((m) => m.role === "assistant");
+    expect(placeholder).toBeDefined();
+    expect(placeholder!.timestamp).toBeNull();
+
+    emit({ type: "content", text: "Hello" });
+    await flush();
+
+    // Still null while streaming (not done yet)
+    const streaming = chat.messages.value.find((m) => m.role === "assistant")!;
+    expect(streaming.timestamp).toBeNull();
+
+    emit({ type: "done" });
+    finish();
+    await flush();
+
+    // Now has a real timestamp
+    const done = chat.messages.value.find((m) => m.role === "assistant")!;
+    expect(done.timestamp).toBeInstanceOf(Date);
+  });
+});
+
+describe("useChat — Fix 3b: parts array preserves arrival order", () => {
+  it("builds parts with interleaved text and block kinds in arrival order", async () => {
+    const { fetchMock, emit, finish } = mockSSEFetch();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const chat = useChat();
+    chat.sendMessage("show me data");
+    await flush();
+
+    const tableBlock = {
+      type: "table",
+      columns: [{ key: "id", label: "ID" }],
+      rows: [{ values: { id: 1 } }],
+    };
+    const chartBlock = {
+      type: "chart",
+      chart_type: "bar",
+      data: { labels: ["A"], datasets: [{ name: "S", values: [1] }] },
+    };
+
+    emit({ type: "content", text: "Here is the table:" });
+    await flush();
+    emit({ type: "content_block", block: tableBlock });
+    await flush();
+    emit({ type: "content", text: "And a chart:" });
+    await flush();
+    emit({ type: "content_block", block: chartBlock });
+    await flush();
+    emit({ type: "content", text: "Done." });
+    await flush();
+
+    emit({ type: "done" });
+    finish();
+    await flush();
+
+    const assistant = chat.messages.value.find((m) => m.role === "assistant")!;
+    expect(assistant.parts).toBeDefined();
+    expect(assistant.parts!.length).toBe(5);
+
+    // Check kinds in order: text, block, text, block, text
+    expect(assistant.parts![0].kind).toBe("text");
+    expect(assistant.parts![1].kind).toBe("block");
+    expect(assistant.parts![2].kind).toBe("text");
+    expect(assistant.parts![3].kind).toBe("block");
+    expect(assistant.parts![4].kind).toBe("text");
+
+    // Check text coalescing: consecutive text chunks merge into the same part
+    // (all three text events here each happen between blocks so they're separate)
+    if (assistant.parts![0].kind === "text") {
+      expect(assistant.parts![0].text).toBe("Here is the table:");
+    }
+    if (assistant.parts![2].kind === "text") {
+      expect(assistant.parts![2].text).toBe("And a chart:");
+    }
+    if (assistant.parts![4].kind === "text") {
+      expect(assistant.parts![4].text).toBe("Done.");
+    }
+  });
+
+  it("coalesces consecutive text tokens into the same text part", async () => {
+    const { fetchMock, emit, finish } = mockSSEFetch();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const chat = useChat();
+    chat.sendMessage("tell me something");
+    await flush();
+
+    emit({ type: "content", text: "Hello " });
+    await flush();
+    emit({ type: "content", text: "world" });
+    await flush();
+    emit({ type: "content", text: "!" });
+    await flush();
+
+    emit({ type: "done" });
+    finish();
+    await flush();
+
+    const assistant = chat.messages.value.find((m) => m.role === "assistant")!;
+    expect(assistant.parts).toBeDefined();
+    // Three consecutive text tokens should merge into a single part
+    expect(assistant.parts!.length).toBe(1);
+    expect(assistant.parts![0].kind).toBe("text");
+    if (assistant.parts![0].kind === "text") {
+      expect(assistant.parts![0].text).toBe("Hello world!");
+    }
+  });
+});

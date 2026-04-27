@@ -44,24 +44,37 @@ function navigate(row: TableRow) {
   <div class="frappe-ai-table">
     <div v-if="block.title" class="frappe-ai-table-title">{{ block.title }}</div>
     <div v-if="block.rows.length === 0" class="frappe-ai-table-empty">No data available</div>
-    <table v-else>
-      <thead>
-        <tr>
-          <th v-for="col in block.columns" :key="col.key" @click="toggleSort(col.key)">
-            {{ col.label }}
-            <span v-if="sortKey === col.key">{{ sortAsc ? "\u2191" : "\u2193" }}</span>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="(row, i) in sortedRows" :key="i"
-            :class="{ 'frappe-ai-table-clickable': !!row.route }"
-            @click="navigate(row)">
-          <td v-for="col in block.columns" :key="col.key">
-            {{ formatValue(row.values[col.key], col.format) }}
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div v-else class="frappe-ai-table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th v-for="col in block.columns" :key="col.key" @click="toggleSort(col.key)">
+              {{ col.label }}
+              <span v-if="sortKey === col.key">{{ sortAsc ? "\u2191" : "\u2193" }}</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(row, i) in sortedRows" :key="i"
+              :class="{ 'frappe-ai-table-clickable': !!row.route }"
+              @click="navigate(row)">
+            <td v-for="col in block.columns" :key="col.key">
+              {{ formatValue(row.values[col.key], col.format) }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.frappe-ai-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+.frappe-ai-table-scroll table {
+  min-width: 100%;
+}
+</style>

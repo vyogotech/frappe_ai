@@ -143,6 +143,14 @@ const chartOption = computed(() => {
   <div class="frappe-ai-chart">
     <div v-if="block.title" class="frappe-ai-chart-title">{{ block.title }}</div>
     <div v-if="!hasData" class="frappe-ai-chart-empty">No data available</div>
-    <VChart v-else :option="chartOption" :autoresize="true" style="height: 300px" />
+    <VChart v-else :option="chartOption" :autoresize="true" style="height: 300px; width: 100%" />
   </div>
 </template>
+
+<style scoped>
+.frappe-ai-chart {
+  max-width: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+</style>
