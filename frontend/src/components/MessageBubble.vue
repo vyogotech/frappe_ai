@@ -134,18 +134,33 @@ const isPendingEmpty = computed(
 </template>
 
 <style scoped>
-/* Fix 1c — Markdown-rendered tables should scroll horizontally inside the
-   sidebar rather than pushing it wider. :deep() is required because content
-   rendered via v-html is not covered by Vue's scoped style transformer. */
-.frappe-ai-markdown :deep(table) {
-  display: block;
+/* Constrain everything inside the assistant bubble to the sidebar width.
+   Markdown-rendered tables (and other v-html content) can have intrinsic
+   widths that push their container past the sidebar edge. Make the
+   .frappe-ai-markdown wrapper itself the horizontal-scroll container so
+   even wide tables, pre/code blocks, and images stay inside the bubble.
+   :deep() is required because v-html content is not covered by Vue's
+   scoped style transformer. */
+.frappe-ai-markdown {
+  max-width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.frappe-ai-markdown :deep(table) {
+  display: table;
+  width: max-content;
   max-width: 100%;
   border-collapse: collapse;
 }
-.frappe-ai-markdown :deep(thead),
-.frappe-ai-markdown :deep(tbody),
-.frappe-ai-markdown :deep(tr) {
-  width: 100%;
+.frappe-ai-markdown :deep(pre),
+.frappe-ai-markdown :deep(img),
+.frappe-ai-markdown :deep(svg) {
+  max-width: 100%;
+}
+/* Make sure the bubble itself can't be widened by its children. */
+.frappe-ai-bubble-content {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 </style>
