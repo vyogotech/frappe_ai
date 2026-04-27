@@ -20,7 +20,7 @@
 
 import { ref, readonly } from "vue";
 import { getPageContext } from "@/utils/context";
-import type { Message, ContentBlock } from "@/types";
+import type { Message, ContentBlock, MessagePart } from "@/types";
 
 declare const frappe: any;
 
@@ -116,7 +116,8 @@ export function useChat() {
       role: "assistant",
       content: "",
       blocks: [],
-      timestamp: new Date(),
+      parts: [],
+      timestamp: null,  // Set at stream completion (done event) — see Fix 3a
       pending: true,
     });
     messages.value = [...messages.value];
@@ -257,6 +258,16 @@ export function useChat() {
           _updateMessage(assistantId, (m) => {
             m.content += ev.text;
             m.pending = false;
+            // Maintain parts: coalesce consecutive text tokens into the last
+            // text part; push a new part if the last part is a block or parts
+            // is empty.
+            if (!m.parts) m.parts = [];
+            const last = m.parts[m.parts.length - 1];
+            if (last && last.kind === "text") {
+              last.text += ev.text;
+            } else {
+              m.parts.push({ kind: "text", text: ev.text } as MessagePart);
+            }
           });
         }
         break;
@@ -272,6 +283,9 @@ export function useChat() {
               m.blocks = [];
             }
             m.blocks.push(ev.block as ContentBlock);
+            // Always push a new block part to preserve arrival order.
+            if (!m.parts) m.parts = [];
+            m.parts.push({ kind: "block", block: ev.block as ContentBlock } as MessagePart);
             m.pending = false;
           });
         }
@@ -286,10 +300,12 @@ export function useChat() {
           return m;
         });
         // Finalize the assistant placeholder — clear any transient
-        // status and the pending flag so MessageBubble stops showing
-        // the in-bubble dots + "Thinking…" block.
+        // status, the pending flag, and assign the completion timestamp
+        // so the chat bubble shows when the response finished, not when
+        // streaming started (Fix 3a).
         _updateMessage(assistantId, (m) => {
           m.pending = false;
+          m.timestamp = new Date();
           m.metadata = { ...m.metadata, statusText: undefined };
         });
         break;
