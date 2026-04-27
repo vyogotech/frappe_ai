@@ -12,7 +12,7 @@ app_license = "MIT"
 
 # include js, css files in header of desk.html
 app_include_css = "/assets/frappe_ai/css/frappe_ai_sidebar.css?v=651f3697"
-app_include_js = "/assets/frappe_ai/frontend/dist/js/frappe_ai.js?v=90a139e3"
+app_include_js = "/assets/frappe_ai/frontend/dist/js/frappe_ai.js?v=2e2d361f"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/frappe_ai/css/frappe_ai.css"
