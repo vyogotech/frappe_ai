@@ -6,7 +6,6 @@ An intelligent AI assistant for Frappe/ERPNext that talks to a configured AI age
 
 - 🤖 AI-powered queries about your ERPNext data
 - 🪟 In-desk chat sidebar with streamed markdown + structured blocks
-- ⚡ Awesome Bar integration for quick AI access
 - ⚙️ Easy configuration through AI Assistant Settings
 
 ## Installation
@@ -30,10 +29,7 @@ bench --site your-site install-app frappe_ai
 
 ## Usage
 
-### From Awesome Bar
-Simply type your query in the Awesome Bar and select **"Ask AI: [your query]"**
-
-Example queries:
+Open the chat sidebar from the navbar button and type your query. Example queries:
 - "Show me all open projects"
 - "What are the top customers by revenue?"
 - "List pending sales orders"
