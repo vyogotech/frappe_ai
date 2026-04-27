@@ -1,5 +1,3 @@
 # DocType module
 
 
-
-

@@ -1,6 +1,7 @@
 """
 Desktop configuration for Frappe AI
 """
+
 from frappe import _
 
 
@@ -13,7 +14,6 @@ def get_data():
 			"color": "#667eea",
 			"icon": "octicon octicon-hubot",
 			"type": "module",
-			"description": _("AI-powered assistant for your ERPNext data")
+			"description": _("AI-powered assistant for your ERPNext data"),
 		}
 	]
-

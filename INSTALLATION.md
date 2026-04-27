@@ -65,26 +65,19 @@ bench --site your-site.local execute frappe_ai.setup.create_oauth_client
 
 This will create an OAuth client and display the credentials.
 
-## Step 4: Configure MCP Server Settings
+## Step 4: Configure AI Assistant Settings
 
 ### 4.1 Open Settings
 
-Navigate to: **Frappe AI > MCP Server Settings** (or go to `/app/mcp-server-settings`)
+Navigate to: **Frappe AI > AI Assistant Settings** (or go to `/app/ai-assistant-settings`)
 
 ### 4.2 Fill in Configuration
 
 - **Enabled**: ✓ (check this box)
-- **MCP Server URL**: `http://localhost:8080` (or your MCP server URL)
-- **Frappe Base URL**: `http://localhost:8000` (or your Frappe instance URL)
-- **OAuth Client ID**: Paste the Client ID from Step 3
-- **OAuth Client Secret**: Paste the Client Secret from Step 3
+- **Agent URL**: `http://localhost:8484` (URL of the AI agent as reachable from the user's browser)
 - **Timeout**: `30` seconds (default)
 
-### 4.3 Save and Test
-
-1. Click **Save**
-2. Click **Test Connection** button to verify the setup
-3. You should see a success message if everything is configured correctly
+### 4.3 Save
 
 ## Step 5: Configure MCP Server
 
@@ -163,16 +156,15 @@ curl -X POST https://your-site.com/api/method/frappe_ai.api.ai_query.query \
 ### Issue: "Failed to query AI assistant"
 
 **Solution:**
-- Check MCP Server URL is correct and accessible
-- Verify MCP server is running
-- Check MCP server logs for errors
-- Use "Test Connection" button in MCP Server Settings
+- Check Agent URL is correct and accessible from the browser
+- Verify the AI agent is running
+- Check agent logs for errors
 
 ### Issue: "Connection timeout"
 
 **Solution:**
-- Increase timeout in MCP Server Settings
-- Check network connectivity between Frappe and MCP server
+- Increase timeout in AI Assistant Settings
+- Check network connectivity between the browser and the agent
 - Verify firewall rules allow communication
 
 ### Issue: Awesome Bar doesn't show AI option

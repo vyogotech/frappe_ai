@@ -21,17 +21,14 @@ bench --site your-site.local execute frappe_ai.setup.create_oauth_client
 
 ## 3. Configure Settings (1 minute)
 
-1. Go to: `/app/mcp-server-settings`
+1. Go to: `/app/ai-assistant-settings`
 2. Fill in:
    ```
    ✓ Enabled
-   MCP Server URL: http://localhost:8080
-   Frappe Base URL: http://localhost:8000
-   OAuth Client ID: [paste from step 2]
-   OAuth Client Secret: [paste from step 2]
+   Agent URL: http://localhost:8484
+   Timeout: 30
    ```
 3. Click **Save**
-4. Click **Test Connection**
 
 ## 4. Update MCP Server Config (1 minute)
 
