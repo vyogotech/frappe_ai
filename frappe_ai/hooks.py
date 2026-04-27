@@ -12,7 +12,7 @@ app_license = "MIT"
 
 # include js, css files in header of desk.html
 app_include_css = "/assets/frappe_ai/css/frappe_ai_sidebar.css?v=fe7970ac"
-app_include_js = "/assets/frappe_ai/frontend/dist/js/frappe_ai.js?v=c2686caa"
+app_include_js = "/assets/frappe_ai/frontend/dist/js/frappe_ai.js?v=9c81d0d1"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/frappe_ai/css/frappe_ai.css"
@@ -42,7 +42,7 @@ app_include_js = "/assets/frappe_ai/frontend/dist/js/frappe_ai.js?v=c2686caa"
 
 # website user home page (by Role)
 # role_home_page = {
-#	"Role": "home_page"
+# "Role": "home_page"
 # }
 
 # Generators
@@ -56,8 +56,8 @@ app_include_js = "/assets/frappe_ai/frontend/dist/js/frappe_ai.js?v=c2686caa"
 
 # add methods and filters to jinja environment
 # jinja = {
-#	"methods": "frappe_ai.utils.jinja_methods",
-#	"filters": "frappe_ai.utils.jinja_filters"
+# "methods": "frappe_ai.utils.jinja_methods",
+# "filters": "frappe_ai.utils.jinja_filters"
 # }
 
 # Installation
@@ -83,11 +83,11 @@ app_include_js = "/assets/frappe_ai/frontend/dist/js/frappe_ai.js?v=c2686caa"
 # Permissions evaluated in scripted ways
 
 # permission_query_conditions = {
-#	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
+# "Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
 # }
 #
 # has_permission = {
-#	"Event": "frappe.desk.doctype.event.event.has_permission",
+# "Event": "frappe.desk.doctype.event.event.has_permission",
 # }
 
 # DocType Class
@@ -95,7 +95,7 @@ app_include_js = "/assets/frappe_ai/frontend/dist/js/frappe_ai.js?v=c2686caa"
 # Override standard doctype classes
 
 # override_doctype_class = {
-#	"ToDo": "custom_app.overrides.CustomToDo"
+# "ToDo": "custom_app.overrides.CustomToDo"
 # }
 
 # Document Events
@@ -103,32 +103,32 @@ app_include_js = "/assets/frappe_ai/frontend/dist/js/frappe_ai.js?v=c2686caa"
 # Hook on document methods and events
 
 # doc_events = {
-#	"*": {
-#		"on_update": "method",
-#		"on_cancel": "method",
-#		"on_trash": "method"
-#	}
+# "*": {
+# "on_update": "method",
+# "on_cancel": "method",
+# "on_trash": "method"
+# }
 # }
 
 # Scheduled Tasks
 # ---------------
 
 # scheduler_events = {
-#	"all": [
-#		"frappe_ai.tasks.all"
-#	],
-#	"daily": [
-#		"frappe_ai.tasks.daily"
-#	],
-#	"hourly": [
-#		"frappe_ai.tasks.hourly"
-#	],
-#	"weekly": [
-#		"frappe_ai.tasks.weekly"
-#	],
-#	"monthly": [
-#		"frappe_ai.tasks.monthly"
-#	],
+# "all": [
+# "frappe_ai.tasks.all"
+# ],
+# "daily": [
+# "frappe_ai.tasks.daily"
+# ],
+# "hourly": [
+# "frappe_ai.tasks.hourly"
+# ],
+# "weekly": [
+# "frappe_ai.tasks.weekly"
+# ],
+# "monthly": [
+# "frappe_ai.tasks.monthly"
+# ],
 # }
 
 # Testing
@@ -139,15 +139,13 @@ app_include_js = "/assets/frappe_ai/frontend/dist/js/frappe_ai.js?v=c2686caa"
 # Overriding Methods
 # ------------------------------
 #
-override_whitelisted_methods = {
-	"frappe.utils.global_search.search": "frappe_ai.search.search"
-}
+override_whitelisted_methods = {"frappe.utils.global_search.search": "frappe_ai.search.search"}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
 # along with any modifications made in other Frappe apps
 # override_doctype_dashboards = {
-#	"Task": "frappe_ai.task.get_dashboard_data"
+# "Task": "frappe_ai.task.get_dashboard_data"
 # }
 
 # exempt linked doctypes from being automatically cancelled
@@ -173,30 +171,29 @@ override_whitelisted_methods = {
 # --------------------
 
 # user_data_fields = [
-#	{
-#		"doctype": "{doctype_1}",
-#		"filter_by": "{filter_by}",
-#		"redact_fields": ["{field_1}", "{field_2}"],
-#		"partial": 1,
-#	},
-#	{
-#		"doctype": "{doctype_2}",
-#		"filter_by": "{filter_by}",
-#		"partial": 1,
-#	},
-#	{
-#		"doctype": "{doctype_3}",
-#		"strict": False,
-#	},
-#	{
-#		"doctype": "{doctype_4}"
-#	}
+# {
+# "doctype": "{doctype_1}",
+# "filter_by": "{filter_by}",
+# "redact_fields": ["{field_1}", "{field_2}"],
+# "partial": 1,
+# },
+# {
+# "doctype": "{doctype_2}",
+# "filter_by": "{filter_by}",
+# "partial": 1,
+# },
+# {
+# "doctype": "{doctype_3}",
+# "strict": False,
+# },
+# {
+# "doctype": "{doctype_4}"
+# }
 # ]
 
 # Authentication and authorization
 # --------------------------------
 
 # auth_hooks = [
-#	"frappe_ai.auth.validate"
+# "frappe_ai.auth.validate"
 # ]
-

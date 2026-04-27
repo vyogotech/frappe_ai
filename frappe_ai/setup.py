@@ -1,6 +1,7 @@
 """
 Setup utilities for Frappe AI
 """
+
 import frappe
 from frappe import _
 
@@ -15,24 +16,21 @@ def create_oauth_client():
 		existing = frappe.get_doc("OAuth Client", {"app_name": "MCP Backend Integration"})
 		print(f"Client ID: {existing.client_id}")
 		return existing
-	
+
 	# Create new OAuth client
-	oauth_client = frappe.get_doc({
-		"doctype": "OAuth Client",
-		"app_name": "MCP Backend Integration",
-		"scopes": [
-			{"scope": "openid"},
-			{"scope": "profile"},
-			{"scope": "email"},
-			{"scope": "all"}
-		],
-		"grant_type": "Client Credentials",
-		"response_type": "Code"
-	})
-	
+	oauth_client = frappe.get_doc(
+		{
+			"doctype": "OAuth Client",
+			"app_name": "MCP Backend Integration",
+			"scopes": [{"scope": "openid"}, {"scope": "profile"}, {"scope": "email"}, {"scope": "all"}],
+			"grant_type": "Client Credentials",
+			"response_type": "Code",
+		}
+	)
+
 	oauth_client.insert(ignore_permissions=True)
 	frappe.db.commit()
-	
+
 	print("=" * 60)
 	print("OAuth Client created successfully!")
 	print("=" * 60)
@@ -42,7 +40,7 @@ def create_oauth_client():
 	print("=" * 60)
 	print("Please save these credentials in AI Assistant Settings")
 	print("=" * 60)
-	
+
 	return oauth_client
 
 
@@ -58,4 +56,3 @@ def after_install():
 	print("2. Configure AI Assistant Settings at /app/ai-assistant-settings")
 	print("3. Test the integration using Awesome Bar")
 	print("=" * 60)
-

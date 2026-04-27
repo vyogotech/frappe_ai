@@ -1,8 +1,9 @@
 # Copyright (c) 2024, Frappe and Contributors
 # See license.txt
 
-import frappe
 import unittest
+
+import frappe
 
 
 class TestAIAssistantSettings(unittest.TestCase):

@@ -407,7 +407,7 @@ export function useChat() {
   }
 
   return {
-    messages: readonly(messages),
+    messages,
     isLoading: readonly(isLoading),
     canCancel: readonly(canCancel),
     lastError: readonly(lastError),

@@ -58,36 +58,25 @@ frappe_ai/api/
 ### 📁 mcp_integration/ - Custom DocTypes
 
 ```
-frappe_ai/mcp_integration/
+frappe_ai/ai_assistant/
 ├── __init__.py
 └── doctype/
-    └── mcp_server_settings/
+    └── ai_assistant_settings/
         ├── __init__.py
-        ├── mcp_server_settings.json        # DocType definition
-        ├── mcp_server_settings.py          # Python controller
-        ├── mcp_server_settings.js          # JavaScript UI
-        └── test_mcp_server_settings.py    # Unit tests
+        ├── ai_assistant_settings.json        # DocType definition
+        ├── ai_assistant_settings.py          # Python controller
+        ├── ai_assistant_settings.js          # JavaScript UI
+        └── test_ai_assistant_settings.py    # Unit tests
 ```
 
-**MCP Server Settings DocType** - Single DocType for configuration:
+**AI Assistant Settings DocType** - Single DocType for configuration:
 
 **Fields:**
 - `enabled` - Enable/disable integration
-- `mcp_server_url` - MCP server endpoint
-- `frappe_base_url` - OAuth server URL
-- `oauth_client_id` - OAuth client ID
-- `oauth_client_secret` - OAuth client secret (encrypted)
+- `agent_url` - URL of the AI agent as reachable from the user's browser
 - `timeout` - Request timeout in seconds
-- `cache_ttl` - Token cache duration
-- `validate_remote` - Remote token validation flag
-
-**Features:**
-- URL validation
-- Timeout validation
-- Test connection button
-- Clear cache button
-- Real-time alerts
-- Auto-clear token cache on save
+- `sidebar_width` - Width of the chat sidebar
+- `keyboard_shortcut` - Shortcut to toggle the sidebar
 
 ### 📁 public/ - Frontend Assets
 
@@ -226,9 +215,9 @@ frappe_ai/config/
 - **Response Format**: Edit `query()` function
 
 ### Settings Customization
-- **Fields**: Edit `mcp_server_settings.json`
-- **Validation**: Edit `mcp_server_settings.py`
-- **UI Behavior**: Edit `mcp_server_settings.js`
+- **Fields**: Edit `ai_assistant_settings.json`
+- **Validation**: Edit `ai_assistant_settings.py`
+- **UI Behavior**: Edit `ai_assistant_settings.js`
 
 ## 📦 Dependencies
 
@@ -250,7 +239,7 @@ bench --site your-site.local run-tests --app frappe_ai
 ```
 
 ### Integration Tests
-Use the Test Connection button in MCP Server Settings
+Open the chat sidebar and send a query end-to-end through the configured agent
 
 ### Manual Testing
 1. Awesome Bar queries
@@ -261,8 +250,8 @@ Use the Test Connection button in MCP Server Settings
 
 - [ ] Install app on production site
 - [ ] Create OAuth client
-- [ ] Configure MCP Server Settings
-- [ ] Update MCP server config.yaml
+- [ ] Configure AI Assistant Settings
+- [ ] Update agent config to point at this Frappe instance
 - [ ] Test connection
 - [ ] Test actual queries
 - [ ] Enable auth in MCP (set `require_auth: true`)
@@ -280,8 +269,8 @@ Use the Test Connection button in MCP Server Settings
 - Review security settings
 
 ### Troubleshooting
-1. Check MCP Server Settings
-2. Verify OAuth client credentials
+1. Check AI Assistant Settings
+2. Verify the Agent URL is reachable from the browser
 3. Test network connectivity
 4. Review error logs
 5. Clear caches if needed

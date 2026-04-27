@@ -1,33 +1,69 @@
-### Frappe AI 
+# Frappe AI
 
-AI power for Awesome Bar
+An intelligent AI assistant for Frappe/ERPNext that talks to a configured AI agent over HTTP and renders streamed responses (markdown prose plus structured KPI/chart/table blocks) in a chat sidebar embedded in the desk.
 
-### Installation
+## Features
 
-You can install this app using the [bench](https://github.com/frappe/bench) CLI:
+- 🤖 AI-powered queries about your ERPNext data
+- 🪟 In-desk chat sidebar with streamed markdown + structured blocks
+- ⚡ Awesome Bar integration for quick AI access
+- ⚙️ Easy configuration through AI Assistant Settings
 
+## Installation
+
+1. Get the app:
 ```bash
-cd $PATH_TO_YOUR_BENCH
-bench get-app $URL_OF_THIS_REPO --branch develop
-bench install-app frappe_ai
+bench get-app https://github.com/yourusername/frappe_ai
 ```
 
-### Contributing
-
-This app uses `pre-commit` for code formatting and linting. Please [install pre-commit](https://pre-commit.com/#installation) and enable it for this repository:
-
+2. Install the app on your site:
 ```bash
-cd apps/frappe_ai
-pre-commit install
+bench --site your-site install-app frappe_ai
 ```
 
-Pre-commit is configured to use the following tools for checking and formatting your code:
+3. Configure AI Assistant Settings:
+   - Navigate to `/app/ai-assistant-settings`
+   - Fill in:
+     - **Enabled**: ✓
+     - **Agent URL** (e.g., `http://localhost:8484`) — must be reachable from the user's browser
+     - **Timeout** (default `30` seconds)
 
-- ruff
-- eslint
-- prettier
-- pyupgrade
+## Usage
 
-### License
+### From Awesome Bar
+Simply type your query in the Awesome Bar and select **"Ask AI: [your query]"**
 
-mit
+Example queries:
+- "Show me all open projects"
+- "What are the top customers by revenue?"
+- "List pending sales orders"
+
+### From Code
+```python
+import frappe
+from frappe_ai.api.ai_query import query
+
+result = query("Show me all open projects")
+print(result['response'])
+```
+
+### From REST API
+```bash
+curl -X POST https://your-site.com/api/method/frappe_ai.api.ai_query.query \
+  -H "Authorization: token YOUR_API_KEY:YOUR_API_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Show me all open projects"}'
+```
+
+## Configuration
+
+All configuration is done through the **AI Assistant Settings** DocType:
+- Navigate to `/app/ai-assistant-settings`
+- Enable/disable the integration
+- Configure the Agent URL
+- Adjust timeout, sidebar width, and keyboard shortcut
+
+## License
+
+MIT
+
