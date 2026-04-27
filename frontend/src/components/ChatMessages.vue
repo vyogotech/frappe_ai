@@ -5,6 +5,7 @@ import ToolCallCard from "./ToolCallCard.vue";
 import type { Message } from "@/types/messages";
 
 declare const frappe: any;
+declare const __BUILD_VERSION__: string;
 
 function frappeIcon(name: string, size: string): string {
   if (typeof frappe !== "undefined" && frappe.utils?.icon) {
@@ -12,6 +13,11 @@ function frappeIcon(name: string, size: string): string {
   }
   return `<svg class="icon icon-${size}"><use href="#icon-${name}"></use></svg>`;
 }
+
+// Build-time version stamp injected by vite.config.js. Visible on the
+// welcome screen so a hard-refresh can be confirmed at a glance.
+const buildVersion =
+  typeof __BUILD_VERSION__ !== "undefined" ? __BUILD_VERSION__ : "dev";
 
 const props = defineProps<{
   messages: readonly Message[];
@@ -42,6 +48,9 @@ watch(
       <p class="frappe-ai-empty-title">How can I help?</p>
       <p class="frappe-ai-empty-subtitle">
         Ask me anything about your ERPNext data, or let me help you with tasks.
+      </p>
+      <p class="frappe-ai-empty-version" :title="buildVersion">
+        build {{ buildVersion }}
       </p>
     </div>
 

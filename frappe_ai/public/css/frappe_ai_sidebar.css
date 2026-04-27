@@ -171,6 +171,18 @@
   margin: 0 0 4px;
 }
 
+/* Build version stamp on the welcome screen — use this to tell whether
+   a hard-refresh actually picked up the latest bundle. Updates on every
+   `make reload-frontend` (vite stamps date+sha at build time). */
+#frappe-ai-sidebar-root .frappe-ai-empty-version {
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.6;
+  margin: 24px 0 0;
+  font-family: var(--font-monospace, ui-monospace, SFMono-Regular, monospace);
+  letter-spacing: 0.02em;
+}
+
 #frappe-ai-sidebar-root .frappe-ai-empty-subtitle {
   font-size: 12px;
   color: var(--text-muted);
@@ -633,8 +645,19 @@
   border-radius: var(--border-radius-md, 8px);
 }
 
+/* The TableBlock component wraps its <table> in .frappe-ai-table-scroll.
+   Make that wrapper the actual horizontal-scroll container so wide tables
+   stay inside the sidebar instead of pushing it past its set width. */
+#frappe-ai-sidebar-root .frappe-ai-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 #frappe-ai-sidebar-root .frappe-ai-table table {
-  width: 100%;
+  display: block;
+  width: max-content;
+  max-width: 100%;
   text-align: left;
   font-size: 12px;
   border-collapse: collapse;
