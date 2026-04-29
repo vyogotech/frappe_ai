@@ -1,9 +1,5 @@
 /** Extract current page context from Frappe globals. */
 
-declare const frappe: any;
-declare const cur_frm: any;
-declare const cur_list: any;
-
 export interface PageContext {
   route: string;
   doctype: string;

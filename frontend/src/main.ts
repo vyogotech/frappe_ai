@@ -4,11 +4,14 @@ import { createApp } from "vue";
 import App from "./App.vue";
 import { setAgentUrl } from "./composables/useChat";
 
-declare const frappe: any;
-declare const $: any;
-declare function __(...args: any[]): string;
-
 const CONTAINER_ID = "frappe-ai-sidebar-root";
+
+interface FrappeAISettings {
+  enabled?: boolean;
+  agent_url?: string;
+  sidebar_width?: number;
+  keyboard_shortcut?: string;
+}
 
 const state = {
   enabled: false,
@@ -19,11 +22,12 @@ const state = {
 };
 
 async function loadSettings(): Promise<void> {
+  if (typeof frappe === "undefined") return;
   try {
-    const settings = await new Promise<any>((resolve, reject) => {
-      frappe.call({
+    const settings = await new Promise<FrappeAISettings | undefined>((resolve, reject) => {
+      frappe.call<FrappeAISettings>({
         method: "frappe_ai.api.get_settings",
-        callback: (r: any) => resolve(r.message),
+        callback: (r) => resolve(r.message),
         error: reject,
       });
     });
@@ -67,6 +71,7 @@ function addNavbarToggle(): void {
     }
     const navNotifications = document.querySelector(".desktop-navbar .desktop-notifications");
     if (!navNotifications) return;
+    if (typeof frappe === "undefined") return;
     clearInterval(interval);
 
     const rightContainer = navNotifications.parentElement!;
@@ -86,12 +91,14 @@ function addNavbarToggle(): void {
 /** Add "Frappe AI" item to the Frappe left sidebar. */
 function addSidebarItem(): void {
   const interval = setInterval(() => {
+    if (typeof frappe === "undefined") return;
     const sidebar = frappe.app?.sidebar;
     if (!sidebar?.$standard_items_sections?.length) return;
     if (!sidebar.standard_items_setup) return;
     clearInterval(interval);
-    if (sidebar.$standard_items_sections.find('[item-name="Frappe AI"]').length) return;
-    sidebar.add_item(sidebar.$standard_items_sections, {
+    const firstSection = sidebar.$standard_items_sections[0];
+    if (firstSection.find('[item-name="Frappe AI"]').length) return;
+    sidebar.add_item(firstSection, {
       label: __("Frappe AI"),
       icon: "message-square-text",
       standard: true,
@@ -152,7 +159,7 @@ function bootstrap(): void {
     });
   }
 
-  if (frappe.app) {
+  if (frappe?.app) {
     init();
   } else {
     $(document).on("app_ready", init);

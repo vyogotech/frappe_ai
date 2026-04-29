@@ -1,7 +1,5 @@
 /** Value formatting for block components. */
 
-declare const frappe: any;
-
 type FormatOptions = {
   currency?: string;
 };
