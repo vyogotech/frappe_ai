@@ -36,7 +36,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from "vue";
 
-declare const frappe: any;
 
 const props = defineProps<{
   /** An assistant turn is currently in flight (SSE or fallback). */

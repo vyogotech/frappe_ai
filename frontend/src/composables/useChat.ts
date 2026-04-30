@@ -22,7 +22,41 @@ import { ref, readonly } from "vue";
 import { getPageContext } from "@/utils/context";
 import type { Message, ContentBlock, MessagePart } from "@/types";
 
-declare const frappe: any;
+/**
+ * Wire shape from frappe_ai.api.ai_query.query (the non-streaming fallback).
+ * The endpoint may return a bare string (legacy) or a structured object.
+ */
+interface FallbackToolCall {
+  call_id?: string;
+  name: string;
+  arguments?: Record<string, unknown>;
+  result?: string;
+  success?: boolean;
+}
+
+type FallbackResponseMessage =
+  | string
+  | {
+      response?: string;
+      content?: string;
+      blocks?: Record<string, unknown>[];
+      tool_calls?: FallbackToolCall[];
+    };
+
+/**
+ * SSE event shapes emitted by /api/v1/chat. Mirrors the union documented in
+ * the file header; new event types must be added here AND in the switch
+ * inside _handleSSEEvent.
+ */
+type SSEEvent =
+  | { type: "session"; id?: string }
+  | { type: "status"; message?: string }
+  | { type: "tool_call"; name?: string; arguments?: Record<string, unknown>; call_id?: string }
+  | { type: "content"; text?: string }
+  | { type: "content_block"; block?: Record<string, unknown> }
+  | { type: "done"; tools_called?: string[]; data_quality?: string }
+  | { type: "error"; message?: string };
+
 
 const VALID_BLOCK_TYPES = new Set(["text", "chart", "table", "kpi", "status_list"]);
 
@@ -99,8 +133,8 @@ export function useChat() {
       message: content,
       session_id: sessionId.value,
       context: {
-        user_id: frappe.session?.user ?? "",
-        user_email: frappe.session?.user ?? "",
+        user_id: frappe?.session?.user ?? "",
+        user_email: frappe?.session?.user ?? "",
         timestamp: new Date().toISOString(),
         ...ctx,
       },
@@ -169,8 +203,10 @@ export function useChat() {
           }
         }
       }
-    } catch (err: any) {
-      if (err?.name === "AbortError") {
+    } catch (err: unknown) {
+      const errName = err instanceof Error ? err.name : undefined;
+      const errMessage = err instanceof Error ? err.message : undefined;
+      if (errName === "AbortError") {
         // User-initiated cancel. Keep whatever streamed, drop an
         // empty placeholder, mark any running tool_calls as cancelled,
         // and don't surface an error bubble.
@@ -200,7 +236,7 @@ export function useChat() {
         });
       } else {
         _removeMessage(assistantId);
-        _addErrorMessage(err?.message ?? "Stream failed");
+        _addErrorMessage(errMessage ?? "Stream failed");
       }
     } finally {
       currentAbort = null;
@@ -209,7 +245,7 @@ export function useChat() {
     }
   }
 
-  function _handleSSEEvent(ev: any, assistantId: string): void {
+  function _handleSSEEvent(ev: SSEEvent, assistantId: string): void {
     switch (ev.type) {
       case "session":
         // Server-assigned id for this conversation. Remember it so the
@@ -278,14 +314,17 @@ export function useChat() {
         // <copilot-block> tags out of the LLM output and emits one
         // content_block event per block, preserving order.
         if (ev.block && isValidBlock(ev.block)) {
+          // The server-side block parser already validates the schema; the
+          // type narrows from Record<string, unknown> via the runtime check.
+          const block = ev.block as unknown as ContentBlock;
           _updateMessage(assistantId, (m) => {
             if (!m.blocks) {
               m.blocks = [];
             }
-            m.blocks.push(ev.block as ContentBlock);
+            m.blocks.push(block);
             // Always push a new block part to preserve arrival order.
             if (!m.parts) m.parts = [];
-            m.parts.push({ kind: "block", block: ev.block as ContentBlock } as MessagePart);
+            m.parts.push({ kind: "block", block } as MessagePart);
             m.pending = false;
           });
         }
@@ -322,11 +361,16 @@ export function useChat() {
   // --------------------------------------------------------------------------
 
   function _sendFallback(content: string): void {
-    frappe.call({
+    if (typeof frappe === "undefined") {
+      isLoading.value = false;
+      _addErrorMessage("Frappe is not available");
+      return;
+    }
+    frappe.call<FallbackResponseMessage>({
       method: "frappe_ai.api.ai_query.query",
       args: { message: content },
       async: true,
-      callback: (r: any) => {
+      callback: (r) => {
         isLoading.value = false;
         if (r?.message) {
           _handleResponse(r.message);
@@ -334,18 +378,18 @@ export function useChat() {
           _addErrorMessage("No response from server");
         }
       },
-      error: (err: any) => {
+      error: (err) => {
         isLoading.value = false;
-        const errMsg =
-          err?.responseJSON?._server_messages
-            ? JSON.parse(err.responseJSON._server_messages)?.[0]
-            : err?.message || "Request failed";
+        const serverMsg = err.responseJSON?._server_messages
+          ? JSON.parse(err.responseJSON._server_messages)?.[0]
+          : null;
+        const errMsg = serverMsg ?? err.message ?? "Request failed";
         _addErrorMessage(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg));
       },
     });
   }
 
-  function _handleResponse(data: any): void {
+  function _handleResponse(data: FallbackResponseMessage): void {
     const assistantMsg: Message = {
       id: crypto.randomUUID(),
       role: "assistant",
@@ -356,7 +400,12 @@ export function useChat() {
 
     if (typeof data === "string") {
       assistantMsg.content = data;
-    } else if (data.response) {
+      messages.value.push(assistantMsg);
+      messages.value = [...messages.value];
+      return;
+    }
+
+    if (data.response) {
       assistantMsg.content = data.response;
     } else if (data.content) {
       assistantMsg.content = data.content;
@@ -365,7 +414,7 @@ export function useChat() {
     if (Array.isArray(data.blocks)) {
       for (const block of data.blocks) {
         if (isValidBlock(block)) {
-          assistantMsg.blocks!.push(block as ContentBlock);
+          assistantMsg.blocks!.push(block as unknown as ContentBlock);
         }
       }
     }

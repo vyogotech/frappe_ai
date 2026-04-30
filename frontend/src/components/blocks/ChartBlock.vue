@@ -48,7 +48,7 @@ const chartOption = computed(() => {
       return {
         tooltip: {
           trigger: "item",
-          formatter: (p: any) =>
+          formatter: (p: { name: string; value: number }) =>
             `${p.name}: ${formatValue(p.value, currency ? "currency" : "number", { currency })}`,
         },
         legend: { orient: "vertical", left: "left" },

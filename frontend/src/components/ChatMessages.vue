@@ -4,7 +4,6 @@ import MessageBubble from "./MessageBubble.vue";
 import ToolCallCard from "./ToolCallCard.vue";
 import type { Message } from "@/types/messages";
 
-declare const frappe: any;
 declare const __BUILD_VERSION__: string;
 
 function frappeIcon(name: string, size: string): string {

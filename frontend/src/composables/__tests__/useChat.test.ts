@@ -7,7 +7,9 @@ const AGENT_URL = "http://localhost:9999";
 
 beforeEach(() => {
   setAgentUrl(AGENT_URL);
-  (globalThis as any).frappe = { session: { user: "test@example.com" } };
+  (globalThis as { frappe?: { session?: { user?: string } } }).frappe = {
+    session: { user: "test@example.com" },
+  };
 });
 
 afterEach(() => {

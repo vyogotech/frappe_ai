@@ -3,7 +3,6 @@ import { ref, computed } from "vue";
 import { formatValue } from "@/utils/formatters";
 import type { TableBlock, TableRow } from "@/types/blocks";
 
-declare const frappe: any;
 
 const props = defineProps<{ block: TableBlock }>();
 
@@ -34,7 +33,7 @@ function toggleSort(key: string) {
 }
 
 function navigate(row: TableRow) {
-  if (row.route) {
+  if (row.route && typeof frappe !== "undefined") {
     frappe.set_route("Form", row.route.doctype, row.route.name);
   }
 }

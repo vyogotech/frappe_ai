@@ -36,7 +36,6 @@
 import { ref, computed } from "vue";
 import type { ToolCall } from "@/types/messages";
 
-declare const frappe: any;
 
 const props = defineProps<{ toolCall: ToolCall }>();
 const expanded = ref(false);

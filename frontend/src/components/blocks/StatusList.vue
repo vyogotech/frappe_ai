@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import type { StatusListBlock, StatusItem } from "@/types/blocks";
 
-declare const frappe: any;
 
 const props = defineProps<{ block: StatusListBlock }>();
 
 function navigate(item: StatusItem) {
-  if (item.route) {
+  if (item.route && typeof frappe !== "undefined") {
     frappe.set_route("Form", item.route.doctype, item.route.name);
   }
 }
