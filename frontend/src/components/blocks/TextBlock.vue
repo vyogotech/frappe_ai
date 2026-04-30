@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import MarkdownIt from "markdown-it";
+import MarkdownIt, { type Options as MarkdownItOptions } from "markdown-it";
+import type Token from "markdown-it/lib/token.mjs";
+import type Renderer from "markdown-it/lib/renderer.mjs";
 import type { TextBlock } from "@/types/blocks";
 
 const props = defineProps<{ block: TextBlock }>();
@@ -10,11 +12,23 @@ const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
 
 const defaultRender =
   md.renderer.rules.link_open ||
-  function (tokens: any, idx: any, options: any, _env: any, self: any) {
+  function (
+    tokens: Token[],
+    idx: number,
+    options: MarkdownItOptions,
+    _env: unknown,
+    self: Renderer,
+  ) {
     return self.renderToken(tokens, idx, options);
   };
 
-md.renderer.rules.link_open = function (tokens: any, idx: any, options: any, env: any, self: any) {
+md.renderer.rules.link_open = function (
+  tokens: Token[],
+  idx: number,
+  options: MarkdownItOptions,
+  env: unknown,
+  self: Renderer,
+) {
   tokens[idx].attrSet("target", "_blank");
   tokens[idx].attrSet("rel", "noopener");
   return defaultRender(tokens, idx, options, env, self);

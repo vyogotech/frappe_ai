@@ -12,7 +12,6 @@ function frappeIcon(name: string, size: string): string {
   return `<svg class="icon icon-${size}"><use href="#icon-${name}"></use></svg>`;
 }
 
-declare const frappe: any;
 </script>
 
 <template>
