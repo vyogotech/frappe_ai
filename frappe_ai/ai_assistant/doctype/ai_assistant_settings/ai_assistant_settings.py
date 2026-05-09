@@ -18,8 +18,12 @@ class AIAssistantSettings(Document):
 
 
 def _validate_shortcut(shortcut: str) -> None:
-    """Accept 'Mod+key', 'Ctrl+key', 'Alt+key', 'Shift+key' combos."""
-    pattern = r"^(Mod|Ctrl|Alt|Shift)(\+(Mod|Ctrl|Alt|Shift))*\+\w+$"
+    """Accept 'Mod+key', 'Ctrl+key', 'Alt+key', 'Shift+key' combos.
+
+    The final key may be a word character (letters, digits, underscore) or a
+    printable special character such as / ; ' [ ] \\ ` - = , . etc.
+    """
+    pattern = r"^(Mod|Ctrl|Alt|Shift)(\+(Mod|Ctrl|Alt|Shift))*\+[\w\S]$"
     if not re.match(pattern, shortcut, re.IGNORECASE):
         frappe.throw(
             frappe._("Invalid keyboard shortcut format. Use e.g. Ctrl+/ or Mod+Shift+A.")
