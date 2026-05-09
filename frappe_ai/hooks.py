@@ -66,7 +66,8 @@ app_include_js = "frappe_ai.bundle.ts"
 # ------------
 
 # before_install = "frappe_ai.install.before_install"
-# after_install = "frappe_ai.install.after_install"
+after_install = "frappe_ai.install.after_install"
+after_migrate = "frappe_ai.install.after_migrate"
 
 # Uninstallation
 # ------------

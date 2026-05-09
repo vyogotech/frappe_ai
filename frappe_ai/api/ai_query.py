@@ -3,7 +3,6 @@ AI Query API — sid cookie authentication forwarded to the AI agent.
 """
 
 import json
-import os
 from datetime import datetime
 
 import frappe
@@ -11,12 +10,8 @@ import requests
 from frappe import _
 
 
-def _server_agent_url(settings):
-	# Server-side calls run inside the ERPNext container, where settings.agent_url
-	# (e.g. http://localhost:8484) is unreachable. AI_AGENT_INTERNAL_URL lets the
-	# docker-compose stack point this code at the sibling container (http://agent:8484)
-	# without changing the browser-facing agent_url.
-	return (os.environ.get("AI_AGENT_INTERNAL_URL") or settings.agent_url or "").rstrip("/")
+def _agent_url() -> str:
+	return frappe.local.conf.get("frappe_ai_agent_url", "").rstrip("/")
 
 
 @frappe.whitelist()
@@ -54,15 +49,11 @@ def query(message):
 		},
 	}
 
-	# The agent's /api/v1/chat returns text/event-stream — never JSON. We
-	# consume the SSE stream here, accumulate content tokens into a single
-	# string, and return a flat JSON shape that the FE's frappe.call()
-	# fallback path knows how to render. The browser-side SSE path is the
-	# primary route (preserves streaming + abort); this fallback is a
-	# graceful-degradation when settings.agent_url is not set in the FE.
+	# Fallback: consumes SSE stream server-side and returns aggregated JSON.
+	# Phase 6 replaces this with a socketio relay where the browser streams directly.
 	try:
 		with requests.post(
-			f"{_server_agent_url(settings)}/api/v1/chat",
+			f"{_agent_url()}/api/v1/chat",
 			json=payload,
 			cookies={"sid": sid},
 			headers={
@@ -134,7 +125,7 @@ def test_connection():
 
 	try:
 		sid = frappe.session.sid
-		agent_url = _server_agent_url(settings)
+		agent_url = _agent_url()
 
 		health_response = requests.get(
 			f"{agent_url}/health",

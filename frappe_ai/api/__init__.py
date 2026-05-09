@@ -9,7 +9,6 @@ def get_settings() -> dict:
 	settings = frappe.get_single("AI Assistant Settings")
 	return {
 		"enabled": bool(settings.enabled),
-		"agent_url": settings.agent_url,
 		"sidebar_width": getattr(settings, "sidebar_width", None) or 380,
 		"keyboard_shortcut": getattr(settings, "keyboard_shortcut", None) or "Ctrl+/",
 	}
