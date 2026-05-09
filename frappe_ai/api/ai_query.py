@@ -16,6 +16,8 @@ def _agent_url() -> str:
 
 @frappe.whitelist()
 def query(message):
+	# Deprecated: use frappe_ai.api.chat.start_stream (socketio relay) instead.
+	# Retained for backward compatibility; will be removed after Phase 7 verification.
 	"""
 	Send a message to the AI agent using the user's sid cookie.
 
