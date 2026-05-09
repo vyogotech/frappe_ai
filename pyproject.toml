@@ -1,14 +1,15 @@
 [project]
 name = "frappe_ai"
 authors = [
-    { name = "Vyogo Technologies", email = "support@vyogolabs.tech"}
+    { name = "Frappe Technologies Pvt. Ltd.", email = "developers@frappe.io"}
 ]
-description = "AI power for Awesome Bar"
+description = "AI Assistant Integration for Frappe/ERPNext using MCP Server"
 requires-python = ">=3.10"
 readme = "README.md"
 dynamic = ["version"]
 dependencies = [
     # "frappe~=15.0.0" # Installed and managed by bench.
+    "requests",
 ]
 
 [build-system]
