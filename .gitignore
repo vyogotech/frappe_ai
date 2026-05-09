@@ -9,3 +9,4 @@ frappe_ai/public/frontend/dist/
 frontend/node_modules/
 uv.lock
 .venv/
+.superpowers/
