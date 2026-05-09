@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useChat } from "@/composables/useChat";
+import { useChat } from "../composables/useChat";
 import ChatHeader from "./ChatHeader.vue";
 import ChatMessages from "./ChatMessages.vue";
 import ChatInput from "./ChatInput.vue";
