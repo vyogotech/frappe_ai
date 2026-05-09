@@ -134,7 +134,6 @@ export function useChat() {
       session_id: sessionId.value,
       context: {
         user_id: frappe?.session?.user ?? "",
-        user_email: frappe?.session?.user ?? "",
         timestamp: new Date().toISOString(),
         ...ctx,
       },
