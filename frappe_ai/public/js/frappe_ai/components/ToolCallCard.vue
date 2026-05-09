@@ -34,7 +34,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import type { ToolCall } from "@/types/messages";
+import type { ToolCall } from "../types/messages";
 
 
 const props = defineProps<{ toolCall: ToolCall }>();

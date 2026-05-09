@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, onErrorCaptured } from "vue";
 import { getBlockComponent } from "./blocks";
-import { renderMarkdown } from "@/utils/markdown";
-import type { Message } from "@/types/messages";
+import { renderMarkdown } from "../utils/markdown";
+import type { Message } from "../types/messages";
 
 const props = defineProps<{ message: Message }>();
 

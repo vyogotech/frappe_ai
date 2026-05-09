@@ -2,7 +2,7 @@
 import { ref, watch, nextTick } from "vue";
 import MessageBubble from "./MessageBubble.vue";
 import ToolCallCard from "./ToolCallCard.vue";
-import type { Message } from "@/types/messages";
+import type { Message } from "../types/messages";
 
 declare const __BUILD_VERSION__: string;
 
