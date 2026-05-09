@@ -11,8 +11,10 @@ app_license = "MIT"
 # ------------------
 
 # include js, css files in header of desk.html
-app_include_css = "/assets/frappe_ai/css/frappe_ai_sidebar.css?v=651f3697"
-app_include_js = "/assets/frappe_ai/frontend/dist/js/frappe_ai.js?v=ffa8d75e"
+# Frappe's bundler resolves these to hashed paths in /assets/frappe_ai/dist/...
+# via sites/assets/assets.json, no manual cache-bust query strings needed.
+app_include_css = "frappe_ai_sidebar.css"
+app_include_js = "frappe_ai.bundle.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/frappe_ai/css/frappe_ai.css"
