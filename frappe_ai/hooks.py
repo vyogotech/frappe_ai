@@ -2,7 +2,7 @@ from . import __version__ as app_version
 
 app_name = "frappe_ai"
 app_title = "Frappe AI"
-app_publisher = "Frappe"
+app_publisher = "Frappe Technologies Pvt. Ltd."
 app_description = "AI Assistant Integration for Frappe/ERPNext using MCP Server"
 app_email = "developers@frappe.io"
 app_license = "MIT"
