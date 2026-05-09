@@ -36,22 +36,37 @@ async function loadSettings(): Promise<void> {
 
 function injectNavbarButton(): void {
   if (document.getElementById("frappe-ai-nav-btn")) return;
-  const $navbarRight = $(".navbar-right");
-  if (!$navbarRight.length) return;
 
-  const $btn = $(`
-    <li class="nav-item" id="frappe-ai-nav-btn" title="Frappe AI (${state.keyboardShortcut})">
-      <a class="nav-link" style="cursor:pointer;display:flex;align-items:center;padding:0 8px">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-             fill="none" stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
-      </a>
-    </li>
-  `);
-  $btn.on("click", toggleSidebar);
-  $navbarRight.prepend($btn);
+  const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+       fill="none" stroke="currentColor" stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>`;
+
+  // saas_platform / Frappe v16 custom desktop navbar — insert before avatar
+  const $avatar = $(".desktop-avatar");
+  if ($avatar.length) {
+    const $btn = $(
+      `<div id="frappe-ai-nav-btn" title="Frappe AI (${state.keyboardShortcut})"
+            style="cursor:pointer;display:flex;align-items:center;padding:0 4px">${svgIcon}</div>`
+    );
+    $btn.on("click", toggleSidebar);
+    $btn.insertBefore($avatar);
+    return;
+  }
+
+  // Traditional Frappe Bootstrap navbar (.navbar-right exists in read-only / announcement mode)
+  const $navbarRight = $(".navbar-right");
+  if ($navbarRight.length) {
+    const $btn = $(
+      `<li class="nav-item" id="frappe-ai-nav-btn" title="Frappe AI (${state.keyboardShortcut})">
+        <a class="nav-link" style="cursor:pointer;display:flex;align-items:center;padding:0 8px">${svgIcon}</a>
+      </li>`
+    );
+    $btn.on("click", toggleSidebar);
+    $navbarRight.prepend($btn);
+    return;
+  }
 }
 
 function mountSidebar(): void {
