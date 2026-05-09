@@ -43,6 +43,11 @@ function mountSidebar(): void {
   el.style.setProperty("--frappe-ai-width", `${state.sidebarWidth}px`);
   document.body.appendChild(el);
 
+  // Sync container hidden attribute with App.vue's visible state.
+  // App.vue dispatches these after updating its own visible ref.
+  document.addEventListener("frappe-ai-opened", () => { el.hidden = false; });
+  document.addEventListener("frappe-ai-closed", () => { el.hidden = true; });
+
   vueApp = createApp(App, {
     sidebarWidth: state.sidebarWidth,
     keyboardShortcut: state.keyboardShortcut,
@@ -58,9 +63,9 @@ function mountSidebar(): void {
 }
 
 function toggleSidebar(): void {
-  const el = document.getElementById(SIDEBAR_ID);
-  if (!el) return;
-  el.hidden = !el.hidden;
+  // Let App.vue own the toggle state; it will dispatch frappe-ai-opened/closed
+  // which syncs el.hidden (and thus the flex layout reflow).
+  document.dispatchEvent(new CustomEvent("frappe-ai-toggle"));
 }
 
 $(document).on("app_ready", async () => {
