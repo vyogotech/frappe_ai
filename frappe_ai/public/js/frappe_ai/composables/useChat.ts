@@ -19,8 +19,8 @@
  */
 
 import { ref, readonly } from "vue";
-import { getPageContext } from "@/utils/context";
-import type { Message, ContentBlock, MessagePart } from "@/types";
+import { getPageContext } from "../utils/context";
+import type { Message, ContentBlock, MessagePart } from "../types";
 
 /**
  * Wire shape from frappe_ai.api.ai_query.query (the non-streaming fallback).
