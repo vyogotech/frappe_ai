@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { formatValue } from "@/utils/formatters";
-import type { TableBlock, TableRow } from "@/types/blocks";
+import { formatValue } from "../../utils/formatters";
+import type { TableBlock, TableRow } from "../../types/blocks";
 
 
 const props = defineProps<{ block: TableBlock }>();

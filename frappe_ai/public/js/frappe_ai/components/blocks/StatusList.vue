@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { StatusListBlock, StatusItem } from "@/types/blocks";
+import type { StatusListBlock, StatusItem } from "../../types/blocks";
 
 
 const props = defineProps<{ block: StatusListBlock }>();
