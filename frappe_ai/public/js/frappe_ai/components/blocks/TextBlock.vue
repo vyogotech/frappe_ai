@@ -3,7 +3,7 @@ import { computed } from "vue";
 import MarkdownIt, { type Options as MarkdownItOptions } from "markdown-it";
 import type Token from "markdown-it/lib/token.mjs";
 import type Renderer from "markdown-it/lib/renderer.mjs";
-import type { TextBlock } from "@/types/blocks";
+import type { TextBlock } from "../../types/blocks";
 
 const props = defineProps<{ block: TextBlock }>();
 

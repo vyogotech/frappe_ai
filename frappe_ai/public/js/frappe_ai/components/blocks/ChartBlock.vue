@@ -11,8 +11,8 @@ import {
   CalendarComponent,
 } from "echarts/components";
 import VChart from "vue-echarts";
-import { formatValue } from "@/utils/formatters";
-import type { ChartBlock } from "@/types/blocks";
+import { formatValue } from "../../utils/formatters";
+import type { ChartBlock } from "../../types/blocks";
 
 use([
   CanvasRenderer,

@@ -1,7 +1,7 @@
 /** Block component registry -- maps block type strings to Vue components. */
 
 import type { Component } from "vue";
-import type { BlockType } from "@/types/blocks";
+import type { BlockType } from "../../types/blocks";
 import TextBlock from "./TextBlock.vue";
 import ChartBlock from "./ChartBlock.vue";
 import TableBlock from "./TableBlock.vue";
