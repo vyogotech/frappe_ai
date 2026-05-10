@@ -1,5 +1,8 @@
 """
 AI Query API — sid cookie authentication forwarded to the AI agent.
+
+query() is deprecated and superseded by frappe_ai.api.chat.start_stream (socketio relay).
+test_connection() is still active and called from ai_assistant_settings.js.
 """
 
 import json
@@ -16,23 +19,13 @@ def _agent_url() -> str:
 
 @frappe.whitelist()
 def query(message):
-	# Deprecated: use frappe_ai.api.chat.start_stream (socketio relay) instead.
-	# Retained for backward compatibility; will be removed after Phase 7 verification.
-	"""
-	Send a message to the AI agent using the user's sid cookie.
-
-	Args:
-	    message (str): The query/message to send to the AI assistant
-
-	Returns:
-	    dict: Aggregated response from the agent containing AI-generated answer
-	"""
+	"""Deprecated — use frappe_ai.api.chat.start_stream instead."""
 	if not message:
 		frappe.throw(_("Message is required"))
 
 	user = frappe.session.user
 	if user == "Guest":
-		frappe.throw(_("Authentication required"))
+		frappe.throw(_("Authentication required"), frappe.AuthenticationError)
 
 	user_email = frappe.db.get_value("User", user, "email")
 	settings = frappe.get_single("AI Assistant Settings")
@@ -51,8 +44,6 @@ def query(message):
 		},
 	}
 
-	# Fallback: consumes SSE stream server-side and returns aggregated JSON.
-	# Phase 6 replaces this with a socketio relay where the browser streams directly.
 	try:
 		with requests.post(
 			f"{_agent_url()}/api/v1/chat",
@@ -86,9 +77,6 @@ def query(message):
 				elif ev_type == "done":
 					tools_called = ev.get("tools_called") or []
 				elif ev_type == "error":
-					# Capture but keep draining — the agent always emits
-					# `done` after `error`, and we want to consume the
-					# stream cleanly to free the connection.
 					agent_error = ev.get("message") or "Agent error"
 
 		if agent_error:
@@ -102,98 +90,61 @@ def query(message):
 	except requests.exceptions.Timeout:
 		frappe.log_error(
 			title="AI Agent Query Timeout",
-			message=f"Query timed out after {settings.timeout or 30}s: {message}",
+			message=f"Query timed out after {settings.timeout or 30}s",
 		)
 		frappe.throw(_("Request timed out. Please try again."))
 
 	except requests.exceptions.RequestException as e:
 		frappe.log_error(
 			title="AI Agent Query Failed",
-			message=f"Query failed: {e}\nMessage: {message}",
+			message=f"Query failed: {e}",
 		)
 		frappe.throw(_("Failed to query AI assistant. Please check the logs."))
 
 
 @frappe.whitelist()
 def test_connection():
-	"""Test connectivity to the AI agent using sid cookie authentication."""
+	"""Test connectivity to the AI agent by calling its /health endpoint."""
 	settings = frappe.get_single("AI Assistant Settings")
 
 	if not settings.enabled:
 		return {"success": False, "message": "AI Assistant is not enabled"}
 
 	if frappe.session.user == "Guest":
-		return {"success": False, "message": "Please log in to test the connection"}
+		frappe.throw(_("Authentication required"), frappe.AuthenticationError)
 
 	try:
-		sid = frappe.session.sid
 		agent_url = _agent_url()
+		if not agent_url:
+			return {"success": False, "message": "AI agent URL is not configured."}
 
 		health_response = requests.get(
 			f"{agent_url}/health",
-			cookies={"sid": sid},
+			cookies={"sid": frappe.session.sid},
 			timeout=10,
 		)
 
-		if health_response.status_code != 200:
-			return {
-				"success": False,
-				"message": f"AI agent health check failed (status {health_response.status_code})",
-			}
-
-		health_data = health_response.json() if health_response.text else {}
-
-		test_query = {
-			"message": "test connection",
-			"context": {
-				"user_id": frappe.session.user,
-				"timestamp": datetime.now().isoformat(),
-			},
-		}
-
-		query_response = requests.post(
-			f"{agent_url}/api/v1/chat",
-			json=test_query,
-			cookies={"sid": sid},
-			headers={"Content-Type": "application/json"},
-			timeout=settings.timeout or 30,
-		)
-
-		if query_response.status_code == 200:
+		if health_response.status_code == 200:
 			return {
 				"success": True,
 				"message": "Successfully connected to AI agent",
 				"details": {
-					"health": health_data,
-					"auth_method": "sid cookie",
+					"health": health_response.json() if health_response.text else {},
 					"user": frappe.session.user,
 				},
 			}
-		else:
-			return {
-				"success": False,
-				"message": f"Health OK but query test failed (status {query_response.status_code})",
-				"details": {
-					"health": health_data,
-					"error": query_response.text[:200] if query_response.text else "",
-				},
-			}
+
+		return {
+			"success": False,
+			"message": f"AI agent health check failed (HTTP {health_response.status_code})",
+		}
 
 	except requests.exceptions.Timeout:
-		return {
-			"success": False,
-			"message": "Connection timeout. Check if the AI agent is running.",
-		}
+		return {"success": False, "message": "Connection timeout. Check if the AI agent is running."}
 
 	except requests.exceptions.ConnectionError as e:
-		return {
-			"success": False,
-			"message": f"Cannot connect to AI agent: {e}",
-		}
+		return {"success": False, "message": f"Cannot connect to AI agent: {e}"}
 
 	except Exception as e:
-		frappe.log_error(
-			title="AI Agent Connection Test Failed",
-			message=f"Error testing connection to AI agent: {e}",
-		)
+		frappe.log_error(title="AI Agent Connection Test Failed", message=str(e))
 		return {"success": False, "message": f"Connection test failed: {e}"}
