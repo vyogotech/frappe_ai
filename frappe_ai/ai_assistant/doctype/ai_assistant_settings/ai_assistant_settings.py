@@ -8,23 +8,24 @@ from frappe.model.document import Document
 
 
 class AIAssistantSettings(Document):
-    def before_save(self):
-        # Always reflect current site_config value — UI field is display-only
-        self.agent_url = frappe.local.conf.get("frappe_ai_agent_url", "")
+	def before_save(self):
+		# The agent URL is authoritative in site_config.json (frappe_ai_agent_url).
+		# The APIs read it from there directly. This field is read-only display
+		# that refreshes on every save so the form always shows the live value.
+		conf_url = frappe.local.conf.get("frappe_ai_agent_url", "")
+		self.agent_url = conf_url.rstrip("/") if conf_url else ""
 
-    def validate(self):
-        if self.keyboard_shortcut:
-            _validate_shortcut(self.keyboard_shortcut)
+	def validate(self):
+		if self.timeout is not None and (self.timeout < 1 or self.timeout > 300):
+			frappe.throw(frappe._("Timeout must be between 1 and 300 seconds."))
+		if self.sidebar_width is not None and (self.sidebar_width < 300 or self.sidebar_width > 600):
+			frappe.throw(frappe._("Sidebar width must be between 300 and 600 pixels."))
+		if self.keyboard_shortcut:
+			_validate_shortcut(self.keyboard_shortcut)
 
 
 def _validate_shortcut(shortcut: str) -> None:
-    """Accept 'Mod+key', 'Ctrl+key', 'Alt+key', 'Shift+key' combos.
-
-    The final key may be a word character (letters, digits, underscore) or a
-    printable special character such as / ; ' [ ] \\ ` - = , . etc.
-    """
-    pattern = r"^(Mod|Ctrl|Alt|Shift)(\+(Mod|Ctrl|Alt|Shift))*\+[\w\S]$"
-    if not re.match(pattern, shortcut, re.IGNORECASE):
-        frappe.throw(
-            frappe._("Invalid keyboard shortcut format. Use e.g. Ctrl+/ or Mod+Shift+A.")
-        )
+	"""Accept modifier+key combos: e.g. Ctrl+/, Mod+Shift+A, Alt+;"""
+	pattern = r"^(Mod|Ctrl|Alt|Shift)(\+(Mod|Ctrl|Alt|Shift))*\+\S$"
+	if not re.match(pattern, shortcut, re.IGNORECASE):
+		frappe.throw(frappe._("Invalid keyboard shortcut format. Use e.g. Ctrl+/ or Mod+Shift+A."))
