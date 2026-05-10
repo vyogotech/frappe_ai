@@ -1,7 +1,7 @@
 import { createApp, type App as VueApp } from "vue";
 import App from "./frappe_ai/App.vue";
 
-const SIDEBAR_ID = "frappe-ai-sidebar";
+const SIDEBAR_ID = "frappe-ai-sidebar-root";
 
 let vueApp: VueApp | null = null;
 
@@ -43,30 +43,45 @@ function injectNavbarButton(): void {
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
   </svg>`;
 
-  // saas_platform / Frappe v16 custom desktop navbar — insert before avatar
-  const $avatar = $(".desktop-avatar");
-  if ($avatar.length) {
-    const $btn = $(
-      `<div id="frappe-ai-nav-btn" title="Frappe AI (${state.keyboardShortcut})"
-            style="cursor:pointer;display:flex;align-items:center;padding:0 4px">${svgIcon}</div>`
-    );
-    $btn.on("click", toggleSidebar);
-    $btn.insertBefore($avatar);
-    return;
+  function tryInject(): boolean {
+    if (document.getElementById("frappe-ai-nav-btn")) return true;
+
+    // saas_platform / Frappe v16 custom desktop navbar — insert before avatar
+    const $avatar = $(".desktop-avatar");
+    if ($avatar.length) {
+      const $btn = $(
+        `<div id="frappe-ai-nav-btn" title="Frappe AI (${state.keyboardShortcut})"
+              style="cursor:pointer;display:flex;align-items:center;padding:0 4px">${svgIcon}</div>`
+      );
+      $btn.on("click", toggleSidebar);
+      $btn.insertBefore($avatar);
+      return true;
+    }
+
+    // Traditional Frappe Bootstrap navbar (.navbar-right exists in read-only / announcement mode)
+    const $navbarRight = $(".navbar-right");
+    if ($navbarRight.length) {
+      const $btn = $(
+        `<li class="nav-item" id="frappe-ai-nav-btn" title="Frappe AI (${state.keyboardShortcut})">
+          <a class="nav-link" style="cursor:pointer;display:flex;align-items:center;padding:0 8px">${svgIcon}</a>
+        </li>`
+      );
+      $btn.on("click", toggleSidebar);
+      $navbarRight.prepend($btn);
+      return true;
+    }
+
+    return false;
   }
 
-  // Traditional Frappe Bootstrap navbar (.navbar-right exists in read-only / announcement mode)
-  const $navbarRight = $(".navbar-right");
-  if ($navbarRight.length) {
-    const $btn = $(
-      `<li class="nav-item" id="frappe-ai-nav-btn" title="Frappe AI (${state.keyboardShortcut})">
-        <a class="nav-link" style="cursor:pointer;display:flex;align-items:center;padding:0 8px">${svgIcon}</a>
-      </li>`
-    );
-    $btn.on("click", toggleSidebar);
-    $navbarRight.prepend($btn);
-    return;
-  }
+  if (tryInject()) return;
+
+  // Navbar not rendered yet (saas_platform renders it after app_ready).
+  // Observe body until the injection point appears.
+  const observer = new MutationObserver(() => {
+    if (tryInject()) observer.disconnect();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 }
 
 function mountSidebar(): void {
