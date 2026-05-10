@@ -41,7 +41,7 @@ md.renderer.rules.link_open = function (
   self: Renderer,
 ) {
   tokens[idx].attrSet("target", "_blank");
-  tokens[idx].attrSet("rel", "noopener");
+  tokens[idx].attrSet("rel", "noopener noreferrer");
   return defaultLinkOpen(tokens, idx, options, env, self);
 };
 

@@ -31,8 +31,7 @@
   {
    "fieldname": "content",
    "fieldtype": "Long Text",
-   "label": "Content",
-   "reqd": 1
+   "label": "Content"
   },
   {
    "fieldname": "tool_name",

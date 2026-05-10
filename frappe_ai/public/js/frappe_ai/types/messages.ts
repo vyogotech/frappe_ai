@@ -19,6 +19,7 @@ export interface ToolCall {
   result?: string;
   success?: boolean;
   status: "running" | "done" | "error" | "cancelled";
+  timestamp?: Date;
 }
 
 export interface ErrorInfo {

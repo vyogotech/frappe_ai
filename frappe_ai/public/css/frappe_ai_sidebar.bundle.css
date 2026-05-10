@@ -137,13 +137,6 @@
   max-width: 240px;
 }
 
-.frappe-ai-empty-version {
-  font-size: 10px;
-  color: var(--text-muted);
-  margin: 8px 0 0;
-  opacity: 0.6;
-}
-
 /* ──────────────────────────────────────────
    Message bubbles (MessageBubble.vue)
    ────────────────────────────────────────── */
@@ -182,7 +175,7 @@
 
 .frappe-ai-bubble--user .frappe-ai-bubble-content {
   background: var(--primary);
-  color: white;
+  color: var(--primary-fg, #fff);
   border-bottom-right-radius: 4px;
 }
 
@@ -242,19 +235,19 @@
 
 .frappe-ai-error--critical {
   background: var(--red-highlight, #fff2f2);
-  border-color: var(--red, #e74c3c);
+  border-color: var(--indicator-red, #e74c3c);
   color: var(--red-dark, #c0392b);
 }
 
 .frappe-ai-error--warning {
   background: var(--yellow-highlight, #fffbf0);
-  border-color: var(--yellow, #f39c12);
+  border-color: var(--indicator-yellow, #f39c12);
   color: var(--yellow-dark, #d68910);
 }
 
 .frappe-ai-error--info {
   background: var(--blue-highlight, #f0f5ff);
-  border-color: var(--blue, #3498db);
+  border-color: var(--indicator-blue, #3498db);
   color: var(--blue-dark, #2176ae);
 }
 
@@ -357,12 +350,12 @@
 }
 
 .frappe-ai-tool-status--running {
-  background: var(--yellow, #f39c12);
+  background: var(--indicator-yellow, #f39c12);
   animation: frappe-ai-blink 1s ease-in-out infinite;
 }
 
-.frappe-ai-tool-status--done { background: var(--green, #27ae60); }
-.frappe-ai-tool-status--error { background: var(--red, #e74c3c); }
+.frappe-ai-tool-status--done { background: var(--indicator-green, #27ae60); }
+.frappe-ai-tool-status--error { background: var(--indicator-red, #e74c3c); }
 
 @keyframes frappe-ai-blink {
   0%, 100% { opacity: 1; }
@@ -502,9 +495,9 @@
 }
 
 .frappe-ai-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.frappe-ai-send-btn--active { background: var(--primary); color: white; }
+.frappe-ai-send-btn--active { background: var(--primary); color: var(--primary-fg, #fff); }
 .frappe-ai-send-btn--active:not(:disabled):hover { opacity: 0.88; }
-.frappe-ai-send-btn--stop { background: var(--red, #e74c3c); color: white; }
+.frappe-ai-send-btn--stop { background: var(--indicator-red, #e74c3c); color: var(--primary-fg, #fff); }
 .frappe-ai-send-btn--stop:not(:disabled):hover { opacity: 0.85; }
 
 .frappe-ai-stop-icon {
@@ -557,8 +550,8 @@
   margin-top: 4px;
 }
 
-.frappe-ai-trend--up { color: var(--green, #27ae60); }
-.frappe-ai-trend--down { color: var(--red, #e74c3c); }
+.frappe-ai-trend--up { color: var(--indicator-green, #27ae60); }
+.frappe-ai-trend--down { color: var(--indicator-red, #e74c3c); }
 .frappe-ai-trend--flat { color: var(--text-muted); }
 
 .frappe-ai-trend-arrow { font-weight: 700; }
@@ -606,13 +599,13 @@
 }
 
 .frappe-ai-status-dot--green,
-.frappe-ai-status-dot--success { background: var(--green, #27ae60); }
+.frappe-ai-status-dot--success { background: var(--indicator-green, #27ae60); }
 .frappe-ai-status-dot--red,
-.frappe-ai-status-dot--danger { background: var(--red, #e74c3c); }
+.frappe-ai-status-dot--danger { background: var(--indicator-red, #e74c3c); }
 .frappe-ai-status-dot--yellow,
-.frappe-ai-status-dot--warning { background: var(--yellow, #f39c12); }
+.frappe-ai-status-dot--warning { background: var(--indicator-yellow, #f39c12); }
 .frappe-ai-status-dot--blue,
-.frappe-ai-status-dot--info { background: var(--blue, #3498db); }
+.frappe-ai-status-dot--info { background: var(--indicator-blue, #3498db); }
 .frappe-ai-status-dot--gray,
 .frappe-ai-status-dot--grey,
 .frappe-ai-status-dot--default { background: var(--text-muted); }
@@ -634,13 +627,13 @@
 }
 
 .frappe-ai-status-badge--green,
-.frappe-ai-status-badge--success { background: var(--green-highlight, #e6f9ee); color: var(--green, #27ae60); }
+.frappe-ai-status-badge--success { background: var(--green-highlight, #e6f9ee); color: var(--indicator-green, #27ae60); }
 .frappe-ai-status-badge--red,
-.frappe-ai-status-badge--danger { background: var(--red-highlight, #fff2f2); color: var(--red, #e74c3c); }
+.frappe-ai-status-badge--danger { background: var(--red-highlight, #fff2f2); color: var(--indicator-red, #e74c3c); }
 .frappe-ai-status-badge--yellow,
 .frappe-ai-status-badge--warning { background: var(--yellow-highlight, #fffbf0); color: var(--yellow-dark, #d68910); }
 .frappe-ai-status-badge--blue,
-.frappe-ai-status-badge--info { background: var(--blue-highlight, #f0f5ff); color: var(--blue, #3498db); }
+.frappe-ai-status-badge--info { background: var(--blue-highlight, #f0f5ff); color: var(--indicator-blue, #3498db); }
 .frappe-ai-status-badge--gray,
 .frappe-ai-status-badge--grey,
 .frappe-ai-status-badge--default { background: var(--bg-light-gray, #f0f0f0); color: var(--text-muted); }
@@ -705,9 +698,3 @@
   opacity: 0;
 }
 
-/* Remove any legacy push/padding hacks */
-body.frappe-ai-open .main-section,
-body.frappe-ai-open .layout-main-section {
-  padding-right: 0 !important;
-  margin-right: 0 !important;
-}

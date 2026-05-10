@@ -1,25 +1,21 @@
-/** Load Frappe AI Settings from the backend. */
+/** Load Frappe AI Settings from the backend. Module-level singleton. */
 
 import { ref, readonly, type Ref } from "vue";
 
 export interface FrappeAISettings {
   enabled: boolean;
-  agentUrl: string;
   sidebarWidth: number;
   keyboardShortcut: string;
 }
 
-/** Wire shape returned by frappe_ai.api.get_settings. */
 interface FrappeAISettingsResponse {
   enabled?: boolean;
-  agent_url?: string;
   sidebar_width?: number;
   keyboard_shortcut?: string;
 }
 
 const DEFAULT_SETTINGS: FrappeAISettings = {
   enabled: false,
-  agentUrl: "",
   sidebarWidth: 380,
   keyboardShortcut: "Ctrl+/",
 };
@@ -42,13 +38,13 @@ export function useSettings() {
       if (msg) {
         settings.value = {
           enabled: msg.enabled ?? false,
-          agentUrl: msg.agent_url ?? "",
           sidebarWidth: msg.sidebar_width ?? 380,
           keyboardShortcut: msg.keyboard_shortcut ?? "Ctrl+/",
         };
       }
-      loaded.value = true;
     } catch {
+      // fall back to defaults
+    } finally {
       loaded.value = true;
     }
   }
