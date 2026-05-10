@@ -1,15 +1,14 @@
-# Copyright (c) 2026, Vyogo and contributors
-# For license information, please see license.txt
-
 import frappe
-from frappe.model.utils.rename_field import rename_field
 
 
 def execute():
-	"""Rename MCP Server Settings.mcp_server_url to agent_url.
+	"""Rename mcp_server_url → agent_url in tabSingles.
 
-	Idempotent: no-op if the old column does not exist.
+	AI Assistant Settings is a Single DocType — values live in tabSingles,
+	not in a dedicated table column. rename_field() is a no-op for Singles;
+	the row must be updated directly.
 	"""
-	if not frappe.db.has_column("MCP Server Settings", "mcp_server_url"):
-		return
-	rename_field("MCP Server Settings", "mcp_server_url", "agent_url")
+	frappe.db.sql(
+		"UPDATE `tabSingles` SET field = 'agent_url'"
+		" WHERE doctype = 'AI Assistant Settings' AND field = 'mcp_server_url'"
+	)

@@ -20,11 +20,9 @@ def execute():
 		new_meta = frappe.get_meta(new_name)
 		for field, value in old_values.items():
 			if new_meta.get_field(field):
-				frappe.db.set_value(new_name, new_name, field, value, update_modified=False)
+				frappe.db.set_single_value(new_name, field, value, update_modified=False)
 		frappe.delete_doc("DocType", old_name, force=True, ignore_missing=True)
 	else:
 		# Pre-sync: rename in place. rename_doc handles the table rename,
 		# the tabSingles `doctype` column, and meta references.
 		frappe.rename_doc("DocType", old_name, new_name, force=True)
-
-	frappe.db.commit()

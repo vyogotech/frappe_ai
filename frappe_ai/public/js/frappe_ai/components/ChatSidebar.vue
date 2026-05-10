@@ -5,52 +5,40 @@ import ChatMessages from "./ChatMessages.vue";
 import ChatInput from "./ChatInput.vue";
 
 defineProps<{
-  sidebarWidth: number;
-  keyboardShortcut: string;
-  visible: boolean;
+	sidebarWidth: number;
+	keyboardShortcut: string;
 }>();
 
 const emit = defineEmits<{ close: [] }>();
 
-const {
-  messages,
-  isLoading,
-  canCancel,
-  sendMessage,
-  cancelMessage,
-  clearMessages,
-} = useChat();
+const { messages, isLoading, canCancel, sendMessage, cancelMessage, clearMessages } = useChat();
 
 function handleSend(content: string) {
-  sendMessage(content);
+	sendMessage(content);
 }
 
 function handleStop() {
-  cancelMessage();
+	cancelMessage();
 }
 
 function handleClear() {
-  clearMessages();
+	clearMessages();
 }
 
 function handleClose() {
-  emit("close");
+	emit("close");
 }
 </script>
 
 <template>
-  <div
-    v-show="visible"
-    class="frappe-ai-sidebar"
-    :style="{ width: sidebarWidth + 'px' }"
-  >
-    <ChatHeader @clear="handleClear" @close="handleClose" />
-    <ChatMessages :messages="messages" />
-    <ChatInput
-      :busy="isLoading"
-      :can-cancel="canCancel"
-      @send="handleSend"
-      @stop="handleStop"
-    />
-  </div>
+	<div class="frappe-ai-sidebar" :style="{ width: sidebarWidth + 'px' }">
+		<ChatHeader @clear="handleClear" @close="handleClose" />
+		<ChatMessages :messages="messages" />
+		<ChatInput
+			:busy="isLoading"
+			:can-cancel="canCancel"
+			@send="handleSend"
+			@stop="handleStop"
+		/>
+	</div>
 </template>

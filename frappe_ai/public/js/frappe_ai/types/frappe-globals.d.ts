@@ -72,6 +72,24 @@ interface FrappeSession {
   user_email?: string;
 }
 
+interface FrappeRealtime {
+  on: (event: string, handler: (data: unknown) => void) => void;
+  off: (event: string, handler?: (data: unknown) => void) => void;
+}
+
+interface FrappeUIKeys {
+  add_shortcut: (opts: {
+    shortcut: string;
+    action: () => void;
+    description: string;
+    ignore_inputs: boolean;
+  }) => void;
+}
+
+interface FrappeUI {
+  keys: FrappeUIKeys;
+}
+
 interface FrappeGlobal {
   app?: FrappeApp;
   router?: FrappeRouter;
@@ -79,6 +97,8 @@ interface FrappeGlobal {
   boot?: FrappeBoot;
   defaults?: FrappeDefaults;
   session?: FrappeSession;
+  realtime: FrappeRealtime;
+  ui: FrappeUI;
   /** Navigate the desk to a route — accepts segments like ("Form", doctype, name). */
   set_route: (...path: string[]) => void;
   /**
@@ -86,7 +106,9 @@ interface FrappeGlobal {
    * callback / error handlers are also invoked. Callers who use only
    * callbacks can ignore the returned Promise.
    */
-  call: <TResponse = unknown>(args: FrappeCallArgs<TResponse>) => Promise<{ message?: TResponse }>;
+  call: <TResponse = unknown>(
+    args: FrappeCallArgs<TResponse>,
+  ) => Promise<{ message?: TResponse }>;
 }
 
 interface FrappeFormDoc {
@@ -103,10 +125,15 @@ interface FrappeList {
   doctype?: string;
 }
 
+interface JQuery {
+  length: number;
+  on: (event: string, handler: () => void) => JQuery;
+  insertBefore: (target: JQuery) => JQuery;
+  prepend: (content: JQuery) => JQuery;
+}
+
 interface JQueryStatic {
-  (selector: Document | string): {
-    on: (event: string, handler: () => void) => void;
-  };
+  (selector: Document | string | HTMLElement): JQuery;
 }
 
 declare const frappe: FrappeGlobal | undefined;

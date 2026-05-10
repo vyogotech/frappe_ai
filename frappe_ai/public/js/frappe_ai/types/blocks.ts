@@ -21,7 +21,13 @@ export interface ChartOptions {
   currency?: string;
 }
 
-export type ChartType = "bar" | "line" | "pie" | "funnel" | "heatmap" | "calendar";
+export type ChartType =
+  | "bar"
+  | "line"
+  | "pie"
+  | "funnel"
+  | "heatmap"
+  | "calendar";
 
 export interface ChartBlock {
   type: "chart";

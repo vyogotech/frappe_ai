@@ -8,7 +8,12 @@ export interface PageContext {
 }
 
 export function getPageContext(): PageContext {
-  const ctx: PageContext = { route: "", doctype: "", docname: "", currency: "" };
+  const ctx: PageContext = {
+    route: "",
+    doctype: "",
+    docname: "",
+    currency: "",
+  };
 
   try {
     if (typeof frappe === "undefined") {

@@ -1,40 +1,12 @@
 import { createApp, type App as VueApp } from "vue";
 import App from "./frappe_ai/App.vue";
+import { useSettings } from "./frappe_ai/composables/useSettings";
 
 const SIDEBAR_ID = "frappe-ai-sidebar-root";
 
 let vueApp: VueApp | null = null;
 
-interface FrappeAISettings {
-  enabled?: boolean;
-  sidebar_width?: number;
-  keyboard_shortcut?: string;
-}
-
-const state = {
-  enabled: false,
-  sidebarWidth: 380,
-  keyboardShortcut: "Ctrl+/",
-};
-
-async function loadSettings(): Promise<void> {
-  try {
-    const settings = await new Promise<FrappeAISettings>((resolve, reject) => {
-      frappe.call<FrappeAISettings>({
-        method: "frappe_ai.api.get_settings",
-        callback: (r) => resolve(r.message ?? {}),
-        error: reject,
-      });
-    });
-    state.enabled = Boolean(settings.enabled);
-    state.sidebarWidth = settings.sidebar_width ?? 380;
-    state.keyboardShortcut = settings.keyboard_shortcut ?? "Ctrl+/";
-  } catch (err) {
-    console.warn("[Frappe AI] Could not load settings:", err);
-  }
-}
-
-function injectNavbarButton(): void {
+function injectNavbarButton(keyboardShortcut: string): void {
   if (document.getElementById("frappe-ai-nav-btn")) return;
 
   const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
@@ -46,28 +18,15 @@ function injectNavbarButton(): void {
   function tryInject(): boolean {
     if (document.getElementById("frappe-ai-nav-btn")) return true;
 
-    // saas_platform / Frappe v16 custom desktop navbar — insert before avatar
+    // Frappe v16 desk navbar — insert the toggle button before the user avatar.
     const $avatar = $(".desktop-avatar");
     if ($avatar.length) {
       const $btn = $(
-        `<div id="frappe-ai-nav-btn" title="Frappe AI (${state.keyboardShortcut})"
-              style="cursor:pointer;display:flex;align-items:center;padding:0 4px">${svgIcon}</div>`
+        `<div id="frappe-ai-nav-btn" title="Frappe AI (${keyboardShortcut})"
+              style="cursor:pointer;display:flex;align-items:center;padding:0 4px">${svgIcon}</div>`,
       );
       $btn.on("click", toggleSidebar);
       $btn.insertBefore($avatar);
-      return true;
-    }
-
-    // Traditional Frappe Bootstrap navbar (.navbar-right exists in read-only / announcement mode)
-    const $navbarRight = $(".navbar-right");
-    if ($navbarRight.length) {
-      const $btn = $(
-        `<li class="nav-item" id="frappe-ai-nav-btn" title="Frappe AI (${state.keyboardShortcut})">
-          <a class="nav-link" style="cursor:pointer;display:flex;align-items:center;padding:0 8px">${svgIcon}</a>
-        </li>`
-      );
-      $btn.on("click", toggleSidebar);
-      $navbarRight.prepend($btn);
       return true;
     }
 
@@ -76,38 +35,43 @@ function injectNavbarButton(): void {
 
   if (tryInject()) return;
 
-  // Navbar not rendered yet (saas_platform renders it after app_ready).
-  // Observe body until the injection point appears.
+  // Frappe v16 renders the navbar element after app_ready in some configurations.
+  // Use MutationObserver to inject once .desktop-avatar appears in the DOM.
   const observer = new MutationObserver(() => {
     if (tryInject()) observer.disconnect();
   });
   observer.observe(document.body, { childList: true, subtree: true });
 }
 
-function mountSidebar(): void {
+function mountSidebar(sidebarWidth: number, keyboardShortcut: string): void {
   if (document.getElementById(SIDEBAR_ID)) return;
 
   const el = document.createElement("div");
   el.id = SIDEBAR_ID;
   el.hidden = true;
-  el.style.setProperty("--frappe-ai-width", `${state.sidebarWidth}px`);
+  el.style.setProperty("--frappe-ai-width", `${sidebarWidth}px`);
   document.body.appendChild(el);
 
-  // Sync container hidden attribute with App.vue's visible state.
-  // App.vue dispatches these after updating its own visible ref.
-  document.addEventListener("frappe-ai-opened", () => { el.hidden = false; });
-  document.addEventListener("frappe-ai-closed", () => { el.hidden = true; });
-
-  vueApp = createApp(App, {
-    sidebarWidth: state.sidebarWidth,
-    keyboardShortcut: state.keyboardShortcut,
+  // Sync the container's hidden attribute with App.vue's visible state.
+  // On open: unhide immediately so Vue's enter-transition has a visible element to animate.
+  // On close: delay until after the CSS leave-transition (250ms) finishes, otherwise
+  // setting hidden=true collapses the container before the slide-out can play.
+  document.addEventListener("frappe-ai-opened", () => {
+    el.hidden = false;
   });
+  document.addEventListener("frappe-ai-closed", () => {
+    setTimeout(() => {
+      el.hidden = true;
+    }, 300);
+  });
+
+  vueApp = createApp(App, { sidebarWidth, keyboardShortcut });
   vueApp.mount(el);
 
-  injectNavbarButton();
+  injectNavbarButton(keyboardShortcut);
 
   frappe.ui.keys.add_shortcut({
-    shortcut: state.keyboardShortcut,
+    shortcut: keyboardShortcut,
     action: toggleSidebar,
     description: "Toggle Frappe AI sidebar",
     ignore_inputs: false,
@@ -115,20 +79,16 @@ function mountSidebar(): void {
 }
 
 function toggleSidebar(): void {
-  // Let App.vue own the toggle state; it will dispatch frappe-ai-opened/closed
-  // which syncs el.hidden (and thus the flex layout reflow).
+  // App.vue owns the toggle state and dispatches frappe-ai-opened/closed
+  // which syncs el.hidden (and the flex layout reflow).
   document.dispatchEvent(new CustomEvent("frappe-ai-toggle"));
 }
 
 $(document).on("app_ready", async () => {
-  const frappeVersion: string = frappe?.boot?.versions?.frappe ?? "";
-  if (frappeVersion.startsWith("15")) {
-    console.warn("[Frappe AI] Requires Frappe v16+. Skipping mount.");
-    return;
-  }
-
+  const { settings, loadSettings } = useSettings();
   await loadSettings();
-  if (!state.enabled) return;
 
-  mountSidebar();
+  if (!settings.value.enabled) return;
+
+  mountSidebar(settings.value.sidebarWidth, settings.value.keyboardShortcut);
 });
