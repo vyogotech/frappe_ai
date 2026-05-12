@@ -62,15 +62,46 @@ def get_recent_messages(limit: int = 50) -> dict:
 	return {"session_id": session_id, "messages": messages}
 
 
+_ALLOWED_PAGE_CONTEXT_KEYS = ("route", "doctype", "docname", "currency")
+
+
+def _sanitize_page_context(raw) -> dict:
+	"""Accept only a flat dict of expected page-context fields with string values.
+
+	frappe.whitelist serialises JSON args, so `page_context` may arrive as a
+	dict or as a JSON string. Anything else (lists, nested dicts, non-strings)
+	gets dropped so a malformed frontend can't bloat the agent payload or
+	smuggle non-grounding data into the system prompt.
+	"""
+	if isinstance(raw, str):
+		try:
+			raw = json.loads(raw)
+		except (json.JSONDecodeError, ValueError):
+			return {}
+	if not isinstance(raw, dict):
+		return {}
+	out: dict = {}
+	for key in _ALLOWED_PAGE_CONTEXT_KEYS:
+		val = raw.get(key)
+		if isinstance(val, str) and val:
+			# Cap at 200 chars so a giant route can't blow the prompt.
+			out[key] = val[:200]
+	return out
+
+
 @frappe.whitelist()
-def start_stream(message: str, session_id: str | None = None) -> dict:
+def start_stream(message: str, session_id: str | None = None, page_context=None) -> dict:
 	"""Enqueue an agent SSE relay in the background and return the session_id immediately.
 
 	The browser subscribes to frappe_ai:chunk:<session_id> via frappe.realtime.on
 	before calling this endpoint. The background worker (queue=long) consumes the
 	agent's SSE stream and publishes each chunk via frappe.publish_realtime.
+
+	`page_context` (optional) is a dict {route, doctype, docname, currency}
+	captured from the browser; forwarded into the agent's context so the
+	system prompt can ground answers in the user's current page.
 	"""
-	if not message:
+	if not message or not message.strip():
 		frappe.throw(_("Message is required"))
 
 	if len(message) > 10000:
@@ -106,6 +137,7 @@ def start_stream(message: str, session_id: str | None = None) -> dict:
 		sid=frappe.session.sid,
 		agent_url=agent_url,
 		timeout_seconds=timeout_seconds,
+		page_context=_sanitize_page_context(page_context),
 	)
 
 	return {"session_id": session_id}
@@ -118,18 +150,25 @@ def _stream_to_agent(
 	sid: str,
 	agent_url: str,
 	timeout_seconds: int = 30,
+	page_context: dict | None = None,
 ) -> None:
 	"""Background worker: relay agent SSE chunks to the browser via frappe.realtime.
 
 	Not a whitelisted endpoint — only called via frappe.enqueue.
 	"""
+	context: dict = {"user_id": user}
+	if page_context:
+		# Merge the sanitised page context (route/doctype/docname/currency) into
+		# the agent's request context. build_system_prompt() reads these keys.
+		context.update(page_context)
+
 	payload = {
 		"message": message,
 		# Forward session_id so the agent's LangGraph checkpointer keys on the
 		# same thread_id across turns — otherwise every message lands in a
 		# fresh thread and the model has no memory of prior turns.
 		"session_id": session_id,
-		"context": {"user_id": user},
+		"context": context,
 	}
 
 	event_name = f"frappe_ai:chunk:{session_id}"
