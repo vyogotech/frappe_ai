@@ -53,8 +53,8 @@
    "label": "Sidebar Width"
   },
   {
-   "default": "Ctrl+/",
-   "description": "Keyboard shortcut to toggle the AI sidebar",
+   "default": "Alt+/",
+   "description": "Keyboard shortcut to toggle the AI sidebar.",
    "fieldname": "keyboard_shortcut",
    "fieldtype": "Data",
    "label": "Keyboard Shortcut"
