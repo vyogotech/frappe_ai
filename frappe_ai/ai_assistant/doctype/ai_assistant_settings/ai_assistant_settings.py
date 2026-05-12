@@ -24,8 +24,31 @@ class AIAssistantSettings(Document):
 			_validate_shortcut(self.keyboard_shortcut)
 
 
+_RESERVED_SHORTCUTS = {
+	# Frappe v16 hard-binds these in the desk; binding the AI toggle to any of
+	# them swallows the keystroke and toggles the wrong thing instead.
+	"ctrl+/",  # Toggle left workspace sidebar
+	"ctrl+k",  # Toggle Awesomebar
+	"ctrl+g",  # Open Awesomebar
+	"ctrl+s",  # Trigger Primary Action
+	"alt+s",  # Open Settings
+	"shift+/",  # Show Keyboard Shortcuts
+}
+
+
 def _validate_shortcut(shortcut: str) -> None:
-	"""Accept modifier+key combos: e.g. Ctrl+/, Mod+Shift+A, Alt+;"""
+	"""Accept modifier+key combos: e.g. Alt+/, Mod+Shift+A, Alt+;
+
+	Rejects shortcuts already claimed by Frappe v16 (Ctrl+/, Ctrl+K, etc.) —
+	the OS still delivers the keystroke, but Frappe's handler runs first and
+	the AI toggle never fires.
+	"""
 	pattern = r"^(Mod|Ctrl|Alt|Shift)(\+(Mod|Ctrl|Alt|Shift))*\+\S$"
 	if not re.match(pattern, shortcut, re.IGNORECASE):
-		frappe.throw(frappe._("Invalid keyboard shortcut format. Use e.g. Ctrl+/ or Mod+Shift+A."))
+		frappe.throw(frappe._("Invalid keyboard shortcut format. Use e.g. Alt+/ or Mod+Shift+A."))
+	if shortcut.lower() in _RESERVED_SHORTCUTS:
+		frappe.throw(
+			frappe._("{0} is reserved by Frappe; pick a different combo (e.g. Alt+/, Mod+Shift+A).").format(
+				shortcut
+			)
+		)
