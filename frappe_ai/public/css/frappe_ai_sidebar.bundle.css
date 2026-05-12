@@ -322,6 +322,11 @@
   background: var(--bg-color);
   width: 100%;
   box-sizing: border-box;
+  /* As a flex item of .frappe-ai-messages (column flex container) the card
+   * inherits flex-shrink: 1, which combined with overflow: hidden collapses
+   * its height to the border (~2px) and hides the header. Pin shrink at 0
+   * so the card always lays out at its content height. */
+  flex-shrink: 0;
 }
 
 .frappe-ai-tool-header {

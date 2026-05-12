@@ -17,6 +17,7 @@
 
 import { ref, readonly } from "vue";
 import type { Message } from "../types";
+import { getPageContext } from "../utils/context";
 
 interface Chunk {
   type: "content" | "content_block" | "tool_call" | "done" | "error" | "session";
@@ -126,6 +127,36 @@ export function useChat() {
                 m.blocks.push(block);
                 m.pending = false;
               });
+            } else if (chunk.type === "tool_call" && chunk.name) {
+              // Surface tool invocations as their own bubble so the user can
+              // see what the agent looked up. The relay only emits the call
+              // (no separate result event today); render in "done" state so
+              // the card isn't stuck in a perpetual "running" spinner.
+              //
+              // The assistant placeholder was pushed before this stream began,
+              // so a naive push() would put the card AFTER the assistant text
+              // even though the tool was called BEFORE the content was
+              // generated. Splice in just before the placeholder so the
+              // visible order matches the agent's actual sequence.
+              const toolCallMessage: Message = {
+                id: crypto.randomUUID(),
+                role: "tool_call",
+                content: "",
+                toolCall: {
+                  call_id: crypto.randomUUID(),
+                  name: chunk.name,
+                  arguments: chunk.arguments ?? {},
+                  status: "done",
+                  timestamp: new Date(),
+                },
+                timestamp: new Date(),
+              };
+              const assistantIdx = messages.value.findIndex((m) => m.id === assistantId);
+              if (assistantIdx >= 0) {
+                messages.value.splice(assistantIdx, 0, toolCallMessage);
+              } else {
+                messages.value.push(toolCallMessage);
+              }
             } else if (chunk.type === "done") {
               _updateMessage(assistantId, (m) => {
                 m.pending = false;
@@ -147,7 +178,14 @@ export function useChat() {
 
           frappe.call<StreamResult>({
             method: "frappe_ai.api.chat.start_stream",
-            args: { message: content, session_id: sessionId },
+            args: {
+              message: content,
+              session_id: sessionId,
+              // Inject route/doctype/docname/currency so the agent prompt
+              // can ground answers in the user's current page. The relay
+              // forwards this dict into the agent's `context` payload.
+              page_context: getPageContext(),
+            },
             error: (err: unknown) => {
               frappe.realtime.off(eventName);
               canCancel.value = false;
