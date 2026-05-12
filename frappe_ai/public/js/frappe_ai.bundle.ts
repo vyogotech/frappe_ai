@@ -18,27 +18,52 @@ function injectNavbarButton(keyboardShortcut: string): void {
   function tryInject(): boolean {
     if (document.getElementById("frappe-ai-nav-btn")) return true;
 
-    // Frappe v16 desk navbar — insert the toggle button before the user avatar.
-    const $avatar = $(".desktop-avatar");
-    if ($avatar.length) {
+    // Desk home renders the top navbar with .desktop-avatar; every other
+    // route hides the top navbar and shows the user button inside the left
+    // sidebar (.dropdown-navbar-user). Anchor to whichever exists so the
+    // toggle is reachable on every page.
+    const $topAvatar = $(".desktop-avatar");
+    if ($topAvatar.length) {
       const $btn = $(
         `<div id="frappe-ai-nav-btn" title="Frappe AI (${keyboardShortcut})"
               style="cursor:pointer;display:flex;align-items:center;padding:0 4px">${svgIcon}</div>`,
       );
       $btn.on("click", toggleSidebar);
-      $btn.insertBefore($avatar);
+      $btn.insertBefore($topAvatar);
+      return true;
+    }
+
+    const $sidebarUser = $(".dropdown-navbar-user");
+    if ($sidebarUser.length) {
+      // Mimic the sibling sidebar nav items (icon + label, left-aligned)
+      // so the AI toggle doesn't look orphaned next to Home/Search/Notification.
+      const $btn = $(
+        `<a id="frappe-ai-nav-btn"
+            class="align-center btn-reset flex nav-link sidebar-user-button"
+            style="cursor:pointer;width:100%;min-height:40px;padding:0 8px;gap:8px;color:var(--text-color)"
+            title="Frappe AI (${keyboardShortcut})">
+            <span style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;flex:0 0 24px">${svgIcon}</span>
+            <span style="font-size:13px;line-height:1.2">Frappe AI</span>
+        </a>`,
+      );
+      $btn.on("click", toggleSidebar);
+      $btn.insertBefore($sidebarUser);
       return true;
     }
 
     return false;
   }
 
-  if (tryInject()) return;
+  tryInject();
 
-  // Frappe v16 renders the navbar element after app_ready in some configurations.
-  // Use MutationObserver to inject once .desktop-avatar appears in the DOM.
+  // Stays connected across SPA route changes — Frappe re-renders the navbar
+  // when navigating between /desk, /app/<doctype>, form views, etc. If we
+  // disconnect after the first inject the button vanishes on the next route
+  // and the user has to hard-reload to get it back.
   const observer = new MutationObserver(() => {
-    if (tryInject()) observer.disconnect();
+    if (!document.getElementById("frappe-ai-nav-btn")) {
+      tryInject();
+    }
   });
   observer.observe(document.body, { childList: true, subtree: true });
 }
