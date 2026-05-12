@@ -19,10 +19,20 @@ import { ref, readonly } from "vue";
 import type { Message } from "../types";
 
 interface Chunk {
-  type: "content" | "done" | "error";
+  type: "content" | "content_block" | "tool_call" | "done" | "error" | "session";
   text?: string;
   message?: string;
   tools_called?: string[];
+  // For chunk.type === "session" the agent echoes back the canonical id it
+  // wants the client to use for subsequent turns in this conversation.
+  id?: string;
+  // For chunk.type === "content_block" the parsed block payload
+  // (table | chart | kpi | status | text) the FE will render via the block
+  // component registry.
+  block?: Record<string, unknown> & { type: string };
+  // For chunk.type === "tool_call" — name + arguments of the agent's invocation.
+  name?: string;
+  arguments?: Record<string, unknown>;
 }
 
 interface StreamResult {
@@ -40,6 +50,11 @@ export function useChat() {
   // Holds a resolve callback so cancelMessage() can cleanly settle the stream promise.
   let _resolveStream: (() => void) | null = null;
   let _activeEventName: string | null = null;
+
+  // Conversation-scoped session id. Reused across sendMessage() calls so the
+  // agent's LangGraph checkpointer keys on the same thread_id and the model
+  // retains multi-turn memory. Cleared by clearMessages() ("New conversation").
+  let _conversationId: string | null = null;
 
   async function sendMessage(content: string): Promise<void> {
     if (!content.trim() || isLoading.value) return;
@@ -65,7 +80,12 @@ export function useChat() {
     messages.value.push(assistantMessage);
 
     try {
-      const sessionId = crypto.randomUUID();
+      // Reuse the conversation's session id if we already have one so the
+      // agent can recall prior turns. First message in a conversation mints
+      // a fresh id; subsequent ones reuse it. The agent's "session" chunk
+      // (below) may override with the canonical id it persisted.
+      const sessionId = _conversationId ?? crypto.randomUUID();
+      _conversationId = sessionId;
       const eventName = `frappe_ai:chunk:${sessionId}`;
       _activeEventName = eventName;
 
@@ -87,9 +107,23 @@ export function useChat() {
           canCancel.value = true;
 
           frappe.realtime.on(eventName, (chunk: Chunk) => {
-            if (chunk.type === "content" && chunk.text) {
+            if (chunk.type === "session" && chunk.id) {
+              // The agent persisted the conversation under this canonical id
+              // (which may differ from the optimistic UUID we minted). Adopt
+              // it so the next turn lands on the same LangGraph thread.
+              _conversationId = chunk.id;
+            } else if (chunk.type === "content" && chunk.text) {
               _updateMessage(assistantId, (m) => {
                 m.content += chunk.text;
+                m.pending = false;
+              });
+            } else if (chunk.type === "content_block" && chunk.block) {
+              // Structured blocks (table/chart/kpi/status) — append to the
+              // message so MessageBubble.vue renders them via getBlockComponent.
+              const block = chunk.block as unknown as import("../types").ContentBlock;
+              _updateMessage(assistantId, (m) => {
+                if (!m.blocks) m.blocks = [];
+                m.blocks.push(block);
                 m.pending = false;
               });
             } else if (chunk.type === "done") {
@@ -160,6 +194,44 @@ export function useChat() {
     messages.value = [];
     isLoading.value = false;
     lastError.value = null;
+    // "New conversation" — drop the threaded id so the next message opens
+    // a fresh LangGraph thread on the agent.
+    _conversationId = null;
+  }
+
+  interface RecentMessagesResponse {
+    session_id: string | null;
+    messages: Array<{ id: string; role: string; content: string; timestamp: string | null }>;
+  }
+
+  async function loadRecentConversation(): Promise<void> {
+    // Hydrate the sidebar on mount so a page reload doesn't throw away the
+    // user's last chat. Best-effort: any failure leaves the bubble list
+    // empty so the user can simply start a new conversation.
+    try {
+      const result = await new Promise<RecentMessagesResponse>((resolve, reject) => {
+        frappe.call({
+          method: "frappe_ai.api.chat.get_recent_messages",
+          args: { limit: 50 },
+          callback: (r: { message: RecentMessagesResponse }) =>
+            resolve(r?.message ?? { session_id: null, messages: [] }),
+          error: reject,
+        });
+      });
+
+      if (!result || !result.session_id || result.messages.length === 0) return;
+
+      _conversationId = result.session_id;
+      messages.value = result.messages.map((m) => ({
+        id: m.id,
+        role: (m.role === "assistant" ? "assistant" : "user") as "assistant" | "user",
+        content: m.content,
+        timestamp: m.timestamp ? new Date(m.timestamp) : null,
+      }));
+    } catch (err) {
+      // Swallow — restoring history is a nice-to-have, not a blocker.
+      console.warn("[Frappe AI] loadRecentConversation failed", err);
+    }
   }
 
   function _updateMessage(id: string, updater: (m: Message) => void): void {
@@ -189,5 +261,6 @@ export function useChat() {
     sendMessage,
     cancelMessage,
     clearMessages,
+    loadRecentConversation,
   };
 }

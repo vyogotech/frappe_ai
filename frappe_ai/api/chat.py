@@ -11,6 +11,58 @@ def _agent_url() -> str:
 
 
 @frappe.whitelist()
+def get_recent_messages(limit: int = 50) -> dict:
+	"""Return the caller's most recent AI Chat Session and its messages.
+
+	Powers the sidebar's restore-on-mount: the user reopens the desk, the
+	sidebar hydrates from this endpoint so the conversation history isn't
+	thrown away each page-load.
+
+	Returns {"session_id": str | None, "messages": [{role, content, timestamp}]}.
+	An empty session_id with empty messages means the user has no prior
+	conversation — the sidebar renders the empty state.
+	"""
+	user = frappe.session.user
+	if user == "Guest":
+		return {"session_id": None, "messages": []}
+
+	sessions = frappe.get_all(
+		"AI Chat Session",
+		filters={"user": user},
+		fields=["name"],
+		order_by="modified desc",
+		limit=1,
+	)
+	if not sessions:
+		return {"session_id": None, "messages": []}
+
+	session_id = sessions[0]["name"]
+	try:
+		safe_limit = max(1, min(int(limit), 200))
+	except (TypeError, ValueError):
+		safe_limit = 50
+
+	rows = frappe.get_all(
+		"AI Chat Message",
+		filters={"session": session_id},
+		fields=["name", "role", "content", "creation"],
+		order_by="creation asc",
+		limit=safe_limit,
+	)
+	messages = [
+		{
+			"id": r["name"],
+			"role": r["role"],
+			"content": r["content"] or "",
+			# RFC3339-ish so the FE can parse with new Date(...)
+			"timestamp": str(r["creation"]) if r.get("creation") else None,
+		}
+		for r in rows
+	]
+	return {"session_id": session_id, "messages": messages}
+
+
+@frappe.whitelist()
 def start_stream(message: str, session_id: str | None = None) -> dict:
 	"""Enqueue an agent SSE relay in the background and return the session_id immediately.
 
@@ -73,6 +125,10 @@ def _stream_to_agent(
 	"""
 	payload = {
 		"message": message,
+		# Forward session_id so the agent's LangGraph checkpointer keys on the
+		# same thread_id across turns — otherwise every message lands in a
+		# fresh thread and the model has no memory of prior turns.
+		"session_id": session_id,
 		"context": {"user_id": user},
 	}
 
