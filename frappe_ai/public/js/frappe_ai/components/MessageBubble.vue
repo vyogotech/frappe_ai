@@ -150,6 +150,32 @@ const isPendingEmpty = computed(
 	width: max-content;
 	max-width: 100%;
 	border-collapse: collapse;
+	margin: 8px 0;
+	font-size: 12px;
+	border: 1px solid var(--border-color, #e2e6e9);
+	border-radius: 6px;
+	overflow: hidden;
+}
+.frappe-ai-markdown :deep(table thead th) {
+	background: var(--bg-light-gray, #f4f5f6);
+	color: var(--text-muted, #525c66);
+	font-weight: 600;
+	text-align: left;
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--border-color, #e2e6e9);
+	white-space: nowrap;
+}
+.frappe-ai-markdown :deep(table tbody td) {
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--border-color, #f0f1f2);
+	vertical-align: middle;
+	white-space: nowrap;
+}
+.frappe-ai-markdown :deep(table tbody tr:last-child td) {
+	border-bottom: none;
+}
+.frappe-ai-markdown :deep(table tbody tr:nth-child(even)) {
+	background: var(--bg-light-gray, #fafbfc);
 }
 .frappe-ai-markdown :deep(pre),
 .frappe-ai-markdown :deep(img),

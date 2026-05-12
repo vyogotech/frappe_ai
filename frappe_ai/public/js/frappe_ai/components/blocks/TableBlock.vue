@@ -76,12 +76,74 @@ function navigate(row: TableRow) {
 </template>
 
 <style scoped>
+.frappe-ai-table {
+	margin: 8px 0;
+	font-size: 12px;
+	color: var(--text-color, #1f272e);
+}
+.frappe-ai-table-title {
+	font-weight: 600;
+	font-size: 13px;
+	margin-bottom: 6px;
+	color: var(--text-color, #1f272e);
+}
+.frappe-ai-table-empty {
+	padding: 12px;
+	text-align: center;
+	color: var(--text-muted, #8d99a6);
+	font-style: italic;
+	border: 1px dashed var(--border-color, #e2e6e9);
+	border-radius: 6px;
+}
 .frappe-ai-table-scroll {
 	overflow-x: auto;
 	max-width: 100%;
 	-webkit-overflow-scrolling: touch;
+	border: 1px solid var(--border-color, #e2e6e9);
+	border-radius: 6px;
 }
 .frappe-ai-table-scroll table {
+	width: 100%;
 	min-width: 100%;
+	border-collapse: collapse;
+	background: var(--bg-color, #fff);
+}
+.frappe-ai-table-scroll thead th {
+	background: var(--bg-light-gray, #f4f5f6);
+	color: var(--text-muted, #525c66);
+	font-weight: 600;
+	text-align: left;
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--border-color, #e2e6e9);
+	white-space: nowrap;
+	cursor: pointer;
+	user-select: none;
+}
+.frappe-ai-table-scroll thead th:hover {
+	background: var(--bg-gray, #ebedef);
+}
+.frappe-ai-table-scroll tbody td {
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--border-color, #f0f1f2);
+	vertical-align: middle;
+	white-space: nowrap;
+}
+/* The sidebar is narrow (~380px); let the horizontal scroller carry overflow
+   rather than vertically-stacked, character-by-character word-break which
+   makes cells unreadable. */
+.frappe-ai-table-scroll {
+	scrollbar-width: thin;
+}
+.frappe-ai-table-scroll tbody tr:last-child td {
+	border-bottom: none;
+}
+.frappe-ai-table-scroll tbody tr:nth-child(even) {
+	background: var(--bg-light-gray, #fafbfc);
+}
+.frappe-ai-table-clickable {
+	cursor: pointer;
+}
+.frappe-ai-table-clickable:hover td {
+	background: var(--bg-blue-light, #e7f1fe);
 }
 </style>
