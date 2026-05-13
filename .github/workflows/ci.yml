@@ -25,7 +25,9 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          # Frappe v16 uses PEP 695 type alias syntax (`type X = ...`)
+          # which is only parseable on Python 3.12+.
+          python-version: '3.12'
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -37,9 +39,6 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           enable-cache: true
-          # uv.lock is gitignored in this repo, so key the cache off
-          # pyproject.toml instead of the default `**/uv.lock` glob.
-          cache-dependency-glob: 'pyproject.toml'
 
       - name: Install Python deps (runtime + dev group)
         run: uv sync --group dev
@@ -124,7 +123,9 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          # Frappe v16 uses PEP 695 type alias syntax (`type X = ...`)
+          # which is only parseable on Python 3.12+.
+          python-version: '3.12'
 
       - name: Set up Node
         uses: actions/setup-node@v4
