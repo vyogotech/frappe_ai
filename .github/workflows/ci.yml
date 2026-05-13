@@ -175,10 +175,16 @@ jobs:
           mv app-checkout frappe-bench/apps/frappe_ai
           cd frappe-bench
           ./env/bin/pip install -e ./apps/frappe_ai
-          # Frappe scans apps.txt to discover installable apps.
-          if ! grep -qx frappe_ai sites/apps.txt 2>/dev/null; then
-            echo "frappe_ai" >> sites/apps.txt
-          fi
+          # Frappe scans sites/apps.txt to discover installable apps.
+          # Use a Python rewrite so we never produce `frappefrappe_ai` when
+          # the existing file lacks a trailing newline.
+          python3 -c "
+          import pathlib
+          p = pathlib.Path('sites/apps.txt')
+          apps = set(p.read_text().split()) if p.exists() else set()
+          apps.add('frappe_ai')
+          p.write_text('\n'.join(sorted(apps)) + '\n')
+          "
 
       - name: Create test site
         working-directory: frappe-bench
