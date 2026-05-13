@@ -1,6 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { AssistantMessage, Message } from "../types/messages";
 
 const g = globalThis as Record<string, unknown>;
+
+/** Narrow a Message to its AssistantMessage variant in tests where we
+ *  asserted the role on the line above. Throws if the runtime shape
+ *  doesn't match, which is what we want — the test should fail loudly. */
+function asAssistant(m: Message): AssistantMessage {
+  if (m.role !== "assistant") throw new Error(`Expected assistant message, got ${m.role}`);
+  return m;
+}
 
 interface CapturedListener {
   event: string;
@@ -75,7 +84,7 @@ describe("useChat", () => {
     expect(chat.messages.value[0].role).toBe("user");
     expect(chat.messages.value[0].content).toBe("hello");
     expect(chat.messages.value[1].role).toBe("assistant");
-    expect(chat.messages.value[1].pending).toBe(true);
+    expect(asAssistant(chat.messages.value[1]).pending).toBe(true);
 
     // Settle the stream so the test's awaited promise resolves.
     fireChunk(listeners, { type: "content", text: "hi back" });
@@ -90,8 +99,9 @@ describe("useChat", () => {
     fireChunk(listeners, { type: "content", text: "world." });
     fireChunk(listeners, { type: "done", tools_called: [] });
     await promise;
-    expect(chat.messages.value[1].content).toBe("Hello, world.");
-    expect(chat.messages.value[1].pending).toBe(false);
+    const assistant = asAssistant(chat.messages.value[1]);
+    expect(assistant.content).toBe("Hello, world.");
+    expect(assistant.pending).toBe(false);
   });
 
   it("appends structured blocks to the assistant message", async () => {
@@ -103,8 +113,9 @@ describe("useChat", () => {
     });
     fireChunk(listeners, { type: "done", tools_called: [] });
     await promise;
-    expect(chat.messages.value[1].blocks).toHaveLength(1);
-    expect(chat.messages.value[1].blocks?.[0].type).toBe("kpi");
+    const assistant = asAssistant(chat.messages.value[1]);
+    expect(assistant.blocks).toHaveLength(1);
+    expect(assistant.blocks?.[0].type).toBe("kpi");
   });
 
   it("splices a tool_call bubble BEFORE the assistant placeholder", async () => {

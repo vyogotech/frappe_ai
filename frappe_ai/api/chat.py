@@ -1,5 +1,7 @@
+import ipaddress
 import json
 import uuid
+from urllib.parse import urlparse
 
 import frappe
 import requests
@@ -8,6 +10,49 @@ from frappe import _
 
 def _agent_url() -> str:
 	return frappe.local.conf.get("frappe_ai_agent_url", "").rstrip("/")
+
+
+def _validate_agent_url(url: str) -> None:
+	"""Refuse agent URLs that look misconfigured or unsafe.
+
+	The worker forwards the user's `sid` cookie to whatever this URL
+	resolves to, so an operator typo pointing at the cloud metadata
+	endpoint or an internal loopback service would leak the session.
+
+	Hard rules (always enforced):
+	  - Must parse as an absolute http(s) URL with a host.
+
+	Soft rules (skipped when site_config has `frappe_ai_agent_url_unsafe_ok`):
+	  - Must not target the cloud metadata IPs (169.254.169.254, fd00:ec2::254).
+	  - Must not resolve to an unspecified address (0.0.0.0 / ::).
+
+	The "unsafe_ok" escape hatch exists because local dev legitimately
+	targets http://host.docker.internal:NNNN or http://127.0.0.1:NNNN,
+	which would otherwise trip the private-network check.
+	"""
+	parsed = urlparse(url)
+	if parsed.scheme not in ("http", "https"):
+		frappe.throw(_("AI agent URL must use http or https (got '{0}').").format(parsed.scheme or "(none)"))
+	if not parsed.hostname:
+		frappe.throw(_("AI agent URL must include a hostname."))
+
+	if frappe.local.conf.get("frappe_ai_agent_url_unsafe_ok"):
+		return
+
+	host = parsed.hostname
+	# Block the IMDS endpoints used to escalate inside AWS / GCP / Azure.
+	# These are documented constants, not arbitrary private-range guesses.
+	if host in ("169.254.169.254", "fd00:ec2::254", "metadata.google.internal"):
+		frappe.throw(_("AI agent URL targets a cloud metadata endpoint, which is not allowed."))
+
+	# Reject unspecified addresses (0.0.0.0 / ::) — they bind everything.
+	try:
+		ip = ipaddress.ip_address(host)
+		if ip.is_unspecified:
+			frappe.throw(_("AI agent URL must not target an unspecified address ({0}).").format(host))
+	except ValueError:
+		# host is a name, not an IP literal — DNS will resolve at request time.
+		pass
 
 
 @frappe.whitelist()
@@ -122,6 +167,7 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 	agent_url = _agent_url()
 	if not agent_url:
 		frappe.throw(_("AI agent URL is not configured. Set frappe_ai_agent_url in site_config."))
+	_validate_agent_url(agent_url)
 
 	timeout_seconds = int(settings.timeout or 30)
 
@@ -157,6 +203,9 @@ def _stream_to_agent(
 
 	Not a whitelisted endpoint — only called via frappe.enqueue.
 	"""
+	import time
+
+	logger = frappe.logger("frappe_ai", allow_site=True)
 	context: dict = {"user_id": user}
 	if page_context:
 		# Merge the sanitised page context (route/doctype/docname/currency) into
@@ -174,6 +223,19 @@ def _stream_to_agent(
 
 	event_name = f"frappe_ai:chunk:{session_id}"
 	done_received = False
+	chunk_count = 0
+	stream_start = time.monotonic()
+	done_source = "fallback"  # set to "agent" when the agent emits the done chunk
+
+	logger.info(
+		"stream.start session=%s user=%s agent=%s timeout=%ds context_keys=%s msg_len=%d",
+		session_id,
+		user,
+		agent_url,
+		timeout_seconds,
+		sorted(page_context or {}),
+		len(message),
+	)
 
 	try:
 		with requests.post(
@@ -197,8 +259,10 @@ def _stream_to_agent(
 				except (json.JSONDecodeError, ValueError):
 					continue
 
+				chunk_count += 1
 				if chunk.get("type") == "done":
 					done_received = True
+					done_source = "agent"
 
 				frappe.publish_realtime(
 					event_name,
@@ -208,6 +272,12 @@ def _stream_to_agent(
 				)
 
 	except requests.exceptions.Timeout:
+		logger.warning(
+			"stream.timeout session=%s after=%dms chunks=%d",
+			session_id,
+			int((time.monotonic() - stream_start) * 1000),
+			chunk_count,
+		)
 		frappe.publish_realtime(
 			event_name,
 			{"type": "error", "message": "Request timed out. Please try again."},
@@ -215,7 +285,15 @@ def _stream_to_agent(
 			after_commit=False,
 		)
 		done_received = True
+		done_source = "timeout"
 	except requests.exceptions.RequestException as e:
+		logger.error(
+			"stream.failed session=%s after=%dms chunks=%d err=%s",
+			session_id,
+			int((time.monotonic() - stream_start) * 1000),
+			chunk_count,
+			e,
+		)
 		frappe.log_error(title="AI Agent Stream Failed", message=str(e))
 		frappe.publish_realtime(
 			event_name,
@@ -224,6 +302,7 @@ def _stream_to_agent(
 			after_commit=False,
 		)
 		done_received = True
+		done_source = "error"
 
 	if not done_received:
 		frappe.publish_realtime(
@@ -232,3 +311,12 @@ def _stream_to_agent(
 			user=user,
 			after_commit=False,
 		)
+
+	logger.info(
+		"stream.done session=%s user=%s duration_ms=%d chunks=%d done_source=%s",
+		session_id,
+		user,
+		int((time.monotonic() - stream_start) * 1000),
+		chunk_count,
+		done_source,
+	)

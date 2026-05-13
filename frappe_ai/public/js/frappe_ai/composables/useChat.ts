@@ -16,7 +16,7 @@
  */
 
 import { ref, readonly } from "vue";
-import type { Message } from "../types";
+import type { AssistantMessage, Message } from "../types/messages";
 import { getPageContext } from "../utils/context";
 
 interface Chunk {
@@ -276,12 +276,24 @@ export function useChat() {
     }
   }
 
-  function _updateMessage(id: string, updater: (m: Message) => void): void {
+  /** Update an assistant message in-place by id.
+   *
+   * Restricted to assistant messages because that's the only role that
+   * receives streamed chunks. Tightening the callback parameter type
+   * means callers can write `m.blocks` / `m.pending` without manual
+   * narrowing.
+   */
+  function _updateMessage(id: string, updater: (m: AssistantMessage) => void): void {
     const idx = messages.value.findIndex((m) => m.id === id);
     if (idx < 0) return;
-    const copy = { ...messages.value[idx] };
-    updater(copy);
-    messages.value.splice(idx, 1, copy);
+    const target = messages.value[idx];
+    if (target.role !== "assistant") return;
+    // Mutate in place. Vue 3's reactive proxy detects nested property
+    // writes, so the splice-clone pattern used previously was wasteful:
+    // for a long streamed response it copied the message object on every
+    // chunk and triggered a deep watch in ChatMessages.vue (O(N²) over
+    // message length). In-place mutation drops both costs.
+    updater(target);
   }
 
   function _addErrorMessage(message: string): void {
