@@ -1,5 +1,5 @@
-# Copyright (c) 2024, Frappe and Contributors
-# See license.txt
+# Copyright (c) 2026, Vyogo and contributors
+# For license information, please see license.txt
 
 import unittest
 

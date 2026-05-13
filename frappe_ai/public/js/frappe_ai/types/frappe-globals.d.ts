@@ -13,6 +13,7 @@ interface FrappeCallArgs<TResponse = unknown> {
   args?: Record<string, unknown>;
   /** When true, frappe.call returns a Promise; the callback is still invoked. */
   async?: boolean;
+  /** `r.message` is the unwrapped value the server returned; absent on error. */
   callback?: (r: { message?: TResponse }) => void;
   error?: (err: FrappeCallError) => void;
 }
@@ -44,36 +45,13 @@ interface FrappeRouter {
   current_route?: string[];
 }
 
-interface FrappeSidebarItem {
-  label: string;
-  icon: string;
-  standard: boolean;
-  type: string;
-  class?: string;
-  onClick?: () => void;
-}
-
-interface FrappeSidebarSection {
-  find: (selector: string) => { length: number };
-}
-
-interface FrappeSidebar {
-  $standard_items_sections?: FrappeSidebarSection[];
-  standard_items_setup?: boolean;
-  add_item: (section: FrappeSidebarSection, item: FrappeSidebarItem) => void;
-}
-
-interface FrappeApp {
-  sidebar?: FrappeSidebar;
-}
-
-interface FrappeSession {
-  user?: string;
-  user_email?: string;
-}
-
 interface FrappeRealtime {
-  on: (event: string, handler: (data: unknown) => void) => void;
+  /**
+   * Subscribe to a realtime event. `T` is the caller's expected payload
+   * shape — the framework hands the handler an arbitrary JSON value, so
+   * type-narrowing inside the handler is the caller's responsibility.
+   */
+  on: <T = unknown>(event: string, handler: (data: T) => void) => void;
   off: (event: string, handler?: (data: unknown) => void) => void;
 }
 
@@ -91,12 +69,10 @@ interface FrappeUI {
 }
 
 interface FrappeGlobal {
-  app?: FrappeApp;
   router?: FrappeRouter;
   utils: FrappeUtils;
   boot?: FrappeBoot;
   defaults?: FrappeDefaults;
-  session?: FrappeSession;
   realtime: FrappeRealtime;
   ui: FrappeUI;
   /** Navigate the desk to a route — accepts segments like ("Form", doctype, name). */
@@ -129,15 +105,17 @@ interface JQuery {
   length: number;
   on: (event: string, handler: () => void) => JQuery;
   insertBefore: (target: JQuery) => JQuery;
-  prepend: (content: JQuery) => JQuery;
 }
 
 interface JQueryStatic {
   (selector: Document | string | HTMLElement): JQuery;
 }
 
-declare const frappe: FrappeGlobal | undefined;
+// `frappe` is loaded by Frappe's bundle before our `app_ready` hook fires, so
+// every site we touch can treat it as defined. Defensive `typeof frappe ===
+// "undefined"` guards in context.ts / formatters.ts still narrow at runtime
+// even though the static type asserts presence.
+declare const frappe: FrappeGlobal;
 declare const cur_frm: FrappeForm | undefined;
 declare const cur_list: FrappeList | undefined;
 declare const $: JQueryStatic;
-declare function __(...args: string[]): string;

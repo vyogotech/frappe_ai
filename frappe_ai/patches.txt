@@ -1,2 +1,0 @@
-# List of patches to run on bench migrate.
-# Format: frappe_ai.patches.<module>

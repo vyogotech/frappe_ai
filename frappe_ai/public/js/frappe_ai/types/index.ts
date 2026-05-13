@@ -21,10 +21,4 @@ export type {
   BlockType,
 } from "./blocks";
 
-export type {
-  MessageRole,
-  ToolCall,
-  ErrorInfo,
-  Message,
-  MessagePart,
-} from "./messages";
+export type { MessageRole, ToolCall, ErrorInfo, Message } from "./messages";

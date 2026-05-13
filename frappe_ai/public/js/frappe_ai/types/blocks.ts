@@ -1,4 +1,4 @@
-/** Content block types — mirrors mcp_server/blocks/models.py */
+/** Content block types — mirrors the block schema the AI agent emits. */
 
 export interface TextBlock {
   type: "text";

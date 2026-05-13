@@ -1,7 +1,7 @@
 {
  "charts": [],
  "content": "[]",
- "creation": "2024-01-01 00:00:00.000000",
+ "creation": "2026-04-14 00:00:00.000000",
  "docstatus": 0,
  "doctype": "Workspace",
  "for_user": "",
@@ -22,7 +22,7 @@
    "type": "Link"
   }
  ],
- "modified": "2024-01-01 00:00:00.000000",
+ "modified": "2026-04-14 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "AI Assistant",
  "name": "Frappe AI",

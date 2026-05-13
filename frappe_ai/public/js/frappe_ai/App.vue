@@ -32,8 +32,9 @@ onUnmounted(() => {
 
 <template>
 	<!-- v-show (not v-if) so the sidebar stays mounted across close/reopen.
-       useChat() state — messages, in-flight SSE stream, AbortController —
-       is in the ChatSidebar's setup scope; v-if would destroy it on close. -->
+       useChat() state — messages, the active realtime subscription, the
+       in-flight conversation id — lives in the ChatSidebar's setup scope;
+       v-if would destroy it on close. -->
 	<Transition name="frappe-ai-slide">
 		<ChatSidebar
 			v-show="visible"

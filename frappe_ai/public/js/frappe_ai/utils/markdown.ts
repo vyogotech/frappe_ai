@@ -1,17 +1,16 @@
 /** Shared markdown-to-HTML renderer backed by markdown-it.
  *
- * Used by MessageBubble for plain-text assistant responses (when the LLM
- * didn't wrap anything in <copilot-block> tags). Supports the common
- * commonmark surface plus GFM-style pipe tables and task lists.
+ * Used by MessageBubble for plain-text assistant responses (the agent's
+ * BlockStreamSplitter keeps `<ai-block>` markup out of the stream that
+ * reaches here). Supports the common commonmark surface plus GFM-style
+ * pipe tables and task lists.
  *
- * Structured responses (charts, KPIs, typed tables) flow through the
- * server-side block parser → content_block SSE events → the dedicated
- * block components in components/blocks/, not this renderer.
+ * Structured responses (charts, KPIs, typed tables) arrive as separate
+ * `content_block` chunks from the agent and render via the components in
+ * components/blocks/ — not through this renderer.
  */
 
-import MarkdownIt, { type Options as MarkdownItOptions } from "markdown-it";
-import type Token from "markdown-it/lib/token.mjs";
-import type Renderer from "markdown-it/lib/renderer.mjs";
+import MarkdownIt from "markdown-it";
 
 const md = new MarkdownIt({
   html: false,
@@ -21,25 +20,15 @@ const md = new MarkdownIt({
 });
 
 // Open all rendered links in a new tab so the sidebar doesn't navigate away.
-const defaultLinkOpen =
+// We forward params to the original rule by inferring its signature instead
+// of importing `Token` / `Renderer` from subpaths (`@types/markdown-it`
+// exposes them only as namespace members, not as separate modules).
+type LinkOpenRule = NonNullable<typeof md.renderer.rules.link_open>;
+const defaultLinkOpen: LinkOpenRule =
   md.renderer.rules.link_open ||
-  function (
-    tokens: Token[],
-    idx: number,
-    options: MarkdownItOptions,
-    _env: unknown,
-    self: Renderer,
-  ) {
-    return self.renderToken(tokens, idx, options);
-  };
+  ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
 
-md.renderer.rules.link_open = function (
-  tokens: Token[],
-  idx: number,
-  options: MarkdownItOptions,
-  env: unknown,
-  self: Renderer,
-) {
+md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
   tokens[idx].attrSet("target", "_blank");
   tokens[idx].attrSet("rel", "noopener noreferrer");
   return defaultLinkOpen(tokens, idx, options, env, self);
