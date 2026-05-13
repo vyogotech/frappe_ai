@@ -188,21 +188,6 @@ jobs:
             --skip-assets \
             "https://github.com/${{ github.repository }}.git"
 
-      - name: Debug — what did `bench get-app` register?
-        working-directory: frappe-bench
-        run: |
-          echo "── apps/ directory ──"
-          ls -la apps/
-          echo ""
-          echo "── apps/apps.txt (if exists) ──"
-          cat apps/apps.txt 2>/dev/null || echo "(no apps/apps.txt)"
-          echo ""
-          echo "── sites/apps.txt (if exists) ──"
-          cat sites/apps.txt 2>/dev/null || echo "(no sites/apps.txt)"
-          echo ""
-          echo "── env/bin/pip list | grep frappe ──"
-          ./env/bin/pip list 2>/dev/null | grep -i frappe || echo "(no frappe* installed)"
-
       - name: Create test site
         working-directory: frappe-bench
         run: |
