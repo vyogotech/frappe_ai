@@ -215,7 +215,9 @@ jobs:
       - name: Configure site for E2E
         working-directory: frappe-bench
         run: |
-          bench --site test_site.local set-config -p \
+          # `-p` parses the value as a Python literal; not needed for a
+          # plain string. Use the default (string-coerced) form.
+          bench --site test_site.local set-config \
             frappe_ai_agent_url "http://localhost:8484"
           bench --site test_site.local set-config -p \
             frappe_ai_agent_url_unsafe_ok 1
