@@ -9,13 +9,11 @@ __pycache__
 .superpowers/
 docs/
 
-# Playwright artefacts
-test-results/
-playwright-report/
-blob-report/
-playwright/.cache/
 # Playwright MCP server's per-run snapshot / console-log dumps. Created
 # under repo root when QA runs drive the desk via the MCP browser tools.
+# (The Playwright e2e tier was removed from the project — see commit
+# history. This entry stays because the MCP server is a separate dev
+# tool that still writes scratch here.)
 .playwright-mcp/
 
 # Local Claude Code settings (per-developer)
