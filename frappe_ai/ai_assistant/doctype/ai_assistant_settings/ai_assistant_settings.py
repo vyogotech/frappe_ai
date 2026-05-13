@@ -8,10 +8,21 @@ from frappe.model.document import Document
 
 
 class AIAssistantSettings(Document):
+	def onload(self):
+		# Populate the read-only agent_url display from site_config on every
+		# form load. Without this, the field is empty on first open and
+		# Frappe applies `hide-control` to empty read-only fields — the
+		# admin can never see what URL the agent is wired to until they
+		# click Save once. Refreshing on load keeps display + truth aligned.
+		self._sync_agent_url_from_conf()
+
 	def before_save(self):
-		# The agent URL is authoritative in site_config.json (frappe_ai_agent_url).
-		# The APIs read it from there directly. This field is read-only display
-		# that refreshes on every save so the form always shows the live value.
+		# Same sync runs on save so a manual edit (or an out-of-band
+		# site_config change between load and save) can't desync the
+		# displayed value from the authoritative one.
+		self._sync_agent_url_from_conf()
+
+	def _sync_agent_url_from_conf(self) -> None:
 		conf_url = frappe.local.conf.get("frappe_ai_agent_url", "")
 		self.agent_url = conf_url.rstrip("/") if conf_url else ""
 

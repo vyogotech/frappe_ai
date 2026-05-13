@@ -14,9 +14,18 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+# Playwright MCP server's per-run snapshot / console-log dumps. Created
+# under repo root when QA runs drive the desk via the MCP browser tools.
+.playwright-mcp/
 
 # Local Claude Code settings (per-developer)
 .claude/
+
+# Per-developer Claude project state / plans / memory under ~/.claude
+# never live in the repo, but the agent occasionally writes scratch
+# under these paths during local audits — ignore them defensively.
+.claude-plans/
+.claude-memory/
 
 # Bench-build output that gets written into the source tree when bench
 # uses a symlink to apps/frappe_ai (local dev only — the real build
