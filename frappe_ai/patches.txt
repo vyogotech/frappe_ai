@@ -1,0 +1,6 @@
+# List of patches to run on `bench migrate`.
+# Format: frappe_ai.patches.<module>
+#
+# This file is empty by design (no migrations needed yet), but it must
+# exist — bench's `is_frappe_app()` check requires hooks.py + modules.txt
+# + patches.txt to consider a directory a valid Frappe app.
