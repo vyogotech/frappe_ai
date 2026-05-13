@@ -27,7 +27,7 @@ All five should be green. If they aren't on `main`, that's a bug — open an iss
 
 ## Running the test suite against a real bench
 
-The Vitest tier is hermetic — it stubs Frappe globals and never spins up a server. The Frappe Python tests (`bench --site … run-tests --app frappe_ai`) and the Playwright E2E suite need a real bench.
+The Vitest tier is hermetic — it stubs Frappe globals and never spins up a server. The Frappe Python tests (`bench --site … run-tests --app frappe_ai`) need a real bench.
 
 The CI workflow at `.github/workflows/ci.yml` is the canonical setup — it's the same path you'd take by hand:
 
@@ -37,18 +37,7 @@ The CI workflow at `.github/workflows/ci.yml` is the canonical setup — it's th
 4. `bench --site test_site.local install-app frappe_ai`
 5. `bench --site test_site.local run-tests --app frappe_ai`
 
-For Playwright:
-
-```bash
-bench --site test_site.local set-config frappe_ai_agent_url "http://localhost:8484"
-bench --site test_site.local set-config -p frappe_ai_agent_url_unsafe_ok 1
-bench use test_site.local
-bench serve --port 8000 &
-# add `127.0.0.1 test_site.local` to /etc/hosts (CI does this too)
-npx playwright test
-```
-
-The `frappe_ai_agent_url_unsafe_ok` flag exists to disable the SSRF guard on `localhost` / `127.0.0.1` during dev. Don't set it in production.
+Browser-driven end-to-end testing is intentionally not part of the test suite. Werkzeug `bench serve` can't reliably simulate the parallel asset loads + socketio handshake that the desk needs for the bundle to mount, so any e2e suite that depends on a real desk render needs a production-shaped Frappe (gunicorn + socketio.js + nginx, like the `central-site` docker stack) rather than CI's lightweight bench. Validate UI flows manually against a real bench before releases.
 
 ## Architecture (at a glance)
 
@@ -74,9 +63,9 @@ The `frappe_ai_agent_url_unsafe_ok` flag exists to disable the SSRF guard on `lo
 | Pure function (formatter, sanitiser, parser) | Vitest (frontend) or `unittest.TestCase` (backend) |
 | Component renders / responds to user input | Vitest (Vue Test Utils) |
 | DocType validator / install hook / whitelisted endpoint | `bench --site … run-tests` |
-| Sidebar mounts, settings page loads, end-to-end flows | Playwright |
+| Sidebar mounts, settings page loads, end-to-end flows | Manual verification against a real bench |
 
-If your change touches the user-visible flow, add a Playwright spec. If it changes a Python contract, add a `unittest`. If it changes a TypeScript function, add a Vitest. If you're not sure, start with the cheapest tier that catches it.
+If your change touches the user-visible flow, walk through it manually against a running bench (the `central-site` docker stack is the closest production-shaped target). If it changes a Python contract, add a `unittest`. If it changes a TypeScript function, add a Vitest. If you're not sure, start with the cheapest tier that catches it.
 
 ## Commit style
 
