@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "jsx": "preserve",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": false,
+    "verbatimModuleSyntax": false,
+    "baseUrl": ".",
+    "types": []
+  },
+  "include": [
+    "frappe_ai/public/js/**/*.ts",
+    "frappe_ai/public/js/**/*.vue",
+    "frappe_ai/public/js/**/*.d.ts"
+  ],
+  "exclude": ["node_modules", ".venv", "docs"]
+}

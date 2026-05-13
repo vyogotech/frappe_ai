@@ -1,9 +1,6 @@
-# List of patches
-# Format: module_name.patch_file_name
-# Example: frappe_ai.patches.v1_0.update_settings
-
-[pre_model_sync]
-frappe_ai.patches.rename_mcp_server_settings
-
-[post_model_sync]
-frappe_ai.patches.rename_mcp_server_url_to_agent_url
+# List of patches to run on `bench migrate`.
+# Format: frappe_ai.patches.<module>
+#
+# This file is empty by design (no migrations needed yet), but it must
+# exist — bench's `is_frappe_app()` check requires hooks.py + modules.txt
+# + patches.txt to consider a directory a valid Frappe app.

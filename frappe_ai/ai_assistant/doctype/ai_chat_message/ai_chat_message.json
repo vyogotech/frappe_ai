@@ -31,8 +31,7 @@
   {
    "fieldname": "content",
    "fieldtype": "Long Text",
-   "label": "Content",
-   "reqd": 1
+   "label": "Content"
   },
   {
    "fieldname": "tool_name",
@@ -55,7 +54,6 @@
    "label": "Created At"
   }
  ],
- "index_web_pages_for_search": 1,
  "links": [],
  "modified": "2026-04-14 00:00:00.000000",
  "modified_by": "Administrator",

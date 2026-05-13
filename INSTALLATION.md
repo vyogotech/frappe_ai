@@ -1,241 +1,117 @@
-# Frappe AI - Installation Guide
+# Frappe AI — Installation Guide
 
-This guide will walk you through installing and configuring the Frappe AI app to integrate with your MCP server.
+End-to-end install and configuration of the Frappe AI app.
 
 ## Prerequisites
 
-1. Frappe/ERPNext instance (v13 or higher)
-2. MCP Server running and accessible
+1. Frappe / ERPNext bench (v15 or higher)
+2. An AI agent reachable over HTTP that exposes:
+   - `POST /api/v1/chat` accepting `{message, session_id, context}` and replying with `text/event-stream` chunks
+   - `GET /health` returning 200 when ready
 3. Bench CLI installed
 
-## Step 1: Get the App
-
-Navigate to your bench directory and get the app:
+## Step 1: Get the app
 
 ```bash
 cd ~/frappe-bench
 bench get-app /path/to/frappe_ai
 ```
 
-Or if hosted on GitHub:
+Or from GitHub:
 
 ```bash
-bench get-app https://github.com/yourusername/frappe_ai
+bench get-app https://github.com/vyogotech/frappe_ai
 ```
 
-## Step 2: Install on Site
-
-Install the app on your site:
+## Step 2: Install on a site
 
 ```bash
 bench --site your-site.local install-app frappe_ai
-```
-
-Restart bench:
-
-```bash
 bench restart
 ```
 
-## Step 3: Setup OAuth2 Client
+`install.py:after_install` creates the **AI Assistant Settings** singleton on first install. The same logic runs in `after_migrate` so the singleton survives migrations.
 
-### 3.1 Create OAuth Client
+## Step 3: Set the agent URL
 
-1. Login to your Frappe/ERPNext instance
-2. Navigate to: **Integrations > OAuth Client** (or go to `/app/oauth-client`)
-3. Click **New**
-4. Fill in the details:
-   - **App Name**: MCP Backend Integration
-   - **Default Redirect URI**: (leave blank for client credentials)
-   - **Scopes**: Select `openid`, `profile`, `email`, and `all`
-   - **Grant Type**: `Client Credentials`
-   - **Client Type**: Confidential
+The agent URL is read from `site_config.json` — it's intentionally not a doctype field, so it stays per-environment and can't be edited from the desk UI.
 
-5. **Save** the document
-6. **Copy the Client ID and Client Secret** (you'll need these in the next step)
-
-### 3.2 Alternative: Use Script to Create OAuth Client
-
-You can also use the provided script:
-
-```bash
-cd ~/frappe-bench
-bench --site your-site.local execute frappe_ai.setup.create_oauth_client
-```
-
-This will create an OAuth client and display the credentials.
-
-## Step 4: Configure AI Assistant Settings
-
-### 4.1 Open Settings
-
-Navigate to: **Frappe AI > AI Assistant Settings** (or go to `/app/ai-assistant-settings`)
-
-### 4.2 Fill in Configuration
-
-- **Enabled**: ✓ (check this box)
-- **Agent URL**: `http://localhost:8484` (URL of the AI agent as reachable from the user's browser)
-- **Timeout**: `30` seconds (default)
-
-### 4.3 Save
-
-## Step 5: Configure MCP Server
-
-Make sure your MCP server is configured to accept OAuth2 authentication from Frappe.
-
-Update your `config.yaml`:
-
-```yaml
-auth:
-  enabled: true
-  require_auth: false  # Set to true for production
-
-  oauth2:
-    # Frappe OAuth endpoints
-    token_info_url: "http://localhost:8000/api/method/frappe.integrations.oauth2.openid.userinfo"
-    issuer_url: "http://localhost:8000"
-
-    # Trusted clients that can provide user context headers
-    trusted_clients:
-      - "your-oauth-client-id"  # Use the Client ID from Step 3
-
-    validate_remote: true
-    timeout: "30s"
-
-  cache:
-    ttl: "5m"
-    cleanup_interval: "10m"
-```
-
-Restart your MCP server:
-
-```bash
-cd ~/frappe-mcp-server
-./frappe-mcp-server-stdio-darwin-arm64  # or your binary
-```
-
-## Step 6: Test the Integration
-
-### 6.1 Using Awesome Bar
-
-1. Click on the **Awesome Bar** (search bar at the top)
-2. Type your question: "Show me all open projects"
-3. Select the **"Ask AI: Show me all open projects"** option
-4. You should see an AI dialog with the response
-
-### 6.2 Using Code
-
-Open the Frappe console and test:
-
-```python
-from frappe_ai.api.ai_query import query
-
-result = query("List all customers")
-print(result)
-```
-
-### 6.3 Using REST API
-
-```bash
-# Get API keys from User Settings
-curl -X POST https://your-site.com/api/method/frappe_ai.api.ai_query.query \
-  -H "Authorization: token YOUR_API_KEY:YOUR_API_SECRET" \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Show me sales statistics"}'
-```
-
-## Troubleshooting
-
-### Issue: "Failed to get access token"
-
-**Solution:**
-- Verify OAuth Client ID and Secret are correct
-- Check that OAuth Client has `client_credentials` grant type
-- Ensure Frappe Base URL is accessible from the server
-
-### Issue: "Failed to query AI assistant"
-
-**Solution:**
-- Check Agent URL is correct and accessible from the browser
-- Verify the AI agent is running
-- Check agent logs for errors
-
-### Issue: "Connection timeout"
-
-**Solution:**
-- Increase timeout in AI Assistant Settings
-- Check network connectivity between the browser and the agent
-- Verify firewall rules allow communication
-
-### Issue: Awesome Bar doesn't show AI option
-
-**Solution:**
-- Clear browser cache
-- Run `bench clear-cache`
-- Restart bench: `bench restart`
-- Check that app is installed: `bench --site your-site.local list-apps`
-
-## Advanced Configuration
-
-### Using Redis for Token Caching (Production)
-
-For production deployments, consider modifying the `ai_query.py` to use Redis instead of in-memory caching:
-
-```python
-# In frappe_ai/api/ai_query.py
-import redis
-
-redis_client = redis.Redis(host='localhost', port=6379, db=0)
-
-def get_access_token():
-    cache_key = "mcp_access_token"
-    cached = redis_client.get(cache_key)
-    if cached:
-        return cached.decode()
-    
-    # ... rest of the token fetching logic
-    
-    redis_client.setex(cache_key, 3600, token_data["access_token"])
-```
-
-### Enable Debug Logging
-
-Add to your `site_config.json`:
+Edit `sites/your-site.local/site_config.json`:
 
 ```json
 {
-  "developer_mode": 1,
-  "logging": 2
+  "frappe_ai_agent_url": "http://localhost:8484"
 }
 ```
 
-### Custom Timeout Settings
+The AI Assistant Settings form shows this value in a read-only **Agent URL** field; the `before_save` hook refreshes it from `site_config` on every save.
 
-Adjust timeouts based on your query complexity:
+## Step 4: Enable and tune
 
-- Simple queries: 10-30 seconds
-- Complex queries: 60-120 seconds
-- Large data processing: 180+ seconds
+Open `/app/ai-assistant-settings` and configure:
+
+| Field | Description | Range |
+| --- | --- | --- |
+| Enabled | Master switch — APIs throw if false | — |
+| Timeout | Per-request timeout forwarded to the agent | 1–300 seconds |
+| Sidebar Width | Chat sidebar width in pixels | 300–600 |
+| Keyboard Shortcut | Toggle combo, e.g. `Alt+/` or `Mod+Shift+A` | See "Reserved shortcuts" below |
+
+### Reserved shortcuts
+
+The settings validator rejects shortcuts that Frappe v16 hard-binds in the desk (the OS still delivers them but Frappe handles them first):
+
+- `Ctrl+/`, `Ctrl+K`, `Ctrl+G`, `Ctrl+S`, `Alt+S`, `Shift+/`
+
+## Step 5: Verify
+
+Click **Test Connection** on the AI Assistant Settings page. It calls `frappe_ai.api.health.test_connection`, which hits `<agent_url>/health` with the user's `sid` cookie.
+
+Then open the desk and click the AI button in the navbar.
+
+## API surface
+
+All endpoints live under `frappe_ai.api.*`. Authentication is the standard Frappe session — APIs `frappe.throw` an `AuthenticationError` for guest users.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `frappe_ai.api.chat.start_stream` | Enqueue a background worker that relays agent SSE chunks via `frappe.realtime`. Returns `{session_id}`. |
+| `frappe_ai.api.chat.get_recent_messages` | Hydrate the sidebar from the user's most recent `AI Chat Session`. Returns `{session_id, messages}`. |
+| `frappe_ai.api.health.test_connection` | Settings page health check. |
+
+The browser subscribes to `frappe_ai:chunk:<session_id>` via `frappe.realtime.on` before calling `start_stream`. The worker then publishes each agent SSE chunk to that channel and finally emits a `{type: "done"}` marker.
+
+## Troubleshooting
+
+### Test Connection fails
+
+- Confirm `frappe_ai_agent_url` is set in `site_config.json` and the bench has been restarted
+- Verify the worker host can reach the agent (`curl <agent_url>/health` from the bench machine)
+- Check the Error Log doctype for entries titled "AI Agent Connection Test Failed"
+
+### Chat sends but nothing streams back
+
+- The realtime channel is `frappe_ai:chunk:<session_id>` — confirm Frappe's socketio server is running (`bench start` includes it; production uses the `socketio` supervisor process)
+- Check `bench logs` for the long-queue worker; SSE failures get logged as "AI Agent Stream Failed"
+
+### Sidebar button doesn't appear
+
+- The bundle is registered in `hooks.py` (`app_include_js` / `app_include_css`). After install, run `bench build --app frappe_ai` and `bench clear-cache`
+- Confirm assets resolved by curling `/assets/frappe_ai/dist/js/...` from the site
+
+### "AI Assistant is not enabled"
+
+- The **Enabled** checkbox in AI Assistant Settings is off, or the singleton hasn't been created. Re-run `bench --site your-site migrate` to trigger `after_migrate`.
 
 ## Uninstallation
-
-If you need to remove the app:
 
 ```bash
 bench --site your-site.local uninstall-app frappe_ai
 bench remove-app frappe_ai
 ```
 
+This drops the three doctypes (`AI Assistant Settings`, `AI Chat Session`, `AI Chat Message`) and their data. Remove `frappe_ai_agent_url` from `site_config.json` manually if desired.
+
 ## Support
 
-For issues, questions, or contributions:
-- GitHub Issues: https://github.com/yourusername/frappe_ai/issues
-- Documentation: https://github.com/yourusername/frappe_ai/wiki
-
-## Next Steps
-
-- Explore different types of queries
-- Customize the UI to match your theme
-- Integrate with custom doctypes
-- Set up monitoring and analytics
-
+- GitHub Issues: <https://github.com/vyogotech/frappe_ai/issues>

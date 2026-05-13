@@ -1,4 +1,4 @@
-// Copyright (c) 2024, Frappe and contributors
+// Copyright (c) 2026, Vyogo and contributors
 // For license information, please see license.txt
 
 frappe.ui.form.on('AI Assistant Settings', {
@@ -36,7 +36,7 @@ function test_agent_connection(frm) {
 	frappe.dom.freeze(__('Testing connection...'));
 
 	frappe.call({
-		method: 'frappe_ai.api.ai_query.test_connection',
+		method: 'frappe_ai.api.health.test_connection',
 		callback: function(r) {
 			frappe.dom.unfreeze();
 
