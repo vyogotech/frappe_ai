@@ -9,6 +9,12 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Silence the "Node.js 20 actions are deprecated" warning by opting the
+  # JavaScript actions (checkout, setup-node, setup-python, setup-uv) into
+  # Node 24 ahead of the 2026-06-02 forced-default date.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   # ──────────────────────────────────────────────────────────────────────
   # Tier 1 — static checks. ~1–2 min. Run all linters / type-checkers
@@ -79,14 +85,17 @@ jobs:
 
   # ──────────────────────────────────────────────────────────────────────
   # Tier 2 — Frappe integration. ~8–12 min. Spin up a real bench against
-  # Frappe v16, install the app, build the bundle, run the test suite.
+  # Frappe v16, install the app the same way production does
+  # (`bench get-app`), build the bundle, run the test suite.
+  #
+  # No manual mv / pip install / apps.txt manipulation here — those are
+  # exactly the bookkeeping steps that `bench get-app` exists to do for
+  # us. If this job passes, the app installs cleanly under real bench.
   # ──────────────────────────────────────────────────────────────────────
   integration:
     name: Frappe v16 integration
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    # Skip the ~10-minute bench setup when the cheap static tier already
-    # caught the problem. Push events still trigger both jobs.
     needs: lint
 
     services:
@@ -113,13 +122,6 @@ jobs:
           - 11000:6379
 
     steps:
-      - name: Checkout app
-        uses: actions/checkout@v4
-        with:
-          # Bench expects the app at apps/<app_name>/ rather than the bare
-          # repo root. We'll copy it into place after `bench init`.
-          path: app-checkout
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -132,7 +134,7 @@ jobs:
           # Frappe v16 frontend declares engines.node >= 24.
           node-version: '24'
 
-      - name: System packages (wkhtmltopdf, MariaDB client, etc.)
+      - name: System packages
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -142,7 +144,7 @@ jobs:
             xvfb \
             libfontconfig
 
-      - name: Configure MariaDB for Frappe (utf8mb4 + barracuda)
+      - name: Configure MariaDB for Frappe (utf8mb4 + remote root)
         run: |
           mysql -h 127.0.0.1 -P 3306 -u root -ptravis -e "
             SET GLOBAL character_set_server = 'utf8mb4';
@@ -170,21 +172,21 @@ jobs:
           bench set-config -g redis_queue "redis://localhost:11000"
           bench set-config -g redis_socketio "redis://localhost:13000"
 
-      - name: Copy this repo into apps/frappe_ai
+      - name: Install this app via `bench get-app` (production install path)
+        working-directory: frappe-bench
+        env:
+          # Pass GITHUB_TOKEN so `git clone` works even if the repo is
+          # private. The token has read access to the current repository
+          # automatically.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mv app-checkout frappe-bench/apps/frappe_ai
-          cd frappe-bench
-          ./env/bin/pip install -e ./apps/frappe_ai
-          # Frappe scans sites/apps.txt to discover installable apps.
-          # Use a Python rewrite so we never produce `frappefrappe_ai` when
-          # the existing file lacks a trailing newline.
-          python3 -c "
-          import pathlib
-          p = pathlib.Path('sites/apps.txt')
-          apps = set(p.read_text().split()) if p.exists() else set()
-          apps.add('frappe_ai')
-          p.write_text('\n'.join(sorted(apps)) + '\n')
-          "
+          git config --global user.email "ci@example.com"
+          git config --global user.name "CI"
+          git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+          bench get-app \
+            --branch "${{ github.ref_name }}" \
+            --skip-assets \
+            "https://github.com/${{ github.repository }}.git"
 
       - name: Create test site
         working-directory: frappe-bench
