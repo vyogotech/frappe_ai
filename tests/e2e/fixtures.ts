@@ -32,20 +32,15 @@ export const test = base.extend<{ login: LoginFn }>({
       const cookies = (await request.storageState()).cookies;
       await page.context().addCookies(cookies);
 
-      // Frappe's desk page never reaches a fully idle network — the
-      // socketio polling fallback (when no socketio server runs, as in
-      // the bench-serve-only dev setup and in CI without socketio) keeps
-      // long-polling. `waitUntil: 'domcontentloaded'` is what we
-      // actually need: the HTML + initial scripts are present, then we
-      // poll for the bundle's effect via locator assertions.
-      await page.goto("/app", { waitUntil: "domcontentloaded" });
+      // /app issues a 301 → /desk; navigate directly to /desk to avoid
+      // a redirect round-trip Playwright sometimes mishandles.
+      // `domcontentloaded` (not the default `load`) is needed because
+      // the socketio polling fallback keeps the network busy forever
+      // when no socketio server is running.
+      await page.goto("/desk", { waitUntil: "domcontentloaded" });
       // Wait directly for the bundle's effect — the sidebar root
       // element only appears after `onFrappeReady()` fires + settings
-      // load + the bundle mounts. Frappe's `boot` and `app` globals are
-      // intermediate signals that vary across dev/prod and across
-      // versions; the sidebar root is what we actually depend on.
-      // Cold-start desk render + bundle mount can take 60+s on
-      // Werkzeug dev server / a fresh CI runner.
+      // load + the bundle mounts.
       await expect(page.locator("#frappe-ai-sidebar-root")).toBeAttached({ timeout: 90_000 });
     };
     await use(loginFn);
