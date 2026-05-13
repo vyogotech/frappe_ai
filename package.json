@@ -4,7 +4,9 @@
   "private": true,
   "description": "Runtime deps for the frappe_ai bundle (resolved by Frappe's esbuild).",
   "scripts": {
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "echarts": "^5.6.0",
@@ -13,6 +15,11 @@
   },
   "devDependencies": {
     "@types/markdown-it": "^14.1.2",
-    "typescript": "~5.6"
+    "@vitejs/plugin-vue": "^5.2.4",
+    "@vue/test-utils": "^2.4.6",
+    "jsdom": "^25.0.1",
+    "typescript": "~5.6",
+    "vitest": "^2.1.9",
+    "vue": "^3.5.13"
   }
 }

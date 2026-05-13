@@ -129,4 +129,3 @@ class TestAIAssistantSettings(unittest.TestCase):
 	def test_shortcut_blank_is_allowed(self):
 		# Empty shortcut means "no keyboard toggle wired" — must not raise.
 		self._save_with_shortcut("")
-

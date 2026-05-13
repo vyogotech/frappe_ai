@@ -12,7 +12,6 @@ import frappe
 
 from frappe_ai.api import chat
 
-
 # ──────────────────────────────────────────────────────────────────────────
 # _sanitize_page_context — pure-function tests, no DB / no Frappe context
 # ──────────────────────────────────────────────────────────────────────────
@@ -201,9 +200,7 @@ class TestGetRecentMessages(unittest.TestCase):
 
 	def tearDown(self):
 		# Clean up any AI Chat Session / Message rows the test created.
-		for s in frappe.get_all(
-			"AI Chat Session", filters={"user": frappe.session.user}, pluck="name"
-		):
+		for s in frappe.get_all("AI Chat Session", filters={"user": frappe.session.user}, pluck="name"):
 			frappe.delete_doc("AI Chat Session", s, ignore_permissions=True, force=True)
 		# Cascade for orphan messages just in case.
 		for m in frappe.get_all("AI Chat Message", pluck="name"):
