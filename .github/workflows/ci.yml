@@ -25,9 +25,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          # Frappe v16 uses PEP 695 type alias syntax (`type X = ...`)
-          # which is only parseable on Python 3.12+.
-          python-version: '3.12'
+          # Frappe v16 (16.18+) requires Python 3.14.
+          python-version: '3.14'
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -123,9 +122,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          # Frappe v16 uses PEP 695 type alias syntax (`type X = ...`)
-          # which is only parseable on Python 3.12+.
-          python-version: '3.12'
+          # Frappe v16 (16.18+) requires Python 3.14.
+          python-version: '3.14'
 
       - name: Set up Node
         uses: actions/setup-node@v4
