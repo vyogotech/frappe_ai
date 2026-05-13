@@ -8,3 +8,17 @@ __pycache__
 .venv/
 .superpowers/
 docs/
+
+# Playwright artefacts
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Local Claude Code settings (per-developer)
+.claude/
+
+# Bench-build output that gets written into the source tree when bench
+# uses a symlink to apps/frappe_ai (local dev only — the real build
+# output lives under sites/assets/ in the bench).
+frappe_ai/public/dist/

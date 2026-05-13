@@ -11,8 +11,16 @@ const props = defineProps<{
 
 const container = ref<HTMLElement>();
 
+// Scroll-to-bottom triggers on (a) a new bubble appearing and (b) the
+// last bubble's content changing as chunks arrive. Watching just
+// `messages.length` and the last item's `content` is cheaper than the
+// previous deep watch over the whole array — deep traversal was O(N)
+// per chunk while the assistant message was being typed.
 watch(
-	() => props.messages,
+	[
+		() => props.messages.length,
+		() => props.messages[props.messages.length - 1]?.content,
+	],
 	() => {
 		nextTick(() => {
 			if (container.value) {
@@ -20,7 +28,6 @@ watch(
 			}
 		});
 	},
-	{ deep: true },
 );
 </script>
 
