@@ -39,7 +39,8 @@ def _validate_agent_url(url: str) -> None:
 	if frappe.local.conf.get("frappe_ai_agent_url_unsafe_ok"):
 		return
 
-	host = parsed.hostname
+	host = parsed.hostname  # str (guaranteed by the earlier `not parsed.hostname` check)
+	assert host is not None  # narrow for the type checker
 	# Block the IMDS endpoints used to escalate inside AWS / GCP / Azure.
 	# These are documented constants, not arbitrary private-range guesses.
 	if host in ("169.254.169.254", "fd00:ec2::254", "metadata.google.internal"):
