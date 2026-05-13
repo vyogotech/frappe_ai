@@ -16,8 +16,10 @@ export default defineConfig({
   fullyParallel: false, // shared Frappe state — keep tests sequential
   workers: 1,
   reporter: process.env.CI ? "github" : "list",
-  timeout: 60_000,
-  expect: { timeout: 10_000 },
+  // Frappe desk's cold-start render on Werkzeug dev server can take
+  // 30+ seconds; the per-test timeout has to accommodate it.
+  timeout: 120_000,
+  expect: { timeout: 15_000 },
   use: {
     baseURL: process.env.FRAPPE_BASE_URL ?? "http://dev.localhost:8080",
     trace: "retain-on-failure",

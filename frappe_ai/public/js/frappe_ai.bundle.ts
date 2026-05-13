@@ -15,6 +15,15 @@ function injectNavbarButton(keyboardShortcut: string): void {
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
   </svg>`;
 
+  /** Build a DOM element from an HTML string and wire its click handler. */
+  function makeButton(html: string): HTMLElement {
+    const tpl = document.createElement("template");
+    tpl.innerHTML = html.trim();
+    const btn = tpl.content.firstElementChild as HTMLElement;
+    btn.addEventListener("click", toggleSidebar);
+    return btn;
+  }
+
   function tryInject(): boolean {
     if (document.getElementById("frappe-ai-nav-btn")) return true;
 
@@ -22,22 +31,24 @@ function injectNavbarButton(keyboardShortcut: string): void {
     // route hides the top navbar and shows the user button inside the left
     // sidebar (.dropdown-navbar-user). Anchor to whichever exists so the
     // toggle is reachable on every page.
-    const $topAvatar = $(".desktop-avatar");
-    if ($topAvatar.length) {
-      const $btn = $(
+    //
+    // jQuery is intentionally not used — Frappe v16.16+ scopes jQuery
+    // into a module bundle, so `window.$` is undefined in app bundles.
+    const topAvatar = document.querySelector(".desktop-avatar");
+    if (topAvatar?.parentNode) {
+      const btn = makeButton(
         `<div id="frappe-ai-nav-btn" title="Frappe AI (${keyboardShortcut})"
               style="cursor:pointer;display:flex;align-items:center;padding:0 4px">${svgIcon}</div>`,
       );
-      $btn.on("click", toggleSidebar);
-      $btn.insertBefore($topAvatar);
+      topAvatar.parentNode.insertBefore(btn, topAvatar);
       return true;
     }
 
-    const $sidebarUser = $(".dropdown-navbar-user");
-    if ($sidebarUser.length) {
+    const sidebarUser = document.querySelector(".dropdown-navbar-user");
+    if (sidebarUser?.parentNode) {
       // Mimic the sibling sidebar nav items (icon + label, left-aligned)
       // so the AI toggle doesn't look orphaned next to Home/Search/Notification.
-      const $btn = $(
+      const btn = makeButton(
         `<a id="frappe-ai-nav-btn"
             class="align-center btn-reset flex nav-link sidebar-user-button"
             style="cursor:pointer;width:100%;min-height:40px;padding:0 8px;gap:8px;color:var(--text-color)"
@@ -46,8 +57,7 @@ function injectNavbarButton(keyboardShortcut: string): void {
             <span style="font-size:13px;line-height:1.2">Frappe AI</span>
         </a>`,
       );
-      $btn.on("click", toggleSidebar);
-      $btn.insertBefore($sidebarUser);
+      sidebarUser.parentNode.insertBefore(btn, sidebarUser);
       return true;
     }
 
@@ -109,7 +119,33 @@ function toggleSidebar(): void {
   document.dispatchEvent(new CustomEvent("frappe-ai-toggle"));
 }
 
-$(document).on("app_ready", async () => {
+// Wait for Frappe to finish booting before mounting. The `app_ready` event
+// is dispatched via jQuery (`$(document).trigger("app_ready")`) which used
+// to be picked up by `$(document).on("app_ready", …)` — but Frappe v16.16+
+// scoped jQuery into a module bundle, so `window.$` no longer exists when
+// app bundles run. Poll for the readiness signal we actually care about:
+// `frappe.boot` populated + `frappe.app` instantiated.
+function onFrappeReady(handler: () => void): void {
+  const tick = (attempts: number) => {
+    if (
+      typeof frappe !== "undefined" &&
+      // boot info loaded
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (frappe as any).boot &&
+      // frappe.app is the desk controller; presence means app_ready already fired
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (frappe as any).app
+    ) {
+      handler();
+      return;
+    }
+    if (attempts > 600) return; // 60s cap; desk that doesn't boot in 60s is broken
+    setTimeout(() => tick(attempts + 1), 100);
+  };
+  tick(0);
+}
+
+onFrappeReady(async () => {
   const { settings, loadSettings } = useSettings();
   await loadSettings();
 

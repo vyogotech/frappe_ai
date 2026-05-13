@@ -101,15 +101,12 @@ interface FrappeList {
   doctype?: string;
 }
 
-interface JQuery {
-  length: number;
-  on: (event: string, handler: () => void) => JQuery;
-  insertBefore: (target: JQuery) => JQuery;
-}
-
-interface JQueryStatic {
-  (selector: Document | string | HTMLElement): JQuery;
-}
+// jQuery is intentionally NOT declared as a global. Frappe v16.16+
+// scopes it into `libs.bundle.js` as a module, so `window.$` is
+// undefined when app bundles run. The bundle entry uses vanilla DOM
+// APIs (querySelector / addEventListener / MutationObserver) instead.
+// Leaving `$` undeclared turns any regression `$(...)` call into a
+// tsc error — the cheapest possible regression guard.
 
 // `frappe` is loaded by Frappe's bundle before our `app_ready` hook fires, so
 // every site we touch can treat it as defined. Defensive `typeof frappe ===
@@ -118,4 +115,3 @@ interface JQueryStatic {
 declare const frappe: FrappeGlobal;
 declare const cur_frm: FrappeForm | undefined;
 declare const cur_list: FrappeList | undefined;
-declare const $: JQueryStatic;
