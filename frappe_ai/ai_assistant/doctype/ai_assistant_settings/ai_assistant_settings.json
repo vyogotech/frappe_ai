@@ -1,7 +1,7 @@
 {
  "actions": [],
- "allow_rename": 1,
- "creation": "2024-01-01 00:00:00.000000",
+ "allow_rename": 0,
+ "creation": "2026-04-14 00:00:00.000000",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
@@ -22,11 +22,11 @@
    "label": "Enabled"
   },
   {
-   "description": "URL of the AI agent as reachable from the user's browser (e.g. http://localhost:8484).",
+   "description": "URL of the AI agent (read-only mirror of `frappe_ai_agent_url` in site_config.json). The Frappe worker process posts to this URL; the browser never reaches it directly.",
    "fieldname": "agent_url",
    "fieldtype": "Data",
    "label": "Agent URL",
-   "reqd": 1
+   "read_only": 1
   },
   {
    "fieldname": "section_settings",
@@ -53,17 +53,16 @@
    "label": "Sidebar Width"
   },
   {
-   "default": "Ctrl+/",
-   "description": "Keyboard shortcut to toggle the AI sidebar",
+   "default": "Alt+/",
+   "description": "Keyboard shortcut to toggle the AI sidebar.",
    "fieldname": "keyboard_shortcut",
    "fieldtype": "Data",
    "label": "Keyboard Shortcut"
   }
  ],
- "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-01-01 00:00:00.000000",
+ "modified": "2026-04-14 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "AI Assistant",
  "name": "AI Assistant Settings",

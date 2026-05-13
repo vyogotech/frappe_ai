@@ -1,129 +1,84 @@
-# Frappe AI - Quick Start Guide
+# Frappe AI — Quick Start
 
-Get your AI assistant up and running in 5 minutes! 🚀
+Up and running in 5 minutes.
 
-## 1. Install the App (2 minutes)
+## 1. Install the app
 
 ```bash
 cd ~/frappe-bench
-bench get-app /path/to/frappe_ai
+bench get-app /path/to/frappe_ai   # or the GitHub URL
 bench --site your-site.local install-app frappe_ai
 bench restart
 ```
 
-## 2. Create OAuth Client (1 minute)
+## 2. Point at your AI agent
 
-```bash
-bench --site your-site.local execute frappe_ai.setup.create_oauth_client
+Edit `sites/your-site.local/site_config.json`:
+
+```json
+{
+  "frappe_ai_agent_url": "http://localhost:8484"
+}
 ```
 
-**Copy the Client ID and Client Secret** that are displayed!
+This URL must be reachable from the worker process — the backend POSTs to `<agent_url>/api/v1/chat` and relays the SSE stream to the browser via `frappe.realtime`.
 
-## 3. Configure Settings (1 minute)
+## 3. Enable the assistant
 
-1. Go to: `/app/ai-assistant-settings`
-2. Fill in:
-   ```
-   ✓ Enabled
-   Agent URL: http://localhost:8484
-   Timeout: 30
-   ```
-3. Click **Save**
+1. Open `/app/ai-assistant-settings`
+2. Check **Enabled**
+3. (Optional) set a `keyboard_shortcut` like `Alt+/`
+4. Click **Save**, then **Test Connection** to confirm the agent is reachable
 
-## 4. Update MCP Server Config (1 minute)
+## 4. Try it
 
-Edit your MCP server `config.yaml`:
-
-```yaml
-auth:
-  enabled: true
-  oauth2:
-    token_info_url: "http://localhost:8000/api/method/frappe.integrations.oauth2.openid.userinfo"
-    issuer_url: "http://localhost:8000"
-    trusted_clients:
-      - "your-client-id-from-step-2"
-```
-
-Restart MCP server:
-
-```bash
-cd ~/frappe-mcp-server
-./frappe-mcp-server-stdio-darwin-arm64
-```
-
-## 5. Test It! (30 seconds)
-
-### Using Awesome Bar:
-1. Click the search bar at the top
-2. Type: "Show me all open projects"
-3. Select "Ask AI: Show me all open projects"
-4. See the magic! ✨
-
-### Using Console:
-```python
-from frappe_ai.api.ai_query import query
-query("List all customers")
-```
-
-## Common Queries to Try
+Click the AI button in the navbar (or press your shortcut) and ask:
 
 - "Show me all open projects"
 - "List customers with revenue > 100000"
 - "What are pending sales orders?"
-- "Show project timeline for Q4"
-- "List top 5 items by sales"
 
 ## Troubleshooting
 
-**Q: Awesome Bar doesn't show AI option?**
+### Sidebar button doesn't appear
+
 ```bash
 bench clear-cache
+bench build --app frappe_ai
 bench restart
 ```
 
-**Q: Token errors?**
-- Verify Client ID/Secret in Settings
-- Check OAuth Client has "Client Credentials" grant
+### Test Connection fails
 
-**Q: Connection timeout?**
-- Increase timeout in Settings
-- Check MCP server is running
-- Verify URLs are correct
+- Verify `frappe_ai_agent_url` in `site_config.json` (no trailing slash needed — it's stripped)
+- Confirm the agent's `/health` endpoint returns 200
+- Check the worker process can reach the agent host (not just your laptop)
 
-## What's Next?
+### Streaming hangs / times out
 
-- 📖 Read [INSTALLATION.md](INSTALLATION.md) for detailed setup
-- 🔧 Check [README.md](README.md) for features
-- 💡 Customize the UI in `public/js/frappe_ai.bundle.js`
-- 🚀 Deploy to production with proper security settings
+- Bump `timeout` in AI Assistant Settings (max 300s)
+- Inspect `bench logs` — the long-queue worker logs request failures to the Error Log
 
-## Architecture Overview
+## Architecture overview
 
-```
-┌──────────┐      Session      ┌───────────────┐
-│  Browser │ ───────────────> │ Frappe/ERPNext│
-└──────────┘                   └───────┬───────┘
-                                       │
-                                       │ OAuth2 Client Credentials
-                                       │ + User Context Headers
-                                       │
-                                       v
-                              ┌────────────────┐
-                              │   MCP Server   │
-                              │  (validates    │
-                              │   OAuth token) │
-                              └────────────────┘
+```text
+┌──────────┐   sid cookie    ┌────────────────┐
+│  Browser │ ──────────────▶ │ Frappe backend │
+└────▲─────┘                 │  chat.py       │
+     │ realtime              └────┬───────────┘
+     │ frappe_ai:chunk:<sid>      │ enqueue (long queue)
+     │                            ▼
+     │                    ┌────────────────┐
+     └────────────────────│ Background     │  POST /api/v1/chat
+                          │ worker         │  (sid forwarded)
+                          │ _stream_to_    │ ───────▶  AI agent
+                          │ agent          │ ◀───────  SSE chunks
+                          └────────────────┘
 ```
 
-## Key Features
+The worker reads SSE chunks from the agent and republishes each chunk to a `frappe_ai:chunk:<session_id>` realtime event. The browser subscribes via `frappe.realtime.on` before kicking off the stream, so it never holds an SSE connection open itself.
 
-✅ **Secure**: OAuth2 standard authentication  
-✅ **Fast**: Token caching for performance  
-✅ **Easy**: Awesome Bar integration  
-✅ **Smart**: Context-aware AI responses  
-✅ **Reliable**: Error handling and logging  
+## What's next?
 
----
-
-**Need help?** Check [INSTALLATION.md](INSTALLATION.md) or open an issue on GitHub!
-
+- [INSTALLATION.md](INSTALLATION.md) — detailed setup
+- [APP_STRUCTURE.md](APP_STRUCTURE.md) — file layout and customization points

@@ -1,0 +1,205 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+
+concurrency:
+  # Cancel older runs of the same branch when a newer commit arrives.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────
+  # Tier 1 — static checks. ~1–2 min. Run all linters / type-checkers
+  # against the working tree without spinning up a Frappe bench.
+  # ──────────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint & type-check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          # Frappe v16 (16.18+) requires Python 3.14.
+          python-version: '3.14'
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          # Frappe v16 frontend declares engines.node >= 24.
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install uv
+        # v8 doesn't ship a major-version tag yet (only v8.0.0 / v8.1.0),
+        # and v7 is the latest rolling major tag. Both target Node 24.
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install Python deps (runtime + dev group)
+        run: uv sync --group dev
+
+      - name: Install Node deps
+        run: npm ci
+
+      - name: ruff check
+        run: uvx ruff check
+
+      - name: ruff format --check
+        run: uvx ruff format --check
+
+      - name: pyrefly check
+        run: uvx pyrefly check
+
+      - name: TypeScript type-check
+        run: npm run type-check
+
+      - name: markdownlint
+        run: npx --yes markdownlint-cli README.md QUICKSTART.md INSTALLATION.md APP_STRUCTURE.md
+
+      - name: Strict JSON validity
+        run: |
+          python - <<'PY'
+          import json, glob, sys
+          files = sorted(glob.glob('frappe_ai/**/*.json', recursive=True) + ['package.json', 'tsconfig.json', '.markdownlint.json'])
+          failed = []
+          for f in files:
+              try:
+                  json.load(open(f))
+                  print(f'OK  {f}')
+              except Exception as e:
+                  print(f'FAIL  {f}: {e}')
+                  failed.append(f)
+          sys.exit(1 if failed else 0)
+          PY
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Tier 2 — Frappe integration. ~8–12 min. Spin up a real bench against
+  # Frappe v16, install the app the same way production does
+  # (`bench get-app`), build the bundle, run the test suite.
+  #
+  # No manual mv / pip install / apps.txt manipulation here — those are
+  # exactly the bookkeeping steps that `bench get-app` exists to do for
+  # us. If this job passes, the app installs cleanly under real bench.
+  # ──────────────────────────────────────────────────────────────────────
+  integration:
+    name: Frappe v16 integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: lint
+
+    services:
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MARIADB_ROOT_PASSWORD: travis
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis-cache:
+        image: redis:alpine
+        ports:
+          - 13000:6379
+
+      redis-queue:
+        image: redis:alpine
+        ports:
+          - 11000:6379
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          # Frappe v16 (16.18+) requires Python 3.14.
+          python-version: '3.14'
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          # Frappe v16 frontend declares engines.node >= 24.
+          node-version: '24'
+
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            mariadb-client \
+            libmariadb-dev \
+            wkhtmltopdf \
+            xvfb \
+            libfontconfig
+
+      - name: Configure MariaDB for Frappe (utf8mb4 + remote root)
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -u root -ptravis -e "
+            SET GLOBAL character_set_server = 'utf8mb4';
+            SET GLOBAL collation_server = 'utf8mb4_unicode_ci';
+            CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY 'travis';
+            GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
+            FLUSH PRIVILEGES;"
+
+      - name: Install frappe-bench
+        run: pip install frappe-bench
+
+      - name: bench init (Frappe v16)
+        run: |
+          bench init \
+            --skip-redis-config-generation \
+            --skip-assets \
+            --python "$(which python3)" \
+            --frappe-branch version-16 \
+            frappe-bench
+
+      - name: Point bench at the CI Redis instances
+        working-directory: frappe-bench
+        run: |
+          bench set-config -g redis_cache "redis://localhost:13000"
+          bench set-config -g redis_queue "redis://localhost:11000"
+          bench set-config -g redis_socketio "redis://localhost:13000"
+
+      - name: Install this app via `bench get-app` (production install path)
+        working-directory: frappe-bench
+        env:
+          # Pass GITHUB_TOKEN so `git clone` works even if the repo is
+          # private. The token has read access to the current repository
+          # automatically.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.email "ci@example.com"
+          git config --global user.name "CI"
+          git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+          bench get-app \
+            --branch "${{ github.ref_name }}" \
+            --skip-assets \
+            "https://github.com/${{ github.repository }}.git"
+
+      - name: Create test site
+        working-directory: frappe-bench
+        run: |
+          bench new-site test_site.local \
+            --mariadb-root-password travis \
+            --admin-password admin \
+            --mariadb-user-host-login-scope='%'
+
+      - name: Install app on test site
+        working-directory: frappe-bench
+        run: bench --site test_site.local install-app frappe_ai
+
+      - name: Build frontend bundle
+        working-directory: frappe-bench
+        run: bench build --app frappe_ai
+
+      - name: Run unit tests
+        working-directory: frappe-bench
+        run: bench --site test_site.local run-tests --app frappe_ai
