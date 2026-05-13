@@ -37,20 +37,16 @@ export const test = base.extend<{ login: LoginFn }>({
       // the bench-serve-only dev setup and in CI without socketio) keeps
       // long-polling. `waitUntil: 'domcontentloaded'` is what we
       // actually need: the HTML + initial scripts are present, then we
-      // poll for boot info via JS.
+      // poll for the bundle's effect via locator assertions.
       await page.goto("/app", { waitUntil: "domcontentloaded" });
-      // Cold-start desk render can take 20+s under Werkzeug dev server.
-      // Wait for Frappe's `app` controller to instantiate — that's the
-      // signal that the desk JS has finished bootstrapping.
-      await page.waitForFunction(
-        () => typeof (window as { frappe?: { app?: unknown } }).frappe?.app !== "undefined",
-        null,
-        { timeout: 60_000 },
-      );
-      // Bundle's onFrappeReady() handler fires shortly after frappe.app
-      // is created; allow another generous window for it to mount the
-      // sidebar root.
-      await expect(page.locator("#frappe-ai-sidebar-root")).toBeAttached({ timeout: 30_000 });
+      // Wait directly for the bundle's effect — the sidebar root
+      // element only appears after `onFrappeReady()` fires + settings
+      // load + the bundle mounts. Frappe's `boot` and `app` globals are
+      // intermediate signals that vary across dev/prod and across
+      // versions; the sidebar root is what we actually depend on.
+      // Cold-start desk render + bundle mount can take 60+s on
+      // Werkzeug dev server / a fresh CI runner.
+      await expect(page.locator("#frappe-ai-sidebar-root")).toBeAttached({ timeout: 90_000 });
     };
     await use(loginFn);
   },

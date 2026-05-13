@@ -123,23 +123,26 @@ function toggleSidebar(): void {
 // is dispatched via jQuery (`$(document).trigger("app_ready")`) which used
 // to be picked up by `$(document).on("app_ready", …)` — but Frappe v16.16+
 // scoped jQuery into a module bundle, so `window.$` no longer exists when
-// app bundles run. Poll for the readiness signal we actually care about:
-// `frappe.boot` populated + `frappe.app` instantiated.
+// app bundles run.
+//
+// Poll for `frappe.boot` (set very early during desk init) + `document.body`
+// being non-empty. `frappe.app` would be tempting but it's only set by the
+// desk controller and isn't reliable across dev/prod environments. boot is
+// enough — once boot is in place, the desk's `frappe.call` / `frappe.realtime`
+// helpers we depend on are wired up.
 function onFrappeReady(handler: () => void): void {
   const tick = (attempts: number) => {
     if (
       typeof frappe !== "undefined" &&
-      // boot info loaded
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (frappe as any).boot &&
-      // frappe.app is the desk controller; presence means app_ready already fired
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (frappe as any).app
+      // Body has been hydrated past the bare loading skeleton.
+      document.body.children.length > 1
     ) {
       handler();
       return;
     }
-    if (attempts > 600) return; // 60s cap; desk that doesn't boot in 60s is broken
+    if (attempts > 900) return; // 90s cap — desk that doesn't reach boot+body in 90s is broken
     setTimeout(() => tick(attempts + 1), 100);
   };
   tick(0);
