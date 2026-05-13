@@ -37,6 +37,9 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           enable-cache: true
+          # uv.lock is gitignored in this repo, so key the cache off
+          # pyproject.toml instead of the default `**/uv.lock` glob.
+          cache-dependency-glob: 'pyproject.toml'
 
       - name: Install Python deps (runtime + dev group)
         run: uv sync --group dev
