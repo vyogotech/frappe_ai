@@ -224,6 +224,12 @@ jobs:
           # Make test_site.local the current site so `bench serve` resolves
           # to it without needing host-header routing tricks.
           bench use test_site.local
+          # Bypass the setup wizard so /app doesn't redirect to
+          # /desk/setup-wizard. `frappe.is_setup_complete()` reads the
+          # Installed Application table — mark `frappe` as setup-complete.
+          bench --site test_site.local execute frappe.db.set_value \
+            --args '["Installed Application", {"app_name": "frappe"}, "is_setup_complete", 1]'
+          bench --site test_site.local clear-cache
           # The Playwright suite navigates to test_site.local:8000; the
           # browser needs the hostname to resolve to loopback.
           echo "127.0.0.1 test_site.local" | sudo tee -a /etc/hosts

@@ -24,4 +24,3 @@ g.frappe = {
 };
 g.cur_frm = undefined;
 g.cur_list = undefined;
-g.$ = vi.fn();
