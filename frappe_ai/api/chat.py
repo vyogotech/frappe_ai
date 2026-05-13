@@ -37,13 +37,11 @@ def get_recent_messages(limit: int = 50) -> dict:
 		return {"session_id": None, "messages": []}
 
 	session_id = sessions[0]["name"]
-	# Frappe's @whitelist endpoints receive query-string args as strings even
-	# when the signature is typed `int`, so the cast is necessary at runtime.
-	try:
-		# pyrefly: ignore[unnecessary-type-conversion]
-		safe_limit = max(1, min(int(limit), 200))
-	except (TypeError, ValueError):
-		safe_limit = 50
+	# Frappe v16's @whitelist wrapper coerces query-string args to the
+	# declared type before the endpoint runs (pydantic-backed), so `limit`
+	# arrives as a real int. Unparseable input is rejected upstream with
+	# FrappeTypeError — see test_unparseable_limit_raises_frappe_type_error.
+	safe_limit = max(1, min(limit, 200))
 
 	rows = frappe.get_all(
 		"AI Chat Message",
