@@ -10,5 +10,7 @@ def get_settings() -> dict:
 	return {
 		"enabled": bool(settings.enabled),
 		"sidebar_width": getattr(settings, "sidebar_width", None) or 380,
-		"keyboard_shortcut": getattr(settings, "keyboard_shortcut", None) or "Ctrl+/",
+		# Keep the fallback in sync with the doctype default — `Ctrl+/` is
+		# reserved by Frappe v16 (toggle left sidebar) so we can't use it.
+		"keyboard_shortcut": getattr(settings, "keyboard_shortcut", None) or "Alt+/",
 	}

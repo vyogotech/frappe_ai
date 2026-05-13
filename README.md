@@ -1,65 +1,53 @@
 # Frappe AI
 
-An intelligent AI assistant for Frappe/ERPNext that talks to a configured AI agent over HTTP and renders streamed responses (markdown prose plus structured KPI/chart/table blocks) in a chat sidebar embedded in the desk.
+An in-desk AI assistant for Frappe/ERPNext. Streams responses from a configured AI agent over HTTP and renders markdown prose plus structured KPI / chart / table blocks in a chat sidebar.
 
 ## Features
 
-- 🤖 AI-powered queries about your ERPNext data
-- 🪟 In-desk chat sidebar with streamed markdown + structured blocks
-- ⚙️ Easy configuration through AI Assistant Settings
+- Chat sidebar embedded in the Frappe desk, toggled from the navbar or a custom keyboard shortcut
+- Streamed responses relayed through `frappe.realtime` (no separate SSE proxy in the browser)
+- Per-user conversation history persisted as `AI Chat Session` / `AI Chat Message` doctypes
+- Page-context forwarding: the agent sees the user's current route / doctype / docname for grounded answers
+- Authentication via the user's existing `sid` cookie — no extra OAuth client to provision
 
 ## Installation
 
-1. Get the app:
 ```bash
-bench get-app https://github.com/yourusername/frappe_ai
-```
-
-2. Install the app on your site:
-```bash
+bench get-app https://github.com/Vyogo/frappe_ai
 bench --site your-site install-app frappe_ai
+bench restart
 ```
 
-3. Configure AI Assistant Settings:
-   - Navigate to `/app/ai-assistant-settings`
-   - Fill in:
-     - **Enabled**: ✓
-     - **Agent URL** (e.g., `http://localhost:8484`) — must be reachable from the user's browser
-     - **Timeout** (default `30` seconds)
+Then set the agent URL in `sites/your-site/site_config.json`:
+
+```json
+{
+  "frappe_ai_agent_url": "http://localhost:8484"
+}
+```
+
+And open `/app/ai-assistant-settings` to toggle **Enabled**.
+
+See [QUICKSTART.md](QUICKSTART.md) for a 5-minute walkthrough or [INSTALLATION.md](INSTALLATION.md) for the full guide.
 
 ## Usage
 
-Open the chat sidebar from the navbar button and type your query. Example queries:
+Click the AI button in the navbar (or press your configured shortcut) and type a query. Examples:
+
 - "Show me all open projects"
 - "What are the top customers by revenue?"
 - "List pending sales orders"
 
-### From Code
-```python
-import frappe
-from frappe_ai.api.ai_query import query
-
-result = query("Show me all open projects")
-print(result['response'])
-```
-
-### From REST API
-```bash
-curl -X POST https://your-site.com/api/method/frappe_ai.api.ai_query.query \
-  -H "Authorization: token YOUR_API_KEY:YOUR_API_SECRET" \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Show me all open projects"}'
-```
-
 ## Configuration
 
-All configuration is done through the **AI Assistant Settings** DocType:
-- Navigate to `/app/ai-assistant-settings`
-- Enable/disable the integration
-- Configure the Agent URL
-- Adjust timeout, sidebar width, and keyboard shortcut
+| Where | Key | Purpose |
+| --- | --- | --- |
+| `site_config.json` | `frappe_ai_agent_url` | Agent endpoint (authoritative) |
+| AI Assistant Settings | `enabled` | Master switch |
+| AI Assistant Settings | `timeout` | Per-request timeout (1–300s) |
+| AI Assistant Settings | `sidebar_width` | Sidebar width in px (300–600) |
+| AI Assistant Settings | `keyboard_shortcut` | Toggle combo (e.g. `Alt+/`) |
 
 ## License
 
 MIT
-

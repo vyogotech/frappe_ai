@@ -40,9 +40,9 @@ import { ref, computed, nextTick } from "vue";
 import { frappeIcon } from "../utils/frappe-icon";
 
 const props = defineProps<{
-	/** An assistant turn is currently in flight (SSE or fallback). */
+	/** An assistant turn is currently in flight. */
 	busy: boolean;
-	/** The in-flight turn can actually be cancelled (SSE path only). */
+	/** The in-flight turn can actually be cancelled. */
 	canCancel: boolean;
 }>();
 const emit = defineEmits<{
@@ -58,7 +58,7 @@ const showStop = computed(() => props.busy && props.canCancel);
 
 /**
  * Send button is disabled when:
- *   - busy in fallback mode (can't cancel, can't queue)  — spec says "stays as Send and is disabled"
+ *   - busy but the turn can't be cancelled (no point in clicking)
  *   - idle but no text typed
  * It is enabled when:
  *   - showStop (so the user can click to abort)
@@ -92,9 +92,9 @@ function send() {
 function handleKeydown(e: KeyboardEvent) {
 	if (e.key === "Enter" && !e.shiftKey) {
 		e.preventDefault();
-		// Enter while busy is a no-op in either mode. We don't repurpose
-		// Enter to mean "stop" because it's too easy to hit by accident
-		// while typing the next message.
+		// Enter while busy is a no-op. We don't repurpose Enter to mean
+		// "stop" — it's too easy to hit by accident while typing the
+		// next message.
 		if (!props.busy) send();
 	}
 }

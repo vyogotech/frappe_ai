@@ -248,11 +248,10 @@ export function useChat() {
     // empty so the user can simply start a new conversation.
     try {
       const result = await new Promise<RecentMessagesResponse>((resolve, reject) => {
-        frappe.call({
+        frappe.call<RecentMessagesResponse>({
           method: "frappe_ai.api.chat.get_recent_messages",
           args: { limit: 50 },
-          callback: (r: { message: RecentMessagesResponse }) =>
-            resolve(r?.message ?? { session_id: null, messages: [] }),
+          callback: (r) => resolve(r?.message ?? { session_id: null, messages: [] }),
           error: reject,
         });
       });
@@ -260,12 +259,17 @@ export function useChat() {
       if (!result || !result.session_id || result.messages.length === 0) return;
 
       _conversationId = result.session_id;
-      messages.value = result.messages.map((m) => ({
-        id: m.id,
-        role: (m.role === "assistant" ? "assistant" : "user") as "assistant" | "user",
-        content: m.content,
-        timestamp: m.timestamp ? new Date(m.timestamp) : null,
-      }));
+      // Skip rows whose role we can't faithfully render (e.g. persisted
+      // "tool" messages — we don't have the toolCall metadata in the
+      // hydrated row). Better to omit than to mislabel them as user input.
+      messages.value = result.messages
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => ({
+          id: m.id,
+          role: m.role as "user" | "assistant",
+          content: m.content,
+          timestamp: m.timestamp ? new Date(m.timestamp) : null,
+        }));
     } catch (err) {
       // Swallow — restoring history is a nice-to-have, not a blocker.
       console.warn("[Frappe AI] loadRecentConversation failed", err);

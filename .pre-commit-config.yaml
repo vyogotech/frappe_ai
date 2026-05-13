@@ -34,15 +34,10 @@ repos:
     rev: v2.7.1
     hooks:
       - id: prettier
-        types_or: [javascript, vue, scss]
-        # Ignore any files that might contain jinja / bundles
+        types_or: [javascript, ts, vue, css, scss]
         exclude: |
             (?x)^(
-                frappe_ai/public/dist/.*|
-                .*node_modules.*|
-                .*boilerplate.*|
-                frappe_ai/templates/includes/.*|
-                frappe_ai/public/js/lib/.*
+                .*node_modules.*
             )$
 
 
@@ -50,17 +45,11 @@ repos:
     rev: v8.44.0
     hooks:
       - id: eslint
-        types_or: [javascript]
+        types_or: [javascript, ts, vue]
         args: ['--quiet']
-        # Ignore any files that might contain jinja / bundles
         exclude: |
             (?x)^(
-                frappe_ai/public/dist/.*|
-                cypress/.*|
-                .*node_modules.*|
-                .*boilerplate.*|
-                frappe_ai/templates/includes/.*|
-                frappe_ai/public/js/lib/.*
+                .*node_modules.*
             )$
 
 ci:

@@ -209,13 +209,6 @@
   40% { opacity: 1; transform: scale(1.1); }
 }
 
-.frappe-ai-bubble-status-text {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-left: 4px;
-  font-style: italic;
-}
-
 .frappe-ai-bubble-time {
   font-size: 10px;
   color: var(--text-muted);
@@ -231,18 +224,6 @@
   font-size: 13px;
   width: 100%;
   box-sizing: border-box;
-}
-
-.frappe-ai-error--critical {
-  background: var(--red-highlight, #fff2f2);
-  border-color: var(--indicator-red, #e74c3c);
-  color: var(--red-dark, #c0392b);
-}
-
-.frappe-ai-error--warning {
-  background: var(--yellow-highlight, #fffbf0);
-  border-color: var(--indicator-yellow, #f39c12);
-  color: var(--yellow-dark, #d68910);
 }
 
 .frappe-ai-error--info {
@@ -603,17 +584,11 @@
   flex-shrink: 0;
 }
 
-.frappe-ai-status-dot--green,
-.frappe-ai-status-dot--success { background: var(--indicator-green, #27ae60); }
-.frappe-ai-status-dot--red,
-.frappe-ai-status-dot--danger { background: var(--indicator-red, #e74c3c); }
-.frappe-ai-status-dot--yellow,
-.frappe-ai-status-dot--warning { background: var(--indicator-yellow, #f39c12); }
-.frappe-ai-status-dot--blue,
-.frappe-ai-status-dot--info { background: var(--indicator-blue, #3498db); }
-.frappe-ai-status-dot--gray,
-.frappe-ai-status-dot--grey,
-.frappe-ai-status-dot--default { background: var(--text-muted); }
+.frappe-ai-status-dot--green { background: var(--indicator-green, #27ae60); }
+.frappe-ai-status-dot--red { background: var(--indicator-red, #e74c3c); }
+.frappe-ai-status-dot--yellow { background: var(--indicator-yellow, #f39c12); }
+.frappe-ai-status-dot--blue { background: var(--indicator-blue, #3498db); }
+.frappe-ai-status-dot--gray { background: var(--text-muted); }
 
 .frappe-ai-status-label {
   flex: 1;
@@ -631,17 +606,11 @@
   flex-shrink: 0;
 }
 
-.frappe-ai-status-badge--green,
-.frappe-ai-status-badge--success { background: var(--green-highlight, #e6f9ee); color: var(--indicator-green, #27ae60); }
-.frappe-ai-status-badge--red,
-.frappe-ai-status-badge--danger { background: var(--red-highlight, #fff2f2); color: var(--indicator-red, #e74c3c); }
-.frappe-ai-status-badge--yellow,
-.frappe-ai-status-badge--warning { background: var(--yellow-highlight, #fffbf0); color: var(--yellow-dark, #d68910); }
-.frappe-ai-status-badge--blue,
-.frappe-ai-status-badge--info { background: var(--blue-highlight, #f0f5ff); color: var(--indicator-blue, #3498db); }
-.frappe-ai-status-badge--gray,
-.frappe-ai-status-badge--grey,
-.frappe-ai-status-badge--default { background: var(--bg-light-gray, #f0f0f0); color: var(--text-muted); }
+.frappe-ai-status-badge--green { background: var(--green-highlight, #e6f9ee); color: var(--indicator-green, #27ae60); }
+.frappe-ai-status-badge--red { background: var(--red-highlight, #fff2f2); color: var(--indicator-red, #e74c3c); }
+.frappe-ai-status-badge--yellow { background: var(--yellow-highlight, #fffbf0); color: var(--yellow-dark, #d68910); }
+.frappe-ai-status-badge--blue { background: var(--blue-highlight, #f0f5ff); color: var(--indicator-blue, #3498db); }
+.frappe-ai-status-badge--gray { background: var(--bg-light-gray, #f0f0f0); color: var(--text-muted); }
 
 /* ──────────────────────────────────────────
    Mobile: full-width overlay

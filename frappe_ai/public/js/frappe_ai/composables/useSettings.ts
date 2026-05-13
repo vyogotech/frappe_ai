@@ -17,7 +17,8 @@ interface FrappeAISettingsResponse {
 const DEFAULT_SETTINGS: FrappeAISettings = {
   enabled: false,
   sidebarWidth: 380,
-  keyboardShortcut: "Ctrl+/",
+  // Matches the doctype default; `Ctrl+/` is reserved by Frappe v16.
+  keyboardShortcut: "Alt+/",
 };
 
 const settings: Ref<FrappeAISettings> = ref({ ...DEFAULT_SETTINGS });
@@ -39,7 +40,7 @@ export function useSettings() {
         settings.value = {
           enabled: msg.enabled ?? false,
           sidebarWidth: msg.sidebar_width ?? 380,
-          keyboardShortcut: msg.keyboard_shortcut ?? "Ctrl+/",
+          keyboardShortcut: msg.keyboard_shortcut ?? "Alt+/",
         };
       }
     } catch {

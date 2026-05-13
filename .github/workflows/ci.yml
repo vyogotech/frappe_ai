@@ -1,0 +1,197 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+
+concurrency:
+  # Cancel older runs of the same branch when a newer commit arrives.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────
+  # Tier 1 — static checks. ~1–2 min. Run all linters / type-checkers
+  # against the working tree without spinning up a Frappe bench.
+  # ──────────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint & type-check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install Python deps (runtime + dev group)
+        run: uv sync --group dev
+
+      - name: Install Node deps
+        run: npm ci
+
+      - name: ruff check
+        run: uv run ruff check
+
+      - name: ruff format --check
+        run: uv run ruff format --check
+
+      - name: pyrefly check
+        run: uvx pyrefly check
+
+      - name: TypeScript type-check
+        run: npm run type-check
+
+      - name: markdownlint
+        run: npx --yes markdownlint-cli README.md QUICKSTART.md INSTALLATION.md APP_STRUCTURE.md
+
+      - name: Strict JSON validity
+        run: |
+          python - <<'PY'
+          import json, glob, sys
+          files = sorted(glob.glob('frappe_ai/**/*.json', recursive=True) + ['package.json', 'tsconfig.json', '.markdownlint.json'])
+          failed = []
+          for f in files:
+              try:
+                  json.load(open(f))
+                  print(f'OK  {f}')
+              except Exception as e:
+                  print(f'FAIL  {f}: {e}')
+                  failed.append(f)
+          sys.exit(1 if failed else 0)
+          PY
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Tier 2 — Frappe integration. ~8–12 min. Spin up a real bench against
+  # Frappe v16, install the app, build the bundle, run the test suite.
+  # ──────────────────────────────────────────────────────────────────────
+  integration:
+    name: Frappe v16 integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Skip the ~10-minute bench setup when the cheap static tier already
+    # caught the problem. Push events still trigger both jobs.
+    needs: lint
+
+    services:
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MARIADB_ROOT_PASSWORD: travis
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis-cache:
+        image: redis:alpine
+        ports:
+          - 13000:6379
+
+      redis-queue:
+        image: redis:alpine
+        ports:
+          - 11000:6379
+
+    steps:
+      - name: Checkout app
+        uses: actions/checkout@v4
+        with:
+          # Bench expects the app at apps/<app_name>/ rather than the bare
+          # repo root. We'll copy it into place after `bench init`.
+          path: app-checkout
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: System packages (wkhtmltopdf, MariaDB client, etc.)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            mariadb-client \
+            libmariadb-dev \
+            wkhtmltopdf \
+            xvfb \
+            libfontconfig
+
+      - name: Configure MariaDB for Frappe (utf8mb4 + barracuda)
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -u root -ptravis -e "
+            SET GLOBAL character_set_server = 'utf8mb4';
+            SET GLOBAL collation_server = 'utf8mb4_unicode_ci';
+            CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY 'travis';
+            GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
+            FLUSH PRIVILEGES;"
+
+      - name: Install frappe-bench
+        run: pip install frappe-bench
+
+      - name: bench init (Frappe v16)
+        run: |
+          bench init \
+            --skip-redis-config-generation \
+            --skip-assets \
+            --python "$(which python3)" \
+            --frappe-branch version-16 \
+            frappe-bench
+
+      - name: Point bench at the CI Redis instances
+        working-directory: frappe-bench
+        run: |
+          bench set-config -g redis_cache "redis://localhost:13000"
+          bench set-config -g redis_queue "redis://localhost:11000"
+          bench set-config -g redis_socketio "redis://localhost:13000"
+
+      - name: Copy this repo into apps/frappe_ai
+        run: |
+          mv app-checkout frappe-bench/apps/frappe_ai
+          cd frappe-bench
+          ./env/bin/pip install -e ./apps/frappe_ai
+          # Frappe scans apps.txt to discover installable apps.
+          if ! grep -qx frappe_ai sites/apps.txt 2>/dev/null; then
+            echo "frappe_ai" >> sites/apps.txt
+          fi
+
+      - name: Create test site
+        working-directory: frappe-bench
+        run: |
+          bench new-site test_site.local \
+            --mariadb-root-password travis \
+            --admin-password admin \
+            --no-mariadb-socket
+
+      - name: Install app on test site
+        working-directory: frappe-bench
+        run: bench --site test_site.local install-app frappe_ai
+
+      - name: Build frontend bundle
+        working-directory: frappe-bench
+        run: bench build --app frappe_ai
+
+      - name: Run unit tests
+        working-directory: frappe-bench
+        run: bench --site test_site.local run-tests --app frappe_ai
