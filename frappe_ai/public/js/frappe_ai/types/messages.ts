@@ -47,10 +47,40 @@ export interface UserMessage extends MessageBase {
   content: string;
 }
 
+/**
+ * Ordered fragments of a streaming assistant reply. The agent emits
+ * text and content_block chunks interleaved in temporal order — a flat
+ * `content` string + parallel `blocks[]` discards that ordering and
+ * makes the renderer always show all text before all blocks, which
+ * looks like the stream "jumping" when a late text chunk lands above
+ * an already-rendered block. Tracking parts in arrival order keeps
+ * the visible layout faithful to the agent's actual sequence.
+ */
+export type MessagePart =
+  | { kind: "text"; text: string }
+  | { kind: "block"; block: ContentBlock };
+
 export interface AssistantMessage extends MessageBase {
   role: "assistant";
+  /**
+   * Concatenation of all text fragments. Kept alongside `parts` for
+   * hydrated messages (loadRecentConversation only restores `content`
+   * — block fragments aren't persisted) and for places that need the
+   * plain-text body without walking the parts array.
+   */
   content: string;
+  /**
+   * All block fragments in arrival order. Same rationale as `content`:
+   * legacy accessors keep working, new code reads `parts` for the
+   * interleaved order.
+   */
   blocks?: ContentBlock[];
+  /**
+   * Ordered sequence of text/block fragments as they arrived from the
+   * stream. Absent on hydrated rows (they only have `content`); the
+   * renderer falls back to `content` + `blocks` in that case.
+   */
+  parts?: MessagePart[];
   /**
    * True while the placeholder is waiting for content. Flipped to false
    * on first content chunk, `done`, error, or abort. Used by MessageBubble

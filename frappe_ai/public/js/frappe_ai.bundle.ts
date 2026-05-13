@@ -7,8 +7,6 @@ const SIDEBAR_ID = "frappe-ai-sidebar-root";
 let vueApp: VueApp | null = null;
 
 function injectNavbarButton(keyboardShortcut: string): void {
-  if (document.getElementById("frappe-ai-nav-btn")) return;
-
   const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
        fill="none" stroke="currentColor" stroke-width="2"
        stroke-linecap="round" stroke-linejoin="round">
@@ -24,56 +22,69 @@ function injectNavbarButton(keyboardShortcut: string): void {
     return btn;
   }
 
-  function tryInject(): boolean {
-    if (document.getElementById("frappe-ai-nav-btn")) return true;
+  function buildTopBtn(): HTMLElement {
+    return makeButton(
+      `<div id="frappe-ai-nav-btn" title="Frappe AI (${keyboardShortcut})"
+            style="cursor:pointer;display:flex;align-items:center;padding:0 4px">${svgIcon}</div>`,
+    );
+  }
 
-    // Desk home renders the top navbar with .desktop-avatar; every other
-    // route hides the top navbar and shows the user button inside the left
-    // sidebar (.dropdown-navbar-user). Anchor to whichever exists so the
-    // toggle is reachable on every page.
-    //
-    // jQuery is intentionally not used — Frappe v16.16+ scopes jQuery
-    // into a module bundle, so `window.$` is undefined in app bundles.
+  function buildSidebarBtn(): HTMLElement {
+    return makeButton(
+      `<a id="frappe-ai-nav-btn"
+          class="align-center btn-reset flex nav-link sidebar-user-button"
+          style="cursor:pointer;width:100%;min-height:40px;padding:0 8px;gap:8px;color:var(--text-color)"
+          title="Frappe AI (${keyboardShortcut})">
+          <span style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;flex:0 0 24px">${svgIcon}</span>
+          <span style="font-size:13px;line-height:1.2">Frappe AI</span>
+      </a>`,
+    );
+  }
+
+  // Idempotent: prefers the top navbar (`.desktop-avatar` is the only target
+  // that's actually visible across Frappe v16.x layouts — the left-sidebar
+  // slot ends up 0×0 when the sidebar is collapsed). Falls back to the sidebar
+  // slot only if the navbar isn't in the DOM yet, and upgrades to the navbar
+  // slot via the MutationObserver as soon as it appears.
+  //
+  // jQuery is intentionally not used — Frappe v16.16+ scopes jQuery into
+  // a module bundle, so `window.$` is undefined in app bundles.
+  function tryInject(): void {
+    const existing = document.getElementById("frappe-ai-nav-btn");
     const topAvatar = document.querySelector(".desktop-avatar");
+
     if (topAvatar?.parentNode) {
-      const btn = makeButton(
-        `<div id="frappe-ai-nav-btn" title="Frappe AI (${keyboardShortcut})"
-              style="cursor:pointer;display:flex;align-items:center;padding:0 4px">${svgIcon}</div>`,
-      );
-      topAvatar.parentNode.insertBefore(btn, topAvatar);
-      return true;
+      // Already in the right slot? Nothing to do.
+      if (
+        existing &&
+        existing.parentNode === topAvatar.parentNode &&
+        existing.nextSibling === topAvatar
+      ) {
+        return;
+      }
+      // Either no button yet, or it's stuck in the sidebar fallback from an
+      // earlier inject — move it to the top navbar.
+      existing?.remove();
+      topAvatar.parentNode.insertBefore(buildTopBtn(), topAvatar);
+      return;
     }
+
+    if (existing) return;
 
     const sidebarUser = document.querySelector(".dropdown-navbar-user");
     if (sidebarUser?.parentNode) {
-      // Mimic the sibling sidebar nav items (icon + label, left-aligned)
-      // so the AI toggle doesn't look orphaned next to Home/Search/Notification.
-      const btn = makeButton(
-        `<a id="frappe-ai-nav-btn"
-            class="align-center btn-reset flex nav-link sidebar-user-button"
-            style="cursor:pointer;width:100%;min-height:40px;padding:0 8px;gap:8px;color:var(--text-color)"
-            title="Frappe AI (${keyboardShortcut})">
-            <span style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;flex:0 0 24px">${svgIcon}</span>
-            <span style="font-size:13px;line-height:1.2">Frappe AI</span>
-        </a>`,
-      );
-      sidebarUser.parentNode.insertBefore(btn, sidebarUser);
-      return true;
+      sidebarUser.parentNode.insertBefore(buildSidebarBtn(), sidebarUser);
     }
-
-    return false;
   }
 
   tryInject();
 
   // Stays connected across SPA route changes — Frappe re-renders the navbar
-  // when navigating between /desk, /app/<doctype>, form views, etc. If we
-  // disconnect after the first inject the button vanishes on the next route
-  // and the user has to hard-reload to get it back.
+  // when navigating between /desk, /app/<doctype>, form views, etc.
+  // `tryInject` is now idempotent and self-upgrading: on every mutation it
+  // re-checks whether the button is in the preferred slot and moves it if not.
   const observer = new MutationObserver(() => {
-    if (!document.getElementById("frappe-ai-nav-btn")) {
-      tryInject();
-    }
+    tryInject();
   });
   observer.observe(document.body, { childList: true, subtree: true });
 }
@@ -105,8 +116,14 @@ function mountSidebar(sidebarWidth: number, keyboardShortcut: string): void {
 
   injectNavbarButton(keyboardShortcut);
 
+  // Frappe normalizes keydown events to a lowercase shortcut string (e.g.
+  // `alt+/`) before dispatching to `frappe.ui.keys.handlers`. The settings
+  // doctype stores user-friendly mixed case (default `Alt+/`), so registering
+  // verbatim leaves an entry under `Alt+/` that the dispatcher never reaches.
+  // Lowercasing at registration time keeps the displayed default friendly
+  // while ensuring the handler actually fires.
   frappe.ui.keys.add_shortcut({
-    shortcut: keyboardShortcut,
+    shortcut: keyboardShortcut.toLowerCase(),
     action: toggleSidebar,
     description: "Toggle Frappe AI sidebar",
     ignore_inputs: false,

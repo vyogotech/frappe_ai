@@ -51,27 +51,44 @@ const isPendingEmpty = computed(
 				</div>
 			</template>
 			<template v-else>
-				<!-- Streamed prose, rendered as markdown. The agent's
-             BlockStreamSplitter holds back `<ai-block>` markup so this path
-             never sees raw block HTML; tables, lists, code, and prose all
-             flow through here. -->
-				<!-- eslint-disable-next-line vue/no-v-html -->
-				<div
-					v-if="message.content"
-					class="frappe-ai-markdown"
-					v-html="renderMarkdown(message.content)"
-				/>
-				<!-- Structured blocks (KPI cards, charts, tables-as-data, status
-             lists). Appended after content because the agent emits them as
-             discrete `content_block` chunks once their `<ai-block>` markup
-             is complete. -->
-				<template v-if="message.blocks && message.blocks.length > 0">
-					<component
-						v-for="(block, i) in message.blocks"
-						:key="i"
-						:is="getBlockComponent(block.type)"
-						:block="block"
+				<!-- Streaming path: walk `parts` in arrival order so text and
+             blocks render where the agent actually emitted them. The
+             agent's BlockStreamSplitter holds back `<ai-block>` markup
+             so text fragments never see raw block HTML; tables, lists,
+             code, and prose all flow through renderMarkdown.
+             Hydrated rows (from get_recent_messages) don't have `parts`
+             — they fall through to the legacy content + blocks render
+             below, which puts everything in a single text block. -->
+				<template v-if="message.parts && message.parts.length > 0">
+					<template v-for="(part, i) in message.parts" :key="i">
+						<!-- eslint-disable-next-line vue/no-v-html -->
+						<div
+							v-if="part.kind === 'text'"
+							class="frappe-ai-markdown"
+							v-html="renderMarkdown(part.text)"
+						/>
+						<component
+							v-else-if="part.kind === 'block'"
+							:is="getBlockComponent(part.block.type)"
+							:block="part.block"
+						/>
+					</template>
+				</template>
+				<template v-else>
+					<!-- eslint-disable-next-line vue/no-v-html -->
+					<div
+						v-if="message.content"
+						class="frappe-ai-markdown"
+						v-html="renderMarkdown(message.content)"
 					/>
+					<template v-if="message.blocks && message.blocks.length > 0">
+						<component
+							v-for="(block, i) in message.blocks"
+							:key="i"
+							:is="getBlockComponent(block.type)"
+							:block="block"
+						/>
+					</template>
 				</template>
 			</template>
 		</div>

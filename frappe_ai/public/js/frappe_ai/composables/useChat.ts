@@ -75,10 +75,22 @@ export function useChat() {
       id: assistantId,
       role: "assistant",
       content: "",
+      // Initialise the ordered fragment list so chunk handlers can append
+      // text/block fragments without first checking presence.
+      parts: [],
       pending: true,
       timestamp: null,
     };
     messages.value.push(assistantMessage);
+
+    // Per-call settlement guard. Every path that finalises the stream
+    // (done chunk, error chunk, frappe.call error, client timeout, cancel)
+    // sets this true and short-circuits any later attempts. Two error
+    // bubbles can otherwise appear when, for example, an "error" chunk
+    // arrives just before the client timeout fires and both rejection
+    // paths run their side effects before Promise.race could disambiguate.
+    let settled = false;
+    let timerId: ReturnType<typeof setTimeout> | undefined;
 
     try {
       // Reuse the conversation's session id if we already have one so the
@@ -90,127 +102,140 @@ export function useChat() {
       const eventName = `frappe_ai:chunk:${sessionId}`;
       _activeEventName = eventName;
 
-      await Promise.race([
-        new Promise<void>((resolve, reject) => {
-          // Expose cancel capability before the realtime listener is registered
-          // so the stop button can appear as soon as the request is in-flight.
-          _resolveStream = () => {
-            frappe.realtime.off(eventName);
+      await new Promise<void>((resolve, reject) => {
+        // Centralised teardown so every settlement path looks identical:
+        // unsubscribe, clear the safety-net timer, drop the cancel
+        // affordance, mark settled. Subsequent calls (from a late chunk,
+        // a stale timer, a duplicate frappe.call error) become no-ops.
+        const settle = (kind: "resolve" | "reject", payload?: unknown) => {
+          if (settled) return;
+          settled = true;
+          if (timerId !== undefined) {
+            clearTimeout(timerId);
+            timerId = undefined;
+          }
+          frappe.realtime.off(eventName);
+          canCancel.value = false;
+          _resolveStream = null;
+          _activeEventName = null;
+          if (kind === "resolve") {
+            resolve();
+          } else {
+            reject(payload as Error);
+          }
+        };
+
+        // Expose cancel capability before the realtime listener is registered
+        // so the stop button can appear as soon as the request is in-flight.
+        _resolveStream = () => {
+          _updateMessage(assistantId, (m) => {
+            m.pending = false;
+            if (!m.timestamp) m.timestamp = new Date();
+          });
+          settle("resolve");
+        };
+        canCancel.value = true;
+
+        frappe.realtime.on(eventName, (chunk: Chunk) => {
+          if (settled) return;
+          if (chunk.type === "session" && chunk.id) {
+            // The agent persisted the conversation under this canonical id
+            // (which may differ from the optimistic UUID we minted). Adopt
+            // it so the next turn lands on the same LangGraph thread.
+            _conversationId = chunk.id;
+          } else if (chunk.type === "content" && chunk.text) {
+            _updateMessage(assistantId, (m) => {
+              m.content += chunk.text;
+              // Merge consecutive text chunks into the same fragment so a
+              // streaming reply still renders as one markdown block. Only
+              // start a new text part when the last fragment was a block —
+              // that's what preserves the arrival order in the renderer.
+              if (!m.parts) m.parts = [];
+              const last = m.parts[m.parts.length - 1];
+              if (last && last.kind === "text") {
+                last.text += chunk.text;
+              } else {
+                m.parts.push({ kind: "text", text: chunk.text as string });
+              }
+              m.pending = false;
+            });
+          } else if (chunk.type === "content_block" && chunk.block) {
+            // Structured blocks (table/chart/kpi/status) — append to the
+            // message so MessageBubble.vue renders them via getBlockComponent.
+            // The fragment is also pushed onto `parts` at its arrival
+            // position so subsequent text chunks render BELOW it instead
+            // of being silently inserted above (the historical bug where
+            // late text "jumped over" an already-rendered table).
+            const block = chunk.block as unknown as import("../types").ContentBlock;
+            _updateMessage(assistantId, (m) => {
+              if (!m.blocks) m.blocks = [];
+              m.blocks.push(block);
+              if (!m.parts) m.parts = [];
+              m.parts.push({ kind: "block", block });
+              m.pending = false;
+            });
+          } else if (chunk.type === "tool_call" && chunk.name) {
+            // Surface tool invocations as their own bubble so the user can
+            // see what the agent looked up. The relay only emits the call
+            // (no separate result event today); render in "done" state so
+            // the card isn't stuck in a perpetual "running" spinner.
+            //
+            // Insert just before the assistant placeholder so the visible
+            // order matches the agent's actual sequence. If the placeholder
+            // isn't found (e.g. an error path removed it before a late tool
+            // chunk arrived), drop the card rather than appending out of
+            // order — the `settled` short-circuit above should normally
+            // prevent reaching this branch in that state.
+            const assistantIdx = messages.value.findIndex((m) => m.id === assistantId);
+            if (assistantIdx < 0) return;
+            const toolCallMessage: Message = {
+              id: crypto.randomUUID(),
+              role: "tool_call",
+              content: "",
+              toolCall: {
+                call_id: crypto.randomUUID(),
+                name: chunk.name,
+                arguments: chunk.arguments ?? {},
+                status: "done",
+                timestamp: new Date(),
+              },
+              timestamp: new Date(),
+            };
+            messages.value.splice(assistantIdx, 0, toolCallMessage);
+          } else if (chunk.type === "done") {
             _updateMessage(assistantId, (m) => {
               m.pending = false;
-              if (!m.timestamp) m.timestamp = new Date();
+              m.timestamp = new Date();
             });
-            canCancel.value = false;
-            _resolveStream = null;
-            _activeEventName = null;
-            resolve();
-          };
-          canCancel.value = true;
+            settle("resolve");
+          } else if (chunk.type === "error") {
+            settle("reject", new Error(chunk.message ?? "Agent error"));
+          }
+        });
 
-          frappe.realtime.on(eventName, (chunk: Chunk) => {
-            if (chunk.type === "session" && chunk.id) {
-              // The agent persisted the conversation under this canonical id
-              // (which may differ from the optimistic UUID we minted). Adopt
-              // it so the next turn lands on the same LangGraph thread.
-              _conversationId = chunk.id;
-            } else if (chunk.type === "content" && chunk.text) {
-              _updateMessage(assistantId, (m) => {
-                m.content += chunk.text;
-                m.pending = false;
-              });
-            } else if (chunk.type === "content_block" && chunk.block) {
-              // Structured blocks (table/chart/kpi/status) — append to the
-              // message so MessageBubble.vue renders them via getBlockComponent.
-              const block = chunk.block as unknown as import("../types").ContentBlock;
-              _updateMessage(assistantId, (m) => {
-                if (!m.blocks) m.blocks = [];
-                m.blocks.push(block);
-                m.pending = false;
-              });
-            } else if (chunk.type === "tool_call" && chunk.name) {
-              // Surface tool invocations as their own bubble so the user can
-              // see what the agent looked up. The relay only emits the call
-              // (no separate result event today); render in "done" state so
-              // the card isn't stuck in a perpetual "running" spinner.
-              //
-              // The assistant placeholder was pushed before this stream began,
-              // so a naive push() would put the card AFTER the assistant text
-              // even though the tool was called BEFORE the content was
-              // generated. Splice in just before the placeholder so the
-              // visible order matches the agent's actual sequence.
-              const toolCallMessage: Message = {
-                id: crypto.randomUUID(),
-                role: "tool_call",
-                content: "",
-                toolCall: {
-                  call_id: crypto.randomUUID(),
-                  name: chunk.name,
-                  arguments: chunk.arguments ?? {},
-                  status: "done",
-                  timestamp: new Date(),
-                },
-                timestamp: new Date(),
-              };
-              const assistantIdx = messages.value.findIndex((m) => m.id === assistantId);
-              if (assistantIdx >= 0) {
-                messages.value.splice(assistantIdx, 0, toolCallMessage);
-              } else {
-                messages.value.push(toolCallMessage);
-              }
-            } else if (chunk.type === "done") {
-              _updateMessage(assistantId, (m) => {
-                m.pending = false;
-                m.timestamp = new Date();
-              });
-              frappe.realtime.off(eventName);
-              canCancel.value = false;
-              _resolveStream = null;
-              _activeEventName = null;
-              resolve();
-            } else if (chunk.type === "error") {
-              frappe.realtime.off(eventName);
-              canCancel.value = false;
-              _resolveStream = null;
-              _activeEventName = null;
-              reject(new Error(chunk.message ?? "Agent error"));
-            }
-          });
+        frappe.call<StreamResult>({
+          method: "frappe_ai.api.chat.start_stream",
+          args: {
+            message: content,
+            session_id: sessionId,
+            // Inject route/doctype/docname/currency so the agent prompt
+            // can ground answers in the user's current page. The relay
+            // forwards this dict into the agent's `context` payload.
+            page_context: getPageContext(),
+          },
+          error: (err: unknown) => settle("reject", err instanceof Error ? err : new Error(String(err))),
+        });
 
-          frappe.call<StreamResult>({
-            method: "frappe_ai.api.chat.start_stream",
-            args: {
-              message: content,
-              session_id: sessionId,
-              // Inject route/doctype/docname/currency so the agent prompt
-              // can ground answers in the user's current page. The relay
-              // forwards this dict into the agent's `context` payload.
-              page_context: getPageContext(),
-            },
-            error: (err: unknown) => {
-              frappe.realtime.off(eventName);
-              canCancel.value = false;
-              _resolveStream = null;
-              _activeEventName = null;
-              reject(err);
-            },
-          });
-        }),
-
-        // Safety net: if the RQ worker dies without emitting "done" or "error",
-        // the stream promise above never settles. Race it against a hard timeout
-        // so the UI never stays frozen permanently.
-        new Promise<never>((_, reject) =>
-          setTimeout(() => {
-            if (_activeEventName) {
-              frappe.realtime.off(_activeEventName);
-              _activeEventName = null;
-            }
-            canCancel.value = false;
-            _resolveStream = null;
-            reject(new Error("Response timed out. Please try again."));
-          }, CLIENT_TIMEOUT_MS),
-        ),
-      ]);
+        // Safety net: if the RQ worker dies without emitting "done" or
+        // "error", the promise above never settles. Schedule a hard
+        // timeout that flows through `settle()` like every other
+        // settlement path, so a late chunk arriving after the timer
+        // can't add a second error bubble.
+        timerId = setTimeout(
+          () => settle("reject", new Error("Response timed out. Please try again.")),
+          CLIENT_TIMEOUT_MS,
+        );
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to get response";
       lastError.value = msg;
