@@ -5,6 +5,6 @@
 tags
 node_modules
 __pycache__
-uv.lock
 .venv/
 .superpowers/
+docs/
