@@ -207,89 +207,9 @@ jobs:
         working-directory: frappe-bench
         run: bench --site test_site.local run-tests --app frappe_ai
 
-      # ── Playwright E2E tier — runs against a bench that's started in
-      # the background. The agent isn't reachable from CI; that's fine:
-      # the E2E suite only validates the sidebar mount, settings page,
-      # and the get_settings + test_connection endpoints. None of them
-      # need a live agent.
-      - name: Configure site for E2E
-        working-directory: frappe-bench
-        run: |
-          # `-p` parses the value as a Python literal; not needed for a
-          # plain string. Use the default (string-coerced) form.
-          bench --site test_site.local set-config \
-            frappe_ai_agent_url "http://localhost:8484"
-          bench --site test_site.local set-config -p \
-            frappe_ai_agent_url_unsafe_ok 1
-          # Make test_site.local the current site so `bench serve` resolves
-          # to it without needing host-header routing tricks.
-          bench use test_site.local
-          # Bypass the setup wizard so /app doesn't redirect to
-          # /desk/setup-wizard. `frappe.is_setup_complete()` reads the
-          # Installed Application table — mark `frappe` as setup-complete.
-          bench --site test_site.local execute frappe.db.set_value \
-            --args '["Installed Application", {"app_name": "frappe"}, "is_setup_complete", 1]'
-          bench --site test_site.local clear-cache
-          # The Playwright suite navigates to test_site.local:8000; the
-          # browser needs the hostname to resolve to loopback.
-          echo "127.0.0.1 test_site.local" | sudo tee -a /etc/hosts
-
-      - name: Install Playwright browser
-        run: |
-          cd "$GITHUB_WORKSPACE"
-          # The repo isn't checked out in this job (bench get-app pulled
-          # only the app source into apps/frappe_ai). Pull the package
-          # manifests we need for Playwright via a shallow checkout.
-          if [ ! -f package.json ]; then
-            git clone --depth 1 --branch "${{ github.ref_name }}" \
-              "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
-              app-source
-            cp -r app-source/. ./
-          fi
-          npm ci
-          npx playwright install --with-deps chromium
-
-      - name: Start bench in background
-        working-directory: frappe-bench
-        run: |
-          nohup bench serve --port 8000 > bench.log 2>&1 &
-          echo $! > bench.pid
-          # Wait for the gunicorn worker to accept connections AND for
-          # the Frappe login page to render — a 200 on / isn't enough
-          # if the desk JS bundles haven't loaded yet.
-          for i in $(seq 1 90); do
-            body=$(curl -s http://test_site.local:8000/login 2>/dev/null || true)
-            if echo "$body" | grep -q 'name="usr"'; then
-              echo "bench is up after ${i}s (login form detected)"
-              break
-            fi
-            sleep 1
-            if [ "$i" = "30" ] || [ "$i" = "60" ]; then
-              echo "── still waiting; bench log tail ──"
-              tail -10 bench.log || true
-            fi
-          done
-          # Dump the final state regardless so failures are debuggable.
-          echo "── bench.log tail ──"
-          tail -30 bench.log || true
-
-      - name: Run Playwright E2E
-        env:
-          FRAPPE_BASE_URL: http://test_site.local:8000
-        run: npx playwright test
-
-      - name: Upload Playwright report on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 7
-
-      - name: Stop bench
-        if: always()
-        working-directory: frappe-bench
-        run: |
-          if [ -f bench.pid ]; then
-            kill "$(cat bench.pid)" || true
-          fi
+      # Playwright E2E intentionally NOT wired into CI yet — driving the
+      # desk under Werkzeug `bench serve` is unreliable (socketio polling
+      # 404s, setup-wizard redirects, cold-start timing). The test files
+      # under tests/e2e/ are still valid; run them locally against a real
+      # bench, or against the production-shaped central-site image. See
+      # CONTRIBUTING.md for the local-Playwright recipe.
