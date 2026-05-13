@@ -86,6 +86,62 @@ class TestSanitizePageContext(unittest.TestCase):
 # ──────────────────────────────────────────────────────────────────────────
 
 
+class TestValidateAgentUrl(unittest.TestCase):
+	def setUp(self):
+		self._original_escape = frappe.local.conf.get("frappe_ai_agent_url_unsafe_ok")
+		frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = 0
+
+	def tearDown(self):
+		if self._original_escape is None:
+			frappe.local.conf.pop("frappe_ai_agent_url_unsafe_ok", None)
+		else:
+			frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = self._original_escape
+
+	def test_accepts_https_url(self):
+		chat._validate_agent_url("https://agent.example.com")
+
+	def test_accepts_http_url(self):
+		chat._validate_agent_url("http://agent.example.com:8484")
+
+	def test_accepts_localhost_with_escape(self):
+		# Localhost is technically a private name; allow it when the
+		# escape hatch is set (local dev).
+		frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = 1
+		chat._validate_agent_url("http://localhost:8484")
+		chat._validate_agent_url("http://127.0.0.1:8484")
+
+	def test_rejects_non_http_scheme(self):
+		with self.assertRaises(frappe.ValidationError):
+			chat._validate_agent_url("ftp://agent.example.com")
+		with self.assertRaises(frappe.ValidationError):
+			chat._validate_agent_url("file:///etc/passwd")
+
+	def test_rejects_missing_scheme(self):
+		with self.assertRaises(frappe.ValidationError):
+			chat._validate_agent_url("agent.example.com:8484")
+
+	def test_rejects_missing_host(self):
+		with self.assertRaises(frappe.ValidationError):
+			chat._validate_agent_url("http://")
+
+	def test_rejects_cloud_metadata_endpoints(self):
+		# AWS / GCE / Azure IMDS — classic SSRF target.
+		with self.assertRaises(frappe.ValidationError):
+			chat._validate_agent_url("http://169.254.169.254/latest/meta-data/")
+		with self.assertRaises(frappe.ValidationError):
+			chat._validate_agent_url("http://metadata.google.internal/computeMetadata/")
+
+	def test_rejects_unspecified_address(self):
+		with self.assertRaises(frappe.ValidationError):
+			chat._validate_agent_url("http://0.0.0.0:8484")
+
+	def test_escape_hatch_allows_metadata_too(self):
+		# Operators who genuinely need internal-network targets opt-in
+		# via site_config. We don't second-guess them.
+		frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = 1
+		chat._validate_agent_url("http://169.254.169.254/")
+
+
 class TestAgentUrl(unittest.TestCase):
 	def setUp(self):
 		self._original = frappe.local.conf.get("frappe_ai_agent_url")

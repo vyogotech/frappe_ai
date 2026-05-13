@@ -4,6 +4,8 @@ import frappe
 import requests
 from frappe import _
 
+from frappe_ai.api.chat import _validate_agent_url
+
 
 def _agent_url() -> str:
 	return frappe.local.conf.get("frappe_ai_agent_url", "").rstrip("/")
@@ -24,6 +26,12 @@ def test_connection():
 		agent_url = _agent_url()
 		if not agent_url:
 			return {"success": False, "message": "AI agent URL is not configured."}
+		try:
+			_validate_agent_url(agent_url)
+		except frappe.ValidationError as e:
+			# Surface the validation message rather than 500-ing; the
+			# settings page caller renders the message verbatim.
+			return {"success": False, "message": str(e)}
 
 		health_response = requests.get(
 			f"{agent_url}/health",

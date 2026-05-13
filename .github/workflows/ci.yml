@@ -60,6 +60,9 @@ jobs:
       - name: TypeScript type-check
         run: npm run type-check
 
+      - name: Vitest (frontend unit tests)
+        run: npm test
+
       - name: markdownlint
         run: npx --yes markdownlint-cli README.md QUICKSTART.md INSTALLATION.md APP_STRUCTURE.md
 
@@ -203,3 +206,72 @@ jobs:
       - name: Run unit tests
         working-directory: frappe-bench
         run: bench --site test_site.local run-tests --app frappe_ai
+
+      # ── Playwright E2E tier — runs against a bench that's started in
+      # the background. The agent isn't reachable from CI; that's fine:
+      # the E2E suite only validates the sidebar mount, settings page,
+      # and the get_settings + test_connection endpoints. None of them
+      # need a live agent.
+      - name: Configure site for E2E
+        working-directory: frappe-bench
+        run: |
+          bench --site test_site.local set-config -p \
+            frappe_ai_agent_url "http://localhost:8484"
+          bench --site test_site.local set-config -p \
+            frappe_ai_agent_url_unsafe_ok 1
+          # Add a host alias so dev.localhost-style configs work via the
+          # bench's serve.
+          echo "127.0.0.1 dev.localhost" | sudo tee -a /etc/hosts
+
+      - name: Install Playwright browser
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          # The repo isn't checked out in this job (bench get-app pulled
+          # only the app source into apps/frappe_ai). Pull the package
+          # manifests we need for Playwright via a shallow checkout.
+          if [ ! -f package.json ]; then
+            git clone --depth 1 --branch "${{ github.ref_name }}" \
+              "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
+              app-source
+            cp -r app-source/. ./
+          fi
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Start bench in background
+        working-directory: frappe-bench
+        run: |
+          # honcho-managed processes (gunicorn, socketio, RQ workers)
+          # serve at localhost:8000. The dev site is a `localhost`
+          # subdomain so we hit it via Host header.
+          nohup bench start > bench.log 2>&1 &
+          echo $! > bench.pid
+          # Wait for the gunicorn worker to accept connections.
+          for i in $(seq 1 60); do
+            if curl -sf -H "Host: test_site.local" http://localhost:8000/login > /dev/null; then
+              echo "bench is up after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run Playwright E2E
+        env:
+          FRAPPE_BASE_URL: http://test_site.local:8000
+        run: npx playwright test
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Stop bench
+        if: always()
+        working-directory: frappe-bench
+        run: |
+          if [ -f bench.pid ]; then
+            kill "$(cat bench.pid)" || true
+          fi
