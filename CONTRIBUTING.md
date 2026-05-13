@@ -70,7 +70,7 @@ The `frappe_ai_agent_url_unsafe_ok` flag exists to disable the SSRF guard on `lo
 ## What goes in which test tier
 
 | Behaviour you're testing | Tier |
-|---|---|
+| --- | --- |
 | Pure function (formatter, sanitiser, parser) | Vitest (frontend) or `unittest.TestCase` (backend) |
 | Component renders / responds to user input | Vitest (Vue Test Utils) |
 | DocType validator / install hook / whitelisted endpoint | `bench --site … run-tests` |
