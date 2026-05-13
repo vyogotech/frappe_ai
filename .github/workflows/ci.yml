@@ -221,6 +221,9 @@ jobs:
             frappe_ai_agent_url "http://localhost:8484"
           bench --site test_site.local set-config -p \
             frappe_ai_agent_url_unsafe_ok 1
+          # Make test_site.local the current site so `bench serve` resolves
+          # to it without needing host-header routing tricks.
+          bench use test_site.local
           # The Playwright suite navigates to test_site.local:8000; the
           # browser needs the hostname to resolve to loopback.
           echo "127.0.0.1 test_site.local" | sudo tee -a /etc/hosts
@@ -243,19 +246,26 @@ jobs:
       - name: Start bench in background
         working-directory: frappe-bench
         run: |
-          # honcho-managed processes (gunicorn, socketio, RQ workers)
-          # serve at localhost:8000. The dev site is a `localhost`
-          # subdomain so we hit it via Host header.
-          nohup bench start > bench.log 2>&1 &
+          nohup bench serve --port 8000 > bench.log 2>&1 &
           echo $! > bench.pid
-          # Wait for the gunicorn worker to accept connections.
-          for i in $(seq 1 60); do
-            if curl -sf -H "Host: test_site.local" http://localhost:8000/login > /dev/null; then
-              echo "bench is up after ${i}s"
+          # Wait for the gunicorn worker to accept connections AND for
+          # the Frappe login page to render — a 200 on / isn't enough
+          # if the desk JS bundles haven't loaded yet.
+          for i in $(seq 1 90); do
+            body=$(curl -s http://test_site.local:8000/login 2>/dev/null || true)
+            if echo "$body" | grep -q 'name="usr"'; then
+              echo "bench is up after ${i}s (login form detected)"
               break
             fi
             sleep 1
+            if [ "$i" = "30" ] || [ "$i" = "60" ]; then
+              echo "── still waiting; bench log tail ──"
+              tail -10 bench.log || true
+            fi
           done
+          # Dump the final state regardless so failures are debuggable.
+          echo "── bench.log tail ──"
+          tail -30 bench.log || true
 
       - name: Run Playwright E2E
         env:
