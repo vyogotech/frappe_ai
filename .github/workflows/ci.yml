@@ -221,9 +221,9 @@ jobs:
             frappe_ai_agent_url "http://localhost:8484"
           bench --site test_site.local set-config -p \
             frappe_ai_agent_url_unsafe_ok 1
-          # Add a host alias so dev.localhost-style configs work via the
-          # bench's serve.
-          echo "127.0.0.1 dev.localhost" | sudo tee -a /etc/hosts
+          # The Playwright suite navigates to test_site.local:8000; the
+          # browser needs the hostname to resolve to loopback.
+          echo "127.0.0.1 test_site.local" | sudo tee -a /etc/hosts
 
       - name: Install Playwright browser
         run: |
