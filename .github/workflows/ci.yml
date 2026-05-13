@@ -60,6 +60,9 @@ jobs:
       - name: TypeScript type-check
         run: npm run type-check
 
+      - name: Vitest (frontend unit tests)
+        run: npm test
+
       - name: markdownlint
         run: npx --yes markdownlint-cli README.md QUICKSTART.md INSTALLATION.md APP_STRUCTURE.md
 
@@ -203,3 +206,10 @@ jobs:
       - name: Run unit tests
         working-directory: frappe-bench
         run: bench --site test_site.local run-tests --app frappe_ai
+
+      # Playwright E2E intentionally NOT wired into CI yet — driving the
+      # desk under Werkzeug `bench serve` is unreliable (socketio polling
+      # 404s, setup-wizard redirects, cold-start timing). The test files
+      # under tests/e2e/ are still valid; run them locally against a real
+      # bench, or against the production-shaped central-site image. See
+      # CONTRIBUTING.md for the local-Playwright recipe.

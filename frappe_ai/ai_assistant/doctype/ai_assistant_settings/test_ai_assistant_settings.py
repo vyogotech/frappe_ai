@@ -74,3 +74,58 @@ class TestAIAssistantSettings(unittest.TestCase):
 		settings.sidebar_width = 380
 		settings.save()
 		self.assertEqual(settings.sidebar_width, 380)
+
+	# ── keyboard shortcut validator (the most complex on this doctype) ──
+
+	def _save_with_shortcut(self, shortcut):
+		settings = _reload_settings()
+		settings.keyboard_shortcut = shortcut
+		settings.save()
+		return settings
+
+	def test_shortcut_accepts_alt_slash(self):
+		# Default value — must round-trip.
+		self.assertEqual(self._save_with_shortcut("Alt+/").keyboard_shortcut, "Alt+/")
+
+	def test_shortcut_accepts_mod_shift_letter(self):
+		self.assertEqual(self._save_with_shortcut("Mod+Shift+A").keyboard_shortcut, "Mod+Shift+A")
+
+	def test_shortcut_accepts_alt_semicolon(self):
+		self.assertEqual(self._save_with_shortcut("Alt+;").keyboard_shortcut, "Alt+;")
+
+	def test_shortcut_accepts_case_insensitively(self):
+		# Validator regex is case-insensitive; the stored value preserves case.
+		self.assertEqual(self._save_with_shortcut("alt+/").keyboard_shortcut, "alt+/")
+
+	def test_shortcut_rejects_no_modifier(self):
+		with self.assertRaises(frappe.ValidationError):
+			self._save_with_shortcut("/")
+
+	def test_shortcut_rejects_garbage(self):
+		with self.assertRaises(frappe.ValidationError):
+			self._save_with_shortcut("not a shortcut")
+
+	def test_shortcut_rejects_empty_modifier_chain(self):
+		with self.assertRaises(frappe.ValidationError):
+			self._save_with_shortcut("Ctrl+")
+
+	def test_shortcut_rejects_each_reserved_combo(self):
+		# These are the Frappe v16 hard-bound combos that `_validate_shortcut`
+		# explicitly refuses. Pinning them in a test means we'll notice if
+		# someone widens the regex without auditing the reserved set.
+		reserved = [
+			"Ctrl+/",
+			"Ctrl+K",
+			"Ctrl+G",
+			"Ctrl+S",
+			"Alt+S",
+			"Shift+/",
+		]
+		for combo in reserved:
+			with self.subTest(combo=combo):
+				with self.assertRaises(frappe.ValidationError):
+					self._save_with_shortcut(combo)
+
+	def test_shortcut_blank_is_allowed(self):
+		# Empty shortcut means "no keyboard toggle wired" — must not raise.
+		self._save_with_shortcut("")
