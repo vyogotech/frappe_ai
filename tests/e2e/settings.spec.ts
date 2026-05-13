@@ -19,14 +19,24 @@ test.describe("AI Assistant Settings form", () => {
     await page.goto("/app/ai-assistant-settings");
     await page.waitForLoadState("networkidle");
 
-    // agent_url field exists and is read-only (mirrors site_config).
-    const agentUrl = page.locator('[data-fieldname="agent_url"] input');
+    // agent_url is declared `read_only: 1` in the doctype JSON. Frappe v16
+    // renders read-only Data fields as a static <div> (no <input>) until
+    // the field is clicked into edit mode, so we assert on the wrapper's
+    // presence rather than the input element. The onload hook in
+    // ai_assistant_settings.py copies the value from site_config.
+    const agentUrl = page.locator('[data-fieldname="agent_url"]').first();
     await expect(agentUrl).toBeVisible({ timeout: 10_000 });
-    await expect(agentUrl).toHaveAttribute("readonly", /.*/);
+    await expect(agentUrl).toContainText(/https?:\/\//);
 
-    // The headline alert tells the user whether the integration is enabled.
-    const alert = page.locator(".form-dashboard-section .indicator-pill, .form-dashboard-section");
-    await expect(alert.first()).toBeVisible();
+    // The headline alert (set via frm.dashboard.set_headline_alert in the
+    // form controller) lives in .form-message-container on Frappe v16 —
+    // the older .form-dashboard-section path is hidden by default now.
+    // Assert on the message text so the test survives further class
+    // renames upstream.
+    const alert = page.locator(".form-message-container").filter({
+      hasText: /AI Assistant is (enabled|disabled)/,
+    });
+    await expect(alert).toBeVisible({ timeout: 10_000 });
   });
 
   test("Test Connection custom button is present and callable", async ({ page }) => {
@@ -40,11 +50,19 @@ test.describe("AI Assistant Settings form", () => {
 
     // Invoke the endpoint directly to assert the contract regardless of
     // whether the agent at frappe_ai_agent_url is reachable from CI.
+    //
+    // Read the CSRF token from `frappe.csrf_token` (the desk runtime puts
+    // it on the namespaced object; `window.csrf_token` is unset in v16).
+    // Without the token Frappe rejects the POST with 403, the response
+    // body has no `message` key, and the toHaveProperty assertions below
+    // explode with the unhelpful "received value must not be null".
     const result = await page.evaluate(async () => {
+      const csrf =
+        (window as { frappe?: { csrf_token?: string } }).frappe?.csrf_token ?? "";
       const r = await fetch("/api/method/frappe_ai.api.health.test_connection", {
         credentials: "include",
         method: "POST",
-        headers: { "X-Frappe-CSRF-Token": (window as { csrf_token?: string }).csrf_token ?? "" },
+        headers: { "X-Frappe-CSRF-Token": csrf },
       });
       return r.json();
     });
