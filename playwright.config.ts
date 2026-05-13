@@ -20,6 +20,11 @@ export default defineConfig({
   // 30+ seconds; the per-test timeout has to accommodate it.
   timeout: 120_000,
   expect: { timeout: 15_000 },
+  // One retry in CI to absorb the rare transient flake (gunicorn
+  // worker recycle mid-test, socketio polling jitter) without
+  // masking real regressions. Local runs keep zero retries so a
+  // dev sees the real failure on the first run.
+  retries: process.env.CI ? 1 : 0,
   use: {
     baseURL: process.env.FRAPPE_BASE_URL ?? "http://dev.localhost:8080",
     trace: "retain-on-failure",
