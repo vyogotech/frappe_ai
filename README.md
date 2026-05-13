@@ -1,5 +1,7 @@
 # Frappe AI
 
+[![CI](https://github.com/vyogotech/frappe_ai/actions/workflows/ci.yml/badge.svg)](https://github.com/vyogotech/frappe_ai/actions/workflows/ci.yml)
+
 An in-desk AI assistant for Frappe/ERPNext. Streams responses from a configured AI agent over HTTP and renders markdown prose plus structured KPI / chart / table blocks in a chat sidebar.
 
 ## Features
@@ -13,7 +15,7 @@ An in-desk AI assistant for Frappe/ERPNext. Streams responses from a configured 
 ## Installation
 
 ```bash
-bench get-app https://github.com/Vyogo/frappe_ai
+bench get-app https://github.com/vyogotech/frappe_ai
 bench --site your-site install-app frappe_ai
 bench restart
 ```

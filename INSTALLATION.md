@@ -20,7 +20,7 @@ bench get-app /path/to/frappe_ai
 Or from GitHub:
 
 ```bash
-bench get-app https://github.com/Vyogo/frappe_ai
+bench get-app https://github.com/vyogotech/frappe_ai
 ```
 
 ## Step 2: Install on a site
@@ -114,4 +114,4 @@ This drops the three doctypes (`AI Assistant Settings`, `AI Chat Session`, `AI C
 
 ## Support
 
-- GitHub Issues: <https://github.com/Vyogo/frappe_ai/issues>
+- GitHub Issues: <https://github.com/vyogotech/frappe_ai/issues>

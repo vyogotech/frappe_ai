@@ -9,12 +9,6 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  # Silence the "Node.js 20 actions are deprecated" warning by opting the
-  # JavaScript actions (checkout, setup-node, setup-python, setup-uv) into
-  # Node 24 ahead of the 2026-06-02 forced-default date.
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-
 jobs:
   # ──────────────────────────────────────────────────────────────────────
   # Tier 1 — static checks. ~1–2 min. Run all linters / type-checkers
@@ -26,23 +20,23 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           # Frappe v16 (16.18+) requires Python 3.14.
           python-version: '3.14'
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           # Frappe v16 frontend declares engines.node >= 24.
           node-version: '24'
           cache: 'npm'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v8
         with:
           enable-cache: true
 
@@ -123,13 +117,13 @@ jobs:
 
     steps:
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           # Frappe v16 (16.18+) requires Python 3.14.
           python-version: '3.14'
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           # Frappe v16 frontend declares engines.node >= 24.
           node-version: '24'
@@ -194,7 +188,7 @@ jobs:
           bench new-site test_site.local \
             --mariadb-root-password travis \
             --admin-password admin \
-            --no-mariadb-socket
+            --mariadb-user-host-login-scope='%'
 
       - name: Install app on test site
         working-directory: frappe-bench
