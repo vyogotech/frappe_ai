@@ -18,6 +18,22 @@
   display: flex;
   flex-direction: column;
   position: relative;
+
+  /* Sidebar-scoped accent token. Defaults to a calm slate that pairs with
+   * monochrome Desk content without clashing against branded navbars
+   * (Invox red, ERPNext blue, etc.). Sites can override at the
+   * #frappe-ai-sidebar-root level to rebrand the chat affordance without
+   * touching Frappe's --primary. Dark-mode override below lifts the slate
+   * so the user bubble stays distinguishable from the page background. */
+  --ai-accent: #475569;
+  --ai-accent-fg: #ffffff;
+  --ai-bubble-assistant-bg: var(--bg-light-gray, var(--control-bg));
+}
+
+[data-theme="dark"] #frappe-ai-sidebar-root {
+  --ai-accent: #94a3b8;
+  --ai-accent-fg: #0f172a;
+  --ai-bubble-assistant-bg: #2a2a2a;
 }
 
 #frappe-ai-sidebar-root[hidden] {
@@ -42,11 +58,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 6px 12px;
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-color);
   flex-shrink: 0;
-  min-height: 44px;
+  /* Match whichever host chrome is rendered for this route — the
+   * Desk navbar on /desk, the .page-head on /app/* — measured at runtime
+   * by syncHostChromeHeight() and published as --frappe-ai-host-chrome-h.
+   * Fall back to --page-head-height + 1px (Frappe's published variable,
+   * adjusted for the page-head's own border) when JS hasn't run yet. */
+  min-height: var(--frappe-ai-host-chrome-h, calc(var(--page-head-height, 45px) + 1px));
+  box-sizing: border-box;
 }
 
 .frappe-ai-header-left {
@@ -120,7 +142,7 @@
   align-items: center;
   justify-content: center;
   margin-bottom: 8px;
-  color: var(--primary);
+  color: var(--ai-accent);
 }
 
 .frappe-ai-empty-title {
@@ -134,7 +156,33 @@
   font-size: 12px;
   color: var(--text-muted);
   margin: 0;
-  max-width: 240px;
+  max-width: 260px;
+}
+
+.frappe-ai-starter-prompts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  width: 100%;
+  max-width: 300px;
+}
+
+.frappe-ai-starter-chip {
+  text-align: left;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-color);
+  color: var(--text-color);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.frappe-ai-starter-chip:hover {
+  background: var(--subtle-accent, var(--bg-light-gray));
+  border-color: var(--ai-accent);
 }
 
 /* ──────────────────────────────────────────
@@ -174,13 +222,13 @@
 }
 
 .frappe-ai-bubble--user .frappe-ai-bubble-content {
-  background: var(--primary);
-  color: var(--primary-fg, #fff);
+  background: var(--ai-accent);
+  color: var(--ai-accent-fg);
   border-bottom-right-radius: 4px;
 }
 
 .frappe-ai-bubble--assistant .frappe-ai-bubble-content {
-  background: var(--bg-light-gray, var(--control-bg));
+  background: var(--ai-bubble-assistant-bg);
   color: var(--text-color);
   border-bottom-left-radius: 4px;
 }
@@ -459,8 +507,8 @@
 }
 
 .frappe-ai-textarea:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px var(--primary-color-light, rgba(82, 96, 246, 0.12));
+  border-color: var(--ai-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ai-accent) 18%, transparent);
 }
 
 .frappe-ai-textarea::placeholder { color: var(--text-muted); }
@@ -481,7 +529,7 @@
 }
 
 .frappe-ai-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.frappe-ai-send-btn--active { background: var(--primary); color: var(--primary-fg, #fff); }
+.frappe-ai-send-btn--active { background: var(--ai-accent); color: var(--ai-accent-fg); }
 .frappe-ai-send-btn--active:not(:disabled):hover { opacity: 0.88; }
 .frappe-ai-send-btn--stop { background: var(--indicator-red, #e74c3c); color: var(--primary-fg, #fff); }
 .frappe-ai-send-btn--stop:not(:disabled):hover { opacity: 0.85; }
@@ -611,6 +659,37 @@
 .frappe-ai-status-badge--yellow { background: var(--yellow-highlight, #fffbf0); color: var(--yellow-dark, #d68910); }
 .frappe-ai-status-badge--blue { background: var(--blue-highlight, #f0f5ff); color: var(--indicator-blue, #3498db); }
 .frappe-ai-status-badge--gray { background: var(--bg-light-gray, #f0f0f0); color: var(--text-muted); }
+
+/* ──────────────────────────────────────────
+   AI nav link in the host's left sidebar (/app/*).
+   Modeled on Frappe's own .item-anchor; the host CSS hides any element
+   with .sidebar-item-label inside an item-anchor when the body sidebar
+   isn't expanded — we extend that rule explicitly so our wrapper class
+   doesn't slip past it.
+   ────────────────────────────────────────── */
+.frappe-ai-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  color: var(--text-color);
+  text-decoration: none;
+  border-radius: 6px;
+}
+
+.frappe-ai-nav-link:hover {
+  background: var(--subtle-accent, var(--bg-light-gray));
+}
+
+.body-sidebar-container:not(.expanded) .frappe-ai-nav-link .sidebar-item-label {
+  display: none;
+}
+
+.body-sidebar-container:not(.expanded) .frappe-ai-nav-link {
+  justify-content: center;
+  padding: 6px;
+  min-height: 32px;
+}
 
 /* ──────────────────────────────────────────
    Mobile: full-width overlay

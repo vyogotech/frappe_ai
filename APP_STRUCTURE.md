@@ -89,7 +89,7 @@ The user's `sid` cookie is forwarded straight to the agent (`requests.post(..., 
 | AI Chat Session | Standard | `user`, `title`, `started_at`, `last_activity`, `context_json` |
 | AI Chat Message | Standard | `session`, `role`, `content`, `tool_name`, `tool_args_json`, `tool_result_json`, `created_at` |
 
-The Settings singleton is created by `install.py:after_install` / `after_migrate`. `before_save` always refreshes the `agent_url` display field from `site_config.json` so the form shows the live value.
+The Settings singleton is created by `install.py:after_install` / `after_migrate`. `after_migrate` additionally re-imports the bundled `Frappe AI` workspace JSON via `frappe.modules.import_file.import_file_by_path(force=True)` so workspace content blob updates reach existing installs (Frappe's normal fixture sync leaves an installed workspace's `content` field untouched). `before_save` always refreshes the `agent_url` display field from `site_config.json` so the form shows the live value.
 
 `validate` rejects timeouts outside 1–300s, sidebar widths outside 300–600px, and any keyboard shortcut that collides with a Frappe v16 hard-bound combo.
 
