@@ -28,8 +28,12 @@
 				@click="onButtonClick"
 			>
 				<span v-if="showStop" class="frappe-ai-stop-icon" aria-hidden="true"></span>
+				<!-- `current-color` makes the arrow stroke follow the button's
+				     `color` — without it, Frappe's icon symbol paints with a
+				     hard-coded dark-gray stroke that disappears on the slate
+				     `--ai-accent` background when the button is active. -->
 				<!-- eslint-disable-next-line vue/no-v-html -->
-				<span v-else v-html="frappeIcon('send-horizontal', 'sm')" />
+				<span v-else v-html="frappeIcon('send-horizontal', 'sm', 'current-color')" />
 			</button>
 		</div>
 	</div>

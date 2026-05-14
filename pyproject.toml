@@ -8,7 +8,12 @@ requires-python = ">=3.10"
 readme = "README.md"
 dynamic = ["version"]
 dependencies = [
-    # "frappe~=15.0.0" # Installed and managed by bench.
+    # Frappe itself is provided by the bench at runtime (`bench get-app` clones
+    # this app into a bench that already has frappe installed). We pin the
+    # supported framework range here purely as documentation — pip/uv won't
+    # see frappe in the venv, but the value tells humans + tooling which
+    # major-version line this app targets.
+    # "frappe>=16.0.0,<17"
     "requests",
 ]
 

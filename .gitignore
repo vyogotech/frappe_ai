@@ -56,3 +56,4 @@ coverage/
 # inevitable accidental check-in.
 .env
 .env.local
+.mcp.json

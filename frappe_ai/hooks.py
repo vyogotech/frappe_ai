@@ -11,6 +11,13 @@ app_license = "MIT"
 # Output lands in /assets/frappe_ai/dist/... with content-hashed filenames,
 # so no manual cache-busting is needed.
 app_include_css = ["frappe_ai_sidebar.bundle.css"]
+# The value must match the source filename, NOT a `.js` rewrite. v16's
+# esbuild writes `assets.json` keys from `info.entryPoint` (the source path)
+# in `apps/frappe/esbuild/esbuild.js:442-454`, so a `.bundle.ts` source
+# produces a `.bundle.ts` key. Verified live: `assets.json` shows
+# `"frappe_ai.bundle.ts": "/assets/frappe_ai/dist/js/frappe_ai.bundle.HASH.js"`.
+# Writing `.bundle.js` here misses the lookup and falls through to a
+# literal `/frappe_ai.bundle.js` URL that 404s.
 app_include_js = ["frappe_ai.bundle.ts"]
 
 # Bootstrap the AI Assistant Settings singleton on first install and after

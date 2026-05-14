@@ -46,6 +46,7 @@
  "modified_by": "Administrator",
  "module": "AI Assistant",
  "name": "AI Chat Session",
+ "naming_rule": "Set by user",
  "owner": "Administrator",
  "permissions": [
   {
