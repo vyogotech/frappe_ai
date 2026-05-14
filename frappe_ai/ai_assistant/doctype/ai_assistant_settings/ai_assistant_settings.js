@@ -41,23 +41,16 @@ function test_agent_connection(frm) {
 			frappe.dom.unfreeze();
 
 			if (r.message && r.message.success) {
+				// Single non-blocking toast; no modal stacked on top.
 				frappe.show_alert({
-					message: __('Connection successful! ') + r.message.message,
+					message: __('Connection successful. The AI agent is reachable.'),
 					indicator: 'green'
 				}, 5);
-
-				frappe.msgprint({
-					title: __('Connection Test Successful'),
-					message: r.message.message,
-					indicator: 'green'
-				});
 			} else {
-				const error_msg = r.message ? r.message.message : 'Unknown error';
-				frappe.show_alert({
-					message: __('Connection failed: ') + error_msg,
-					indicator: 'red'
-				}, 5);
-
+				const error_msg = r.message ? r.message.message : __('Unknown error');
+				// Failures are surfaced as a modal so the message can't be missed
+				// (the agent URL is read-only — user can't fix it from here, but
+				// at least they know to escalate).
 				frappe.msgprint({
 					title: __('Connection Test Failed'),
 					message: error_msg,

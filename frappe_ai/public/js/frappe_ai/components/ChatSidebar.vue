@@ -48,7 +48,7 @@ function handleClose() {
 <template>
 	<div class="frappe-ai-sidebar" :style="{ width: sidebarWidth + 'px' }">
 		<ChatHeader @clear="handleClear" @close="handleClose" />
-		<ChatMessages :messages="messages" />
+		<ChatMessages :messages="messages" @send="handleSend" />
 		<ChatInput
 			:busy="isLoading"
 			:can-cancel="canCancel"

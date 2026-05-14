@@ -1,18 +1,13 @@
 import { createApp, type App as VueApp } from "vue";
 import App from "./frappe_ai/App.vue";
 import { useSettings } from "./frappe_ai/composables/useSettings";
+import { frappeIcon } from "./frappe_ai/utils/frappe-icon";
 
 const SIDEBAR_ID = "frappe-ai-sidebar-root";
 
 let vueApp: VueApp | null = null;
 
 function injectNavbarButton(keyboardShortcut: string): void {
-  const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-       fill="none" stroke="currentColor" stroke-width="2"
-       stroke-linecap="round" stroke-linejoin="round">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-  </svg>`;
-
   /** Build a DOM element from an HTML string and wire its click handler. */
   function makeButton(html: string): HTMLElement {
     const tpl = document.createElement("template");
@@ -22,21 +17,33 @@ function injectNavbarButton(keyboardShortcut: string): void {
     return btn;
   }
 
+  // Use Frappe's own icon helper (via the shared `frappeIcon` wrapper) so the
+  // AI button picks up the host theme's symbol stroke — exactly like the bell
+  // sibling. Avoid inline `<svg stroke="currentColor">` because that inherits
+  // whichever colour the wrapping anchor happens to have, which gave us the
+  // invisible grey-on-red icon on Invox.
   function buildTopBtn(): HTMLElement {
+    // `btn-reset nav-link text-muted` matches the bell — same hit-area, same
+    // colour-inheritance path, same hover affordance — so the AI button reads
+    // as a peer of the existing navbar icons across themes.
     return makeButton(
-      `<div id="frappe-ai-nav-btn" title="Frappe AI (${keyboardShortcut})"
-            style="cursor:pointer;display:flex;align-items:center;padding:0 4px">${svgIcon}</div>`,
+      `<button id="frappe-ai-nav-btn" type="button"
+               class="btn-reset nav-link text-muted"
+               style="cursor:pointer;background:transparent;border:none;display:flex;align-items:center;justify-content:center;padding:0 6px"
+               title="Frappe AI (${keyboardShortcut})">${frappeIcon("message-square-text", "md")}</button>`,
     );
   }
 
   function buildSidebarBtn(): HTMLElement {
+    // Modelled on Frappe's own workspace `.item-anchor` so the host's
+    // "collapsed left sidebar hides labels" rule applies for free — see the
+    // companion CSS rule in frappe_ai_sidebar.bundle.css.
     return makeButton(
-      `<a id="frappe-ai-nav-btn"
-          class="align-center btn-reset flex nav-link sidebar-user-button"
-          style="cursor:pointer;width:100%;min-height:40px;padding:0 8px;gap:8px;color:var(--text-color)"
+      `<a id="frappe-ai-nav-btn" class="item-anchor frappe-ai-nav-link"
+          style="cursor:pointer"
           title="Frappe AI (${keyboardShortcut})">
-          <span style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;flex:0 0 24px">${svgIcon}</span>
-          <span style="font-size:13px;line-height:1.2">Frappe AI</span>
+          <span class="sidebar-item-icon text-ink-gray-7" item-icon="frappe-ai">${frappeIcon("message-square-text", "sm")}</span>
+          <span class="sidebar-item-label">Frappe AI</span>
       </a>`,
     );
   }
@@ -89,6 +96,28 @@ function injectNavbarButton(keyboardShortcut: string): void {
   observer.observe(document.body, { childList: true, subtree: true });
 }
 
+/** Publish the host chrome's measured height as a CSS variable so the
+ * sidebar header can match whichever bar the current route renders.
+ *
+ * On `/desk` the chrome is `header.navbar` (the Invox red top bar — 52px on
+ * that theme, 48px on the default theme). On `/app/*` the chrome is
+ * `.page-head` (46px). Frappe v16 only exposes one of those as a CSS custom
+ * property (`--page-head-height`), and it's just the unthemed default — so
+ * reading the variable alone doesn't match what a custom theme actually
+ * paints. Measuring the rendered element is the only way to align robustly
+ * across themes, routes, and viewport changes.
+ */
+function syncHostChromeHeight(): void {
+  const navbar = document.querySelector("header.navbar") as HTMLElement | null;
+  const pageHead = document.querySelector(".page-head") as HTMLElement | null;
+  const host = navbar?.offsetHeight ? navbar : pageHead?.offsetHeight ? pageHead : null;
+  if (!host) return;
+  const h = host.getBoundingClientRect().height;
+  if (h > 0) {
+    document.documentElement.style.setProperty("--frappe-ai-host-chrome-h", `${h}px`);
+  }
+}
+
 function mountSidebar(sidebarWidth: number, keyboardShortcut: string): void {
   if (document.getElementById(SIDEBAR_ID)) return;
 
@@ -98,12 +127,32 @@ function mountSidebar(sidebarWidth: number, keyboardShortcut: string): void {
   el.style.setProperty("--frappe-ai-width", `${sidebarWidth}px`);
   document.body.appendChild(el);
 
+  // Initial sync + keep in lock-step with viewport resizes and SPA route
+  // changes (Frappe re-renders .page-head / header.navbar wholesale on
+  // navigation, so a MutationObserver on body's direct children catches it).
+  syncHostChromeHeight();
+  new ResizeObserver(syncHostChromeHeight).observe(document.body);
+  new MutationObserver(syncHostChromeHeight).observe(document.body, {
+    childList: true,
+    subtree: false,
+  });
+
   // Sync the container's hidden attribute with App.vue's visible state.
   // On open: unhide immediately so Vue's enter-transition has a visible element to animate.
   // On close: delay until after the CSS leave-transition (250ms) finishes, otherwise
   // setting hidden=true collapses the container before the slide-out can play.
+  //
+  // Re-run syncHostChromeHeight on open and after the next paint. The host's
+  // navbar/page-head only reaches its final painted height once the desk has
+  // finished its own layout pass — measuring at mount time alone can race the
+  // theme's `.navbar { height }` rule and stamp the wrong value into
+  // --frappe-ai-host-chrome-h. Resyncing here guarantees the sidebar header
+  // bottom lands on the same baseline as the host chrome every time the panel
+  // opens.
   document.addEventListener("frappe-ai-opened", () => {
     el.hidden = false;
+    syncHostChromeHeight();
+    requestAnimationFrame(syncHostChromeHeight);
   });
   document.addEventListener("frappe-ai-closed", () => {
     setTimeout(() => {

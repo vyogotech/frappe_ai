@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[]",
+ "content": "[{\"id\":\"frappe-ai-hdr\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Frappe AI</b></span>\",\"col\":12}},{\"id\":\"frappe-ai-intro\",\"type\":\"paragraph\",\"data\":{\"text\":\"<span class=\\\"text-muted\\\">Your in-Desk AI assistant. Open the chat from the top bar (or press <b>Alt + /</b>) to ask questions about your ERPNext data, summarise records, or run common reports from natural language.</span>\",\"col\":12}},{\"id\":\"frappe-ai-spacer-1\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"frappe-ai-card-settings\",\"type\":\"card\",\"data\":{\"card_name\":\"Configuration\",\"col\":4}}]",
  "creation": "2026-04-14 00:00:00.000000",
  "docstatus": 0,
  "doctype": "Workspace",
@@ -9,6 +9,14 @@
  "is_hidden": 0,
  "label": "Frappe AI",
  "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Configuration",
+   "link_count": 0,
+   "onboard": 0,
+   "type": "Card Break"
+  },
   {
    "dependencies": "",
    "doctype": "Workspace Link",

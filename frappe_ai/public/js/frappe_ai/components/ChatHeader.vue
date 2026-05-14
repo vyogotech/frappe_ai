@@ -10,8 +10,6 @@ const emit = defineEmits<{
 <template>
 	<div class="frappe-ai-header">
 		<div class="frappe-ai-header-left">
-			<!-- eslint-disable-next-line vue/no-v-html -->
-			<span v-html="frappeIcon('message-square-text', 'sm')" />
 			<span class="frappe-ai-header-title">Frappe AI</span>
 		</div>
 		<div class="frappe-ai-header-actions">

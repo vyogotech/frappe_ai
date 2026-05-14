@@ -43,6 +43,13 @@ interface FrappeDefaults {
 
 interface FrappeRouter {
   current_route?: string[];
+  /**
+   * Frappe wraps the router with `make_event_emitter`, exposing on/off/trigger.
+   * The "change" event fires after every SPA navigation, including the first
+   * desk load.
+   */
+  on?: (event: "change" | string, handler: (...args: unknown[]) => void) => void;
+  off?: (event: "change" | string, handler?: (...args: unknown[]) => void) => void;
 }
 
 interface FrappeRealtime {
