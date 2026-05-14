@@ -35,33 +35,46 @@ function injectNavbarButton(keyboardShortcut: string): void {
   }
 
   function buildSidebarBtn(): HTMLElement {
-    // Modelled on Frappe's own workspace `.item-anchor` so the host's
-    // "collapsed left sidebar hides labels" rule applies for free — see the
-    // companion CSS rule in frappe_ai_sidebar.bundle.css.
+    // Mirrors Frappe's own "Getting Started" entry (`a.onboarding-sidebar`
+    // inside `.body-sidebar-bottom`):
+    //
+    //   * `.onboarding-sidebar` + `.px-2` give the canonical layout (display:
+    //     flex, align-items:center, 8px horizontal padding, 10px gap between
+    //     svg and label).
+    //   * `text-ink-gray-7 current-color` on the SVG keeps the icon stroke
+    //     gray (`--ink-gray-7`) regardless of the anchor's `color` — peers
+    //     have gray icons + themed text, so an unstyled SVG that follows the
+    //     anchor's red `currentColor` reads as visually different.
+    //   * `.frappe-ai-nav-link` is a scoping hook for our own CSS rules
+    //     (currently only the collapsed-label hide and a margin-bottom that
+    //     mimics Getting Started's `<p>` wrapper margin).
     return makeButton(
-      `<a id="frappe-ai-nav-btn" class="item-anchor frappe-ai-nav-link"
-          style="cursor:pointer"
+      `<a id="frappe-ai-nav-btn" class="onboarding-sidebar frappe-ai-nav-link px-2"
           title="Frappe AI (${keyboardShortcut})">
-          <span class="sidebar-item-icon text-ink-gray-7" item-icon="frappe-ai">${frappeIcon("message-square-text", "sm")}</span>
+          ${frappeIcon("message-square-text", "sm", "text-ink-gray-7 current-color")}
           <span class="sidebar-item-label">Frappe AI</span>
       </a>`,
     );
   }
 
-  // Idempotent: prefers the top navbar (`.desktop-avatar` is the only target
-  // that's actually visible across Frappe v16.x layouts — the left-sidebar
-  // slot ends up 0×0 when the sidebar is collapsed). Falls back to the sidebar
-  // slot only if the navbar isn't in the DOM yet, and upgrades to the navbar
-  // slot via the MutationObserver as soon as it appears.
+  // Idempotent: prefers the top navbar slot next to a *visibly mounted*
+  // `.desktop-avatar`, falls back to the left sidebar slot otherwise.
+  //
+  // Visibility matters because Frappe v16 leaves the previous route's
+  // `header.desktop-navbar` (with its `.desktop-avatar` child) in the DOM at
+  // 0×0 after SPA route changes — so a bare `querySelector('.desktop-avatar')`
+  // would happily match the orphan and strand the button in a hidden subtree
+  // until the next hard refresh.
   //
   // jQuery is intentionally not used — Frappe v16.16+ scopes jQuery into
   // a module bundle, so `window.$` is undefined in app bundles.
   function tryInject(): void {
     const existing = document.getElementById("frappe-ai-nav-btn");
-    const topAvatar = document.querySelector(".desktop-avatar");
+    const topAvatar = Array.from(
+      document.querySelectorAll<HTMLElement>(".desktop-avatar"),
+    ).find((el) => el.offsetParent !== null);
 
     if (topAvatar?.parentNode) {
-      // Already in the right slot? Nothing to do.
       if (
         existing &&
         existing.parentNode === topAvatar.parentNode &&
@@ -69,31 +82,42 @@ function injectNavbarButton(keyboardShortcut: string): void {
       ) {
         return;
       }
-      // Either no button yet, or it's stuck in the sidebar fallback from an
-      // earlier inject — move it to the top navbar.
       existing?.remove();
       topAvatar.parentNode.insertBefore(buildTopBtn(), topAvatar);
       return;
     }
 
-    if (existing) return;
-
     const sidebarUser = document.querySelector(".dropdown-navbar-user");
-    if (sidebarUser?.parentNode) {
-      sidebarUser.parentNode.insertBefore(buildSidebarBtn(), sidebarUser);
+    if (!sidebarUser?.parentNode) return;
+
+    if (
+      existing &&
+      existing.parentNode === sidebarUser.parentNode &&
+      existing.nextSibling === sidebarUser
+    ) {
+      return;
     }
+    existing?.remove();
+    sidebarUser.parentNode.insertBefore(buildSidebarBtn(), sidebarUser);
   }
 
   tryInject();
 
-  // Stays connected across SPA route changes — Frappe re-renders the navbar
-  // when navigating between /desk, /app/<doctype>, form views, etc.
-  // `tryInject` is now idempotent and self-upgrading: on every mutation it
-  // re-checks whether the button is in the preferred slot and moves it if not.
-  const observer = new MutationObserver(() => {
-    tryInject();
-  });
+  // Two triggers, both needed:
+  //   - MutationObserver catches the host re-painting the navbar on initial
+  //     boot (before the router has finished setting up).
+  //   - frappe.router.on('change') is the canonical SPA route signal — fires
+  //     deterministically when navigating /desk ↔ /app/* ↔ /desk/* Builder
+  //     views, where MutationObserver alone can miss the right moment to
+  //     re-evaluate the orphaned `.desktop-avatar` from the previous route.
+  //     A double-rAF chase handles routes whose chrome paints a couple
+  //     frames after the route event.
+  const observer = new MutationObserver(tryInject);
   observer.observe(document.body, { childList: true, subtree: true });
+  frappe.router?.on?.("change", () => {
+    tryInject();
+    requestAnimationFrame(() => requestAnimationFrame(tryInject));
+  });
 }
 
 /** Publish the host chrome's measured height as a CSS variable so the
@@ -111,7 +135,15 @@ function syncHostChromeHeight(): void {
   const navbar = document.querySelector("header.navbar") as HTMLElement | null;
   const pageHead = document.querySelector(".page-head") as HTMLElement | null;
   const host = navbar?.offsetHeight ? navbar : pageHead?.offsetHeight ? pageHead : null;
-  if (!host) return;
+  if (!host) {
+    // Neither host chrome is rendered for this route — e.g. v16 Builder
+    // workspaces under /desk/* paint their own header inside .main-section.
+    // Drop the inline var so the CSS fallback (--page-head-height + 1px,
+    // ≈46px) governs, instead of leaving a stale measurement from the
+    // previously-visited route.
+    document.documentElement.style.removeProperty("--frappe-ai-host-chrome-h");
+    return;
+  }
   const h = host.getBoundingClientRect().height;
   if (h > 0) {
     document.documentElement.style.setProperty("--frappe-ai-host-chrome-h", `${h}px`);
@@ -128,13 +160,17 @@ function mountSidebar(sidebarWidth: number, keyboardShortcut: string): void {
   document.body.appendChild(el);
 
   // Initial sync + keep in lock-step with viewport resizes and SPA route
-  // changes (Frappe re-renders .page-head / header.navbar wholesale on
-  // navigation, so a MutationObserver on body's direct children catches it).
+  // changes. `frappe.router.on('change')` is the canonical signal for SPA
+  // navigation; the double-rAF chase covers v16 Builder routes that paint
+  // their chrome a couple frames after the route event fires. ResizeObserver
+  // catches viewport resizes (host theme breakpoints, dev-tools toggling).
   syncHostChromeHeight();
   new ResizeObserver(syncHostChromeHeight).observe(document.body);
-  new MutationObserver(syncHostChromeHeight).observe(document.body, {
-    childList: true,
-    subtree: false,
+  frappe.router?.on?.("change", () => {
+    syncHostChromeHeight();
+    requestAnimationFrame(() =>
+      requestAnimationFrame(syncHostChromeHeight),
+    );
   });
 
   // Sync the container's hidden attribute with App.vue's visible state.

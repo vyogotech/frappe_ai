@@ -25,8 +25,19 @@ interface FrappeCallError {
 }
 
 interface FrappeUtils {
-  /** Frappe accepts arbitrary size hints; common values are "sm" / "md" / "lg". */
-  icon: (name: string, size?: string) => string;
+  /**
+   * Frappe accepts arbitrary size hints; common values are "sm" / "md" / "lg".
+   * Trailing positional args: `useClass` (5th-position `<use>` class), `style`
+   * (inline CSS), `svgClass` (extra classes on `<svg>`). Only the SVG-class
+   * slot is exposed here — the rest are passed as empty strings by callers.
+   */
+  icon: (
+    name: string,
+    size?: string,
+    useClass?: string,
+    style?: string,
+    svgClass?: string,
+  ) => string;
 }
 
 interface FrappeBootSysDefaults {
