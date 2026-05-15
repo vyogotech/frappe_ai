@@ -683,28 +683,17 @@
    isn't expanded — we extend that rule explicitly so our wrapper class
    doesn't slip past it.
    ────────────────────────────────────────── */
-.frappe-ai-nav-link {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px;
-  color: var(--text-color);
-  text-decoration: none;
-  border-radius: 6px;
-}
-
-.frappe-ai-nav-link:hover {
-  background: var(--subtle-accent, var(--bg-light-gray));
-}
-
+/* The button uses Frappe's own `.onboarding-sidebar .px-2` for layout
+   (flex / center / 7px horizontal padding / 0 vertical), so this hook
+   only carries the collapsed-state overrides. Anything beyond that
+   would fight the peer "Getting Started" entry's native styling —
+   visible regression if reintroduced. */
 .body-sidebar-container:not(.expanded) .frappe-ai-nav-link .sidebar-item-label {
   display: none;
 }
 
 .body-sidebar-container:not(.expanded) .frappe-ai-nav-link {
   justify-content: center;
-  padding: 6px;
-  min-height: 32px;
 }
 
 /* ──────────────────────────────────────────
