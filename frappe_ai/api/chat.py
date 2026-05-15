@@ -7,9 +7,26 @@ import frappe
 import requests
 from frappe import _
 
+# Upper bound on the user's single-message payload. Mirrors the agent's
+# own 32 000-char Pydantic cap with a stricter ceiling because the relay
+# also has to serialise this to RQ. Settable per-site via
+# `frappe_ai_message_max_chars` in site_config.json.
+_DEFAULT_MESSAGE_MAX_CHARS = 10_000
+
 
 def _agent_url() -> str:
 	return frappe.local.conf.get("frappe_ai_agent_url", "").rstrip("/")
+
+
+def _message_max_chars() -> int:
+	raw = frappe.local.conf.get("frappe_ai_message_max_chars")
+	if raw is None:
+		return _DEFAULT_MESSAGE_MAX_CHARS
+	try:
+		v = int(raw)
+		return v if v > 0 else _DEFAULT_MESSAGE_MAX_CHARS
+	except (TypeError, ValueError):
+		return _DEFAULT_MESSAGE_MAX_CHARS
 
 
 def _validate_agent_url(url: str) -> None:
@@ -151,8 +168,9 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 	if not message or not message.strip():
 		frappe.throw(_("Message is required"))
 
-	if len(message) > 10000:
-		frappe.throw(_("Message too long (max 10,000 characters)."))
+	max_chars = _message_max_chars()
+	if len(message) > max_chars:
+		frappe.throw(_("Message too long (max {0} characters).").format(max_chars))
 
 	user = frappe.session.user
 	if user == "Guest":
@@ -215,9 +233,9 @@ def _stream_to_agent(
 
 	payload = {
 		"message": message,
-		# Forward session_id so the agent's LangGraph checkpointer keys on the
-		# same thread_id across turns — otherwise every message lands in a
-		# fresh thread and the model has no memory of prior turns.
+		# Forward session_id so the agent groups all turns under the same
+		# AI Chat Session row (used for sidebar scrollback). The agent
+		# itself does not yet replay prior turns into the LLM context.
 		"session_id": session_id,
 		"context": context,
 	}

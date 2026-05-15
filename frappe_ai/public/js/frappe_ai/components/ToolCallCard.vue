@@ -2,16 +2,24 @@
 	<div class="frappe-ai-tool-card">
 		<button
 			:class="['frappe-ai-tool-header', expanded ? 'frappe-ai-tool-header--open' : '']"
+			:aria-expanded="expanded"
+			:aria-label="`Tool call: ${toolCall.name}, ${expanded ? 'collapse' : 'expand'} details`"
+			type="button"
 			@click="expanded = !expanded"
 		>
 			<span
 				class="frappe-ai-tool-status"
 				:class="`frappe-ai-tool-status--${toolCall.status || 'running'}`"
+				aria-hidden="true"
 			/>
 			<span class="frappe-ai-tool-name">{{ toolCall.name }}</span>
 			<span class="frappe-ai-tool-time">{{ formattedTime }}</span>
 			<!-- eslint-disable-next-line vue/no-v-html -->
-			<span class="frappe-ai-tool-chevron" v-html="frappeIcon('chevron-right', 'xs')" />
+			<span
+				class="frappe-ai-tool-chevron"
+				aria-hidden="true"
+				v-html="frappeIcon('chevron-right', 'xs')"
+			/>
 		</button>
 		<div v-if="expanded">
 			<div class="frappe-ai-tool-section">
@@ -24,10 +32,13 @@
 						'frappe-ai-tool-expand-btn',
 						resultExpanded ? 'frappe-ai-tool-expand-btn--open' : '',
 					]"
+					:aria-expanded="resultExpanded"
+					:aria-label="`${resultExpanded ? 'Hide' : 'Show'} tool result`"
+					type="button"
 					@click.stop="resultExpanded = !resultExpanded"
 				>
 					<!-- eslint-disable-next-line vue/no-v-html -->
-					<span v-html="frappeIcon('chevron-right', 'xs')" />
+					<span aria-hidden="true" v-html="frappeIcon('chevron-right', 'xs')" />
 					Result
 				</button>
 				<div v-if="resultExpanded">
