@@ -34,8 +34,8 @@
    "label": "Connection Settings"
   },
   {
-   "default": "30",
-   "description": "Seconds before giving up on a reply. Default 30.",
+   "default": "120",
+   "description": "Seconds before giving up on a reply. Default 120.",
    "fieldname": "timeout",
    "fieldtype": "Int",
    "label": "Timeout (seconds)"

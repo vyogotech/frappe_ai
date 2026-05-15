@@ -216,7 +216,8 @@ describe("useChat", () => {
   it("CLIENT_TIMEOUT_MS triggers a typed error when the relay never settles", async () => {
     const { chat } = await setup();
     const promise = chat.sendMessage("hang");
-    vi.advanceTimersByTime(61_000);
+    // CLIENT_TIMEOUT_MS is 120_000; advance just past it.
+    vi.advanceTimersByTime(121_000);
     await promise; // settles via catch → _addErrorMessage
     const errMsg = chat.messages.value.find((m) => m.role === "error");
     expect(errMsg).toBeDefined();

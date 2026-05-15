@@ -40,7 +40,14 @@ interface StreamResult {
   session_id: string;
 }
 
-const CLIENT_TIMEOUT_MS = 60_000;
+// Frontend safety-net: bound how long sendMessage() can hang before
+// settle("reject") fires. Keep this generous (and >= the server-side
+// `AI Assistant Settings.timeout` so the relay surfaces its own error
+// first when it can), since chart prompts that fan out to multiple
+// tools routinely take 60–90s end-to-end. A user-visible "timed out"
+// is preferable to a never-resolving spinner if everything else
+// breaks; 2 minutes is the upper bound we want to wait.
+const CLIENT_TIMEOUT_MS = 120_000;
 
 export function useChat() {
   const messages = ref<Message[]>([]);
@@ -52,9 +59,12 @@ export function useChat() {
   let _resolveStream: (() => void) | null = null;
   let _activeEventName: string | null = null;
 
-  // Conversation-scoped session id. Reused across sendMessage() calls so the
-  // agent's LangGraph checkpointer keys on the same thread_id and the model
-  // retains multi-turn memory. Cleared by clearMessages() ("New conversation").
+  // Conversation-scoped session id. Reused across sendMessage() calls so
+  // Frappe groups all turns under the same AI Chat Session row (used for
+  // sidebar scrollback). The agent itself does not yet replay prior turns
+  // into the LLM context (run_agent_loop receives history=None) — this id
+  // is purely a persistence handle today. Cleared by clearMessages()
+  // ("New conversation") to start a fresh row.
   let _conversationId: string | null = null;
 
   async function sendMessage(content: string): Promise<void> {
@@ -141,7 +151,7 @@ export function useChat() {
           if (chunk.type === "session" && chunk.id) {
             // The agent persisted the conversation under this canonical id
             // (which may differ from the optimistic UUID we minted). Adopt
-            // it so the next turn lands on the same LangGraph thread.
+            // it so subsequent turns continue saving against the same row.
             _conversationId = chunk.id;
           } else if (chunk.type === "content" && chunk.text) {
             _updateMessage(assistantId, (m) => {
@@ -257,8 +267,8 @@ export function useChat() {
     messages.value = [];
     isLoading.value = false;
     lastError.value = null;
-    // "New conversation" — drop the threaded id so the next message opens
-    // a fresh LangGraph thread on the agent.
+    // "New conversation" — drop the session id so the next message opens
+    // a fresh AI Chat Session row.
     _conversationId = null;
   }
 

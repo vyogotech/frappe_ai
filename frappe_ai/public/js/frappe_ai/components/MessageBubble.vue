@@ -53,8 +53,9 @@ const isPendingEmpty = computed(
 			<template v-else>
 				<!-- Streaming path: walk `parts` in arrival order so text and
              blocks render where the agent actually emitted them. The
-             agent's BlockStreamSplitter holds back `<ai-block>` markup
-             so text fragments never see raw block HTML; tables, lists,
+             agent's SSE protocol delivers `content` (prose) and
+             `content_block` (structured payload) as separate events, so
+             text fragments never see raw block HTML; tables, lists,
              code, and prose all flow through renderMarkdown.
              Hydrated rows (from get_recent_messages) don't have `parts`
              — they fall through to the legacy content + blocks render

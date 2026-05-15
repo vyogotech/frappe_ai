@@ -13,7 +13,6 @@ export interface Dataset {
 export interface ChartData {
   labels: string[];
   datasets: Dataset[];
-  yLabels?: string[];
 }
 
 export interface ChartOptions {

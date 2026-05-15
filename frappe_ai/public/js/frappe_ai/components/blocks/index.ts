@@ -1,22 +1,20 @@
 /** Block component registry — maps block type strings to Vue components.
  *
- *  ChartBlock is lazy-loaded. echarts + its component imports add ~300KB
- *  gzipped to the bundle; users without chart blocks shouldn't pay that
- *  on every desk page-load. `defineAsyncComponent` defers the import
- *  until a chart block is actually rendered.
- *
- *  TextBlock, TableBlock, KPICards, StatusList stay eager — they're
- *  small and used on the first response of nearly every session.
+ *  Frappe's esbuild build doesn't emit a separate chunk for dynamic
+ *  `import()`; the previous `defineAsyncComponent(() => import(...))`
+ *  wrapper resolved to a loader that never produced output, so chart
+ *  blocks silently rendered nothing while KPI/table/status_list (eager)
+ *  worked. Eager-import ChartBlock to match — echarts is already inlined
+ *  into the main bundle anyway, so there's no size win to recover.
  */
 
-import { defineAsyncComponent, type Component } from "vue";
+import type { Component } from "vue";
 import type { BlockType } from "../../types/blocks";
 import TextBlock from "./TextBlock.vue";
 import TableBlock from "./TableBlock.vue";
 import KPICards from "./KPICards.vue";
 import StatusList from "./StatusList.vue";
-
-const ChartBlock = defineAsyncComponent(() => import("./ChartBlock.vue"));
+import ChartBlock from "./ChartBlock.vue";
 
 export const blockComponentMap: Record<BlockType, Component> = {
   text: TextBlock,

@@ -206,6 +206,22 @@
   align-items: flex-start;
 }
 
+/* Charts auto-size echarts canvas to their container, and the default
+   88%-max-width-fit-to-content sizing of assistant bubbles collapses
+   that container to the chart's intrinsic ~150px width. Force the
+   bubble to fill the sidebar whenever it contains a chart (or table,
+   which also needs the horizontal room). :has() is supported in all
+   modern Chromium/WebKit/Gecko releases Frappe targets. */
+.frappe-ai-bubble--assistant:has(.frappe-ai-chart),
+.frappe-ai-bubble--assistant:has(.frappe-ai-table) {
+  align-self: stretch;
+  max-width: 100%;
+}
+.frappe-ai-bubble--assistant:has(.frappe-ai-chart) .frappe-ai-bubble-content,
+.frappe-ai-bubble--assistant:has(.frappe-ai-table) .frappe-ai-bubble-content {
+  width: 100%;
+}
+
 .frappe-ai-bubble--error {
   align-self: stretch;
   max-width: 100%;
@@ -523,19 +539,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, opacity 0.15s, color 0.15s;
-  /* Idle (no text typed): use a slightly darker gray for the icon than the
-   * old --text-muted, otherwise the arrow sits invisibly close to the
-   * --border-color background. --ink-gray-7 (#525252) on --bg-light-gray
-   * (~#f3f3f3) clears WCAG AA at 14px+. */
-  background: var(--bg-light-gray, var(--border-color));
-  color: var(--ink-gray-7, var(--text-color));
+  transition: background 0.15s, opacity 0.15s;
+  background: var(--border-color);
+  color: var(--text-muted);
 }
 
-/* Disabled is the "no text typed" state. Don't dim all the way to 0.4 —
- * the arrow needs to remain legibly visible so the user can see what the
- * button will do once they type. 0.65 stays clearly "muted" but readable. */
-.frappe-ai-send-btn:disabled { opacity: 0.65; cursor: not-allowed; }
+.frappe-ai-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .frappe-ai-send-btn--active { background: var(--ai-accent); color: var(--ai-accent-fg); }
 .frappe-ai-send-btn--active:not(:disabled):hover { opacity: 0.88; }
 .frappe-ai-send-btn--stop { background: var(--indicator-red, #e74c3c); color: var(--primary-fg, #fff); }
@@ -669,35 +678,33 @@
 
 /* ──────────────────────────────────────────
    AI nav link in the host's left sidebar (/app/*).
-   `.onboarding-sidebar` + `.px-2` (Bootstrap) supply the entire visual base —
-   display, padding, icon-label gap, hover color shift. The two rules below
-   are the only delta we add:
-
-     * `margin-bottom: 10px` mirrors the `<p>` wrapper that Frappe puts
-       around the Getting Started entry — Getting Started's `<p>` has
-       margin-bottom:10px (browser default for `<p>`), which gives the row
-       its breathing space from the Administrator card below. Our `<a>`
-       lives bare in `.body-sidebar-bottom` (no wrapper), so we replicate
-       that margin directly. Without this, the AI row sits flush against
-       the Administrator card's `mt-3` and reads as a different unit.
-     * `.sidebar-item-label { display: none }` when the host collapses the
-       sidebar — mirrors what Frappe's sidebar.js does to
-       `.onboarding-sidebar span` via jQuery `.hide()`. CSS keeps it
-       declarative.
-
-   Nothing else is overridden on purpose: cursor inherits from
-   `a { cursor: pointer }` in Frappe core; color/hover-color shift from
-   primary → primary-dark comes from the global `a` / `a:hover` rules in
-   the active theme (Invox red, default Frappe text-color, etc.); icon
-   stroke stays gray because the `<svg>` carries `text-ink-gray-7 current-color`
-   (added at build time in `bundle.ts:buildSidebarBtn`).
+   Modeled on Frappe's own .item-anchor; the host CSS hides any element
+   with .sidebar-item-label inside an item-anchor when the body sidebar
+   isn't expanded — we extend that rule explicitly so our wrapper class
+   doesn't slip past it.
    ────────────────────────────────────────── */
 .frappe-ai-nav-link {
-  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  color: var(--text-color);
+  text-decoration: none;
+  border-radius: 6px;
+}
+
+.frappe-ai-nav-link:hover {
+  background: var(--subtle-accent, var(--bg-light-gray));
 }
 
 .body-sidebar-container:not(.expanded) .frappe-ai-nav-link .sidebar-item-label {
   display: none;
+}
+
+.body-sidebar-container:not(.expanded) .frappe-ai-nav-link {
+  justify-content: center;
+  padding: 6px;
+  min-height: 32px;
 }
 
 /* ──────────────────────────────────────────
