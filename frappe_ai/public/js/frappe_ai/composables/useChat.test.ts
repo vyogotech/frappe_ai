@@ -182,8 +182,9 @@ describe("useChat", () => {
     await first;
 
     // Second turn (no clear) — must reuse the same _conversationId so
-    // the agent's LangGraph checkpointer threads correctly. Subscribes
-    // to UUID-1 again.
+    // the agent groups both turns under the same AI Chat Session and
+    // its FrappeHistoryClient can replay turn 1 into the LLM context.
+    // Subscribes to UUID-1 again.
     const second = chat.sendMessage("second");
     fireChunk(listeners, { type: "done", tools_called: [] });
     await second;

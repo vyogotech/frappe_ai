@@ -128,22 +128,22 @@ const isPendingEmpty = computed(
 	border-collapse: collapse;
 	margin: 8px 0;
 	font-size: 12px;
-	border: 1px solid var(--border-color, #e2e6e9);
+	border: 1px solid var(--border-color);
 	border-radius: 6px;
 	overflow: hidden;
 }
 .frappe-ai-markdown :deep(table thead th) {
-	background: var(--bg-light-gray, #f4f5f6);
-	color: var(--text-muted, #525c66);
+	background: var(--bg-light-gray);
+	color: var(--text-muted);
 	font-weight: 600;
 	text-align: left;
 	padding: 6px 10px;
-	border-bottom: 1px solid var(--border-color, #e2e6e9);
+	border-bottom: 1px solid var(--border-color);
 	white-space: nowrap;
 }
 .frappe-ai-markdown :deep(table tbody td) {
 	padding: 6px 10px;
-	border-bottom: 1px solid var(--border-color, #f0f1f2);
+	border-bottom: 1px solid var(--border-color);
 	vertical-align: middle;
 	white-space: nowrap;
 }
@@ -151,7 +151,7 @@ const isPendingEmpty = computed(
 	border-bottom: none;
 }
 .frappe-ai-markdown :deep(table tbody tr:nth-child(even)) {
-	background: var(--bg-light-gray, #fafbfc);
+	background: var(--bg-light-gray);
 }
 .frappe-ai-markdown :deep(pre),
 .frappe-ai-markdown :deep(img),
