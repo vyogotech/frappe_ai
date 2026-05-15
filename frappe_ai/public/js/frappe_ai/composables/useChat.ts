@@ -60,10 +60,9 @@ export function useChat() {
   let _activeEventName: string | null = null;
 
   // Conversation-scoped session id. Reused across sendMessage() calls so
-  // Frappe groups all turns under the same AI Chat Session row (used for
-  // sidebar scrollback). The agent itself does not yet replay prior turns
-  // into the LLM context (run_agent_loop receives history=None) — this id
-  // is purely a persistence handle today. Cleared by clearMessages()
+  // Frappe groups all turns under the same AI Chat Session row, and so
+  // the agent's FrappeHistoryClient can pull prior messages back into
+  // the LLM context for that session. Cleared by clearMessages()
   // ("New conversation") to start a fresh row.
   let _conversationId: string | null = null;
 
@@ -104,9 +103,10 @@ export function useChat() {
 
     try {
       // Reuse the conversation's session id if we already have one so the
-      // agent can recall prior turns. First message in a conversation mints
-      // a fresh id; subsequent ones reuse it. The agent's "session" chunk
-      // (below) may override with the canonical id it persisted.
+      // agent loads prior turns for the same AI Chat Session row. First
+      // message in a conversation mints a fresh id; subsequent ones reuse
+      // it. The agent's "session" chunk (below) may override with the
+      // canonical id it persisted.
       const sessionId = _conversationId ?? crypto.randomUUID();
       _conversationId = sessionId;
       const eventName = `frappe_ai:chunk:${sessionId}`;

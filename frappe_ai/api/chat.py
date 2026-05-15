@@ -234,8 +234,8 @@ def _stream_to_agent(
 	payload = {
 		"message": message,
 		# Forward session_id so the agent groups all turns under the same
-		# AI Chat Session row (used for sidebar scrollback). The agent
-		# itself does not yet replay prior turns into the LLM context.
+		# AI Chat Session row, and so its FrappeHistoryClient can pull
+		# prior messages back into the LLM context for this session.
 		"session_id": session_id,
 		"context": context,
 	}
