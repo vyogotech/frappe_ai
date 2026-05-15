@@ -676,25 +676,17 @@
 .frappe-ai-status-badge--blue { background: var(--blue-highlight, #f0f5ff); color: var(--indicator-blue, #3498db); }
 .frappe-ai-status-badge--gray { background: var(--bg-light-gray, #f0f0f0); color: var(--text-muted); }
 
-/* ──────────────────────────────────────────
-   AI nav link in the host's left sidebar (/app/*).
-   Modeled on Frappe's own .item-anchor; the host CSS hides any element
-   with .sidebar-item-label inside an item-anchor when the body sidebar
-   isn't expanded — we extend that rule explicitly so our wrapper class
-   doesn't slip past it.
-   ────────────────────────────────────────── */
-/* The button uses Frappe's own `.onboarding-sidebar .px-2` for layout
-   (flex / center / 7px horizontal padding / 0 vertical), so this hook
-   only carries the collapsed-state overrides. Anything beyond that
-   would fight the peer "Getting Started" entry's native styling —
-   visible regression if reintroduced. */
-.body-sidebar-container:not(.expanded) .frappe-ai-nav-link .sidebar-item-label {
-  display: none;
-}
-
-.body-sidebar-container:not(.expanded) .frappe-ai-nav-link {
-  justify-content: center;
-}
+/* AI nav link in the host's left sidebar (/app/*).
+   The button uses Frappe's own `.onboarding-sidebar .px-2` for layout
+   (flex / center / 7px horizontal padding / 0 vertical). No extra rules
+   are needed: peer "Getting Started" works by leaving its label as a
+   block-level flex item that overflows the 14px-wide collapsed anchor
+   and gets clipped by the parent's overflow — keeping the icon at its
+   natural x=7px AND preserving the 19.5px row height even when no text
+   is visible. Hiding the label with `display: none` would drop the row
+   to 16px (icon-only) and mis-align with native peer rows; centering
+   the icon would shift it from x=7px to x=-1px (clipped). Tested
+   side-by-side: peer parity in BOTH expanded and collapsed states. */
 
 /* ──────────────────────────────────────────
    Mobile: full-width overlay
