@@ -49,6 +49,44 @@ interface StreamResult {
 // breaks; 2 minutes is the upper bound we want to wait.
 const CLIENT_TIMEOUT_MS = 120_000;
 
+// Frappe's `frappe.call` rejects with a plain object (not Error) shaped like
+//   { exc_type, _server_messages, exception, message? }
+// where `_server_messages` is a JSON-encoded array of JSON-encoded message
+// objects (yes, double-encoded). The naive `new Error(String(err))` then
+// renders as the literal string "[object Object]" in the error bubble.
+// _toError normalises any of these shapes into an Error with a human-readable
+// message — see BUG-012 regression test.
+function _toError(err: unknown): Error {
+  if (err instanceof Error) return err;
+  if (typeof err === "string") return new Error(err);
+  if (err && typeof err === "object") {
+    const e = err as Record<string, unknown>;
+    // Frappe surfaces validation errors via _server_messages: JSON array of
+    // JSON-encoded {message, indicator} objects. Try the first one.
+    const sm = e._server_messages;
+    if (typeof sm === "string") {
+      try {
+        const arr = JSON.parse(sm);
+        if (Array.isArray(arr) && arr.length > 0) {
+          const first = typeof arr[0] === "string" ? JSON.parse(arr[0]) : arr[0];
+          if (first && typeof first === "object" && typeof (first as { message?: unknown }).message === "string") {
+            return new Error((first as { message: string }).message);
+          }
+        }
+      } catch {
+        // fall through to other extraction paths
+      }
+    }
+    if (typeof e.message === "string" && e.message) return new Error(e.message);
+    if (typeof e.exception === "string" && e.exception) {
+      // "frappe.exceptions.ValidationError: actual message" — strip the prefix.
+      return new Error(e.exception.replace(/^[\w.]+Error:\s*/, ""));
+    }
+    if (typeof e.exc_type === "string" && e.exc_type) return new Error(e.exc_type);
+  }
+  return new Error("Failed to get response");
+}
+
 export function useChat() {
   const messages = ref<Message[]>([]);
   const isLoading = ref(false);
@@ -233,7 +271,7 @@ export function useChat() {
             // forwards this dict into the agent's `context` payload.
             page_context: getPageContext(),
           },
-          error: (err: unknown) => settle("reject", err instanceof Error ? err : new Error(String(err))),
+          error: (err: unknown) => settle("reject", _toError(err)),
         });
 
         // Safety net: if the RQ worker dies without emitting "done" or
@@ -259,17 +297,61 @@ export function useChat() {
     }
   }
 
+  function _serverCancelInFlight(): void {
+    // Fire-and-forget signal to the worker so it stops relaying chunks and
+    // stops burning Ollama cycles for a turn the user no longer wants.
+    // See BUG-003 + BUG-008. Client-side settle handles the bubble cleanup;
+    // this is the server-side counterpart.
+    if (!_conversationId) return;
+    frappe.call({
+      method: "frappe_ai.api.chat.cancel_stream",
+      args: { session_id: _conversationId },
+    });
+  }
+
   function cancelMessage(): void {
+    _serverCancelInFlight();
     if (_resolveStream) _resolveStream();
   }
 
   function clearMessages(): void {
+    // If a stream is in flight, settle it cleanly first. settle() calls
+    // frappe.realtime.off(eventName), clears the safety timer, drops
+    // _resolveStream / _activeEventName, and resolves the awaited promise.
+    // Without this, the listener leaked (OBS-006) and a follow-up
+    // sendMessage could race the orphan listener (BUG-009: stray chunks
+    // routed at the previous message's assistantId that no longer exists,
+    // leaving the new assistant bubble empty).
+    if (isLoading.value) _serverCancelInFlight();
+    if (_resolveStream) _resolveStream();
     messages.value = [];
     isLoading.value = false;
     lastError.value = null;
     // "New conversation" — drop the session id so the next message opens
     // a fresh AI Chat Session row.
     _conversationId = null;
+  }
+
+  // Stop the worker if the tab is closing or navigating away mid-stream.
+  // Uses sendBeacon when available so the request survives unload. See
+  // BUG-003: without this, the worker kept relaying SSE chunks to a defunct
+  // channel and the agent kept generating tokens for no consumer.
+  if (typeof window !== "undefined") {
+    window.addEventListener("beforeunload", () => {
+      if (!isLoading.value || !_conversationId) return;
+      try {
+        const blob = new Blob(
+          [JSON.stringify({ session_id: _conversationId })],
+          { type: "application/json" },
+        );
+        navigator.sendBeacon(
+          "/api/method/frappe_ai.api.chat.cancel_stream",
+          blob,
+        );
+      } catch {
+        // best-effort
+      }
+    });
   }
 
   interface RecentMessagesResponse {
@@ -330,6 +412,32 @@ export function useChat() {
     // message length). In-place mutation drops both costs.
     updater(target);
   }
+
+  // Cross-tab sync: server publishes `frappe_ai:msg_added` whenever an AI
+  // Chat Message row is inserted (see the `doc_events` hook in
+  // frappe_ai.api.realtime). The handler appends the new message if it
+  // belongs to the conversation this tab is currently showing AND we're not
+  // mid-stream (the streaming tab already renders these via chunk events;
+  // appending again would duplicate the bubble).
+  interface MsgAddedPayload {
+    session_id: string;
+    id: string;
+    role: "user" | "assistant" | "tool";
+    content: string;
+    timestamp: string | null;
+  }
+  frappe.realtime.on("frappe_ai:msg_added", (payload: MsgAddedPayload) => {
+    if (!payload || payload.session_id !== _conversationId) return;
+    if (isLoading.value) return; // active tab handles its own turn via chunks
+    if (payload.role !== "user" && payload.role !== "assistant") return;
+    if (messages.value.some((m) => m.id === payload.id)) return;
+    messages.value.push({
+      id: payload.id,
+      role: payload.role,
+      content: payload.content,
+      timestamp: payload.timestamp ? new Date(payload.timestamp) : null,
+    });
+  });
 
   function _addErrorMessage(message: string): void {
     lastError.value = message;

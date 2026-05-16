@@ -40,8 +40,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick } from "vue";
+import { ref, computed, nextTick, onMounted, watch } from "vue";
 import { frappeIcon } from "../utils/frappe-icon";
+import { useDraft } from "../composables/useDraft";
 
 const props = defineProps<{
 	/** An assistant turn is currently in flight. */
@@ -56,6 +57,16 @@ const emit = defineEmits<{
 
 const text = ref("");
 const inputEl = ref<HTMLTextAreaElement>();
+
+// NOTE-005: keep the textarea's unsent content across hard reloads.
+// `useDraft` debounces writes and scopes by user.
+const draft = useDraft();
+onMounted(() => {
+	text.value = draft.load();
+});
+watch(text, (v) => {
+	draft.save(v);
+});
 
 /** Stop button is shown only when busy AND cancel is possible. */
 const showStop = computed(() => props.busy && props.canCancel);
@@ -88,6 +99,11 @@ function send() {
 	if (!content) return;
 	emit("send", content);
 	text.value = "";
+	// Clear the persisted draft immediately so a refresh between the send
+	// and the assistant reply doesn't re-populate the textarea with what
+	// the user just sent. The watch above would also fire (debounced), but
+	// the explicit clear avoids the 500ms window of staleness.
+	draft.clear();
 	nextTick(() => {
 		if (inputEl.value) inputEl.value.style.height = "auto";
 	});

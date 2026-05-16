@@ -10,7 +10,8 @@
   "title",
   "started_at",
   "last_activity",
-  "context_json"
+  "context_json",
+  "tenant_id"
  ],
  "fields": [
   {
@@ -39,6 +40,16 @@
    "fieldname": "context_json",
    "fieldtype": "Long Text",
    "label": "Context JSON"
+  },
+  {
+   "fieldname": "tenant_id",
+   "fieldtype": "Data",
+   "label": "Tenant ID",
+   "read_only": 1,
+   "hidden": 1,
+   "no_copy": 1,
+   "print_hide": 1,
+   "description": "Tenant scope for multi-tenant isolation. Populated by saas_platform.utils.tenant.set_tenant_id on insert."
   }
  ],
  "links": [],

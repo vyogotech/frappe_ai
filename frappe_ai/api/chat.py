@@ -73,6 +73,52 @@ def _validate_agent_url(url: str) -> None:
 		pass
 
 
+_CANCEL_KEY_PREFIX = "frappe_ai:cancel:"
+# Short TTL: cancellation should propagate within a few seconds. If the worker
+# never sees the flag (already done), the key just expires.
+_CANCEL_KEY_TTL_SECONDS = 300
+
+
+def _cancel_key(session_id: str) -> str:
+	return _CANCEL_KEY_PREFIX + session_id
+
+
+@frappe.whitelist()
+def cancel_stream(session_id: str) -> dict:
+	"""Signal the running worker for ``session_id`` to stop relaying chunks.
+
+	Used by the sidebar's ``cancelMessage`` (e.g. user clicked Stop) and by
+	the ``beforeunload`` hook (BUG-003). The worker checks the cache flag
+	between agent SSE reads and exits the loop when the flag appears.
+	"""
+	if not session_id or not session_id.strip():
+		return {"ok": False}
+	# Use site cache so all worker processes for this site see the flag.
+	frappe.cache().set_value(
+		_cancel_key(session_id),
+		"1",
+		expires_in_sec=_CANCEL_KEY_TTL_SECONDS,
+	)
+	return {"ok": True}
+
+
+def _is_stream_cancelled(session_id: str) -> bool:
+	"""Return True if a cancel was requested for ``session_id``.
+
+	Consumes the flag on read so subsequent turns on the same session start
+	fresh — preventing a stale cancel from killing a brand new turn.
+	"""
+	if not session_id:
+		return False
+	key = _cancel_key(session_id)
+	cache = frappe.cache()
+	val = cache.get_value(key)
+	if val:
+		cache.delete_value(key)
+		return True
+	return False
+
+
 @frappe.whitelist()
 def get_recent_messages(limit: int = 50) -> dict:
 	"""Return the caller's most recent AI Chat Session and its messages.
@@ -118,12 +164,53 @@ def get_recent_messages(limit: int = 50) -> dict:
 			"id": r["name"],
 			"role": r["role"],
 			"content": r["content"] or "",
-			# RFC3339-ish so the FE can parse with new Date(...)
-			"timestamp": str(r["creation"]) if r.get("creation") else None,
+			"timestamp": _to_iso_utc(r.get("creation")),
 		}
 		for r in rows
 	]
 	return {"session_id": session_id, "messages": messages}
+
+
+def _to_iso_utc(value) -> str | None:
+	"""Serialise a Frappe datetime as ISO 8601 with an explicit UTC suffix.
+
+	Frappe writes ``creation`` naively in ``System Settings.time_zone`` (NOT
+	the container's OS TZ). ``str(dt)`` therefore returns e.g.
+	``"2026-05-16 16:17:20.101924"`` with no tz suffix even when the container
+	is UTC. JavaScript's ``new Date(str)`` parses that as LOCAL time, which
+	produced BUG-002: fresh-sent bubbles (rendered with ``new Date()``) showed
+	a different time than restored bubbles after reload.
+
+	Convert from the configured system tz to UTC, then emit ISO 8601 with
+	``Z`` so the FE's ``new Date(ts)`` resolves to the same instant on every
+	device and renders in the user's local timezone consistently.
+	"""
+	import datetime as _dt
+
+	from frappe.utils import get_datetime, get_system_timezone
+
+	if value is None:
+		return None
+
+	dt = get_datetime(value) if not isinstance(value, _dt.datetime) else value
+	if dt is None:
+		return None
+
+	if dt.tzinfo is None:
+		# Naive Frappe datetime: localise to the system timezone first.
+		try:
+			system_tz = get_system_timezone()
+			# get_system_timezone returns a string like "Asia/Kolkata".
+			# Use zoneinfo for the actual conversion (Python 3.9+).
+			from zoneinfo import ZoneInfo
+			dt = dt.replace(tzinfo=ZoneInfo(system_tz))
+		except Exception:
+			# Fallback: assume UTC if anything goes wrong getting the tz.
+			dt = dt.replace(tzinfo=_dt.timezone.utc)
+
+	utc_dt = dt.astimezone(_dt.timezone.utc)
+	# Replace "+00:00" with "Z" for the canonical UTC suffix the FE expects.
+	return utc_dt.isoformat().replace("+00:00", "Z")
 
 
 _ALLOWED_PAGE_CONTEXT_KEYS = ("route", "doctype", "docname", "currency")
@@ -271,6 +358,27 @@ def _stream_to_agent(
 			response.raise_for_status()
 
 			for line in response.iter_lines(decode_unicode=True):
+				# Cooperative cancel: the client posts to cancel_stream when
+				# the user clicks Stop, hits New conversation mid-flight,
+				# or closes the tab (beforeunload). The flag is consumed on
+				# read so a follow-up turn on the same session isn't
+				# pre-cancelled. See BUG-003 + BUG-008.
+				if _is_stream_cancelled(session_id):
+					logger.info(
+						"stream.cancelled session=%s after=%dms chunks=%d",
+						session_id,
+						int((time.monotonic() - stream_start) * 1000),
+						chunk_count,
+					)
+					done_received = True
+					done_source = "cancel"
+					frappe.publish_realtime(
+						event_name,
+						{"type": "done", "tools_called": [], "cancelled": True},
+						user=user,
+						after_commit=False,
+					)
+					break
 				if not line or not line.startswith("data: "):
 					continue
 				try:

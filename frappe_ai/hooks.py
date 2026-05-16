@@ -24,3 +24,12 @@ app_include_js = ["frappe_ai.bundle.ts"]
 # every migrate so the doctype is always present.
 after_install = "frappe_ai.install.after_install"
 after_migrate = "frappe_ai.install.after_migrate"
+
+# Cross-tab sync (BUG-004): broadcast inserted messages so other tabs
+# subscribed to the same session can append without polling. The handler
+# itself does a best-effort `frappe.publish_realtime`; any failure is logged.
+doc_events = {
+    "AI Chat Message": {
+        "after_insert": "frappe_ai.api.realtime.broadcast_message_added",
+    },
+}

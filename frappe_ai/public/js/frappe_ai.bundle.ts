@@ -1,7 +1,9 @@
 import { createApp, type App as VueApp } from "vue";
 import App from "./frappe_ai/App.vue";
 import { useSettings } from "./frappe_ai/composables/useSettings";
+import { decideBoot } from "./frappe_ai/utils/boot-decision";
 import { frappeIcon } from "./frappe_ai/utils/frappe-icon";
+import { createSidebarVisibilityController } from "./frappe_ai/utils/sidebar-visibility";
 
 const SIDEBAR_ID = "frappe-ai-sidebar-root";
 
@@ -178,6 +180,11 @@ function mountSidebar(sidebarWidth: number, keyboardShortcut: string): void {
   // On close: delay until after the CSS leave-transition (250ms) finishes, otherwise
   // setting hidden=true collapses the container before the slide-out can play.
   //
+  // The visibility controller owns the hide-timer cancellation so a rapid
+  // close→open within the 300ms grace doesn't leave a stale timer that fires
+  // AFTER the second open and silently re-hides the container. See BUG-001
+  // and sidebar-visibility.test.ts.
+  //
   // Re-run syncHostChromeHeight on open and after the next paint. The host's
   // navbar/page-head only reaches its final painted height once the desk has
   // finished its own layout pass — measuring at mount time alone can race the
@@ -185,15 +192,14 @@ function mountSidebar(sidebarWidth: number, keyboardShortcut: string): void {
   // --frappe-ai-host-chrome-h. Resyncing here guarantees the sidebar header
   // bottom lands on the same baseline as the host chrome every time the panel
   // opens.
+  const visibility = createSidebarVisibilityController(el);
   document.addEventListener("frappe-ai-opened", () => {
-    el.hidden = false;
+    visibility.onOpen();
     syncHostChromeHeight();
     requestAnimationFrame(syncHostChromeHeight);
   });
   document.addEventListener("frappe-ai-closed", () => {
-    setTimeout(() => {
-      el.hidden = true;
-    }, 300);
+    visibility.onClose();
   });
 
   vueApp = createApp(App, { sidebarWidth, keyboardShortcut });
@@ -250,11 +256,55 @@ function onFrappeReady(handler: () => void): void {
   tick(0);
 }
 
+/** Inject a small "AI is disabled — open settings" link in the navbar.
+ *
+ * OBS-015: System Managers who toggle Enabled off lose the chat icon and
+ * have no in-UI clue how to turn it back on. This marker fills that gap
+ * — for them only; regular users can't enable it so they see nothing.
+ */
+function injectDisabledHint(): void {
+  function build(): HTMLElement {
+    const tpl = document.createElement("template");
+    tpl.innerHTML = `
+      <a id="frappe-ai-disabled-hint"
+         href="/app/ai-assistant-settings"
+         title="Frappe AI is disabled — open settings to re-enable"
+         style="display:flex;align-items:center;color:var(--ink-gray-5,#888);padding:0 6px;text-decoration:none"
+         class="nav-link text-muted">
+        ${frappeIcon("message-square-text", "md")}
+      </a>`.trim();
+    return tpl.content.firstElementChild as HTMLElement;
+  }
+
+  function tryInject(): void {
+    if (document.getElementById("frappe-ai-disabled-hint")) return;
+    const topAvatar = Array.from(
+      document.querySelectorAll<HTMLElement>(".desktop-avatar"),
+    ).find((el) => el.offsetParent !== null);
+    if (!topAvatar?.parentNode) return;
+    topAvatar.parentNode.insertBefore(build(), topAvatar);
+  }
+
+  tryInject();
+  const observer = new MutationObserver(tryInject);
+  observer.observe(document.body, { childList: true, subtree: true });
+  frappe.router?.on?.("change", () => {
+    tryInject();
+    requestAnimationFrame(() => requestAnimationFrame(tryInject));
+  });
+}
+
 onFrappeReady(async () => {
   const { settings, loadSettings } = useSettings();
   await loadSettings();
 
-  if (!settings.value.enabled) return;
-
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const roles = ((frappe as any).user_roles as string[]) || [];
+  const decision = decideBoot({ enabled: settings.value.enabled, roles });
+  if (decision === "hidden") return;
+  if (decision === "show-disabled-hint") {
+    injectDisabledHint();
+    return;
+  }
   mountSidebar(settings.value.sidebarWidth, settings.value.keyboardShortcut);
 });

@@ -245,6 +245,44 @@ class TestStartStream(unittest.TestCase):
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# cancel_stream + _is_stream_cancelled — server-side stream cancellation
+# ──────────────────────────────────────────────────────────────────────────
+
+
+class TestCancelStream(unittest.TestCase):
+	"""BUG-003 + BUG-008: client must be able to signal cancel to the worker."""
+
+	def setUp(self):
+		self._sid = "test-cancel-session-id"
+		# Ensure clean state.
+		frappe.cache().delete_value(f"frappe_ai:cancel:{self._sid}")
+
+	def tearDown(self):
+		frappe.cache().delete_value(f"frappe_ai:cancel:{self._sid}")
+
+	def test_cancel_sets_redis_flag(self):
+		chat.cancel_stream(session_id=self._sid)
+		self.assertTrue(chat._is_stream_cancelled(self._sid))
+
+	def test_flag_false_without_cancel(self):
+		self.assertFalse(chat._is_stream_cancelled(self._sid))
+
+	def test_empty_session_id_is_noop(self):
+		# Must not raise, must not poison any cache key.
+		chat.cancel_stream(session_id="")
+		# Sanity: cancelling "" shouldn't affect a real session.
+		self.assertFalse(chat._is_stream_cancelled(self._sid))
+
+	def test_consume_clears_flag(self):
+		# Worker calls _is_stream_cancelled, which must clear so a follow-up
+		# turn on the same session isn't pre-cancelled.
+		chat.cancel_stream(session_id=self._sid)
+		self.assertTrue(chat._is_stream_cancelled(self._sid))
+		# Second call returns False (flag consumed).
+		self.assertFalse(chat._is_stream_cancelled(self._sid))
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # get_recent_messages — hydrates the sidebar
 # ──────────────────────────────────────────────────────────────────────────
 
@@ -288,6 +326,33 @@ class TestGetRecentMessages(unittest.TestCase):
 		self.assertEqual(len(out["messages"]), 2)
 		self.assertEqual(out["messages"][0]["role"], "user")
 		self.assertEqual(out["messages"][0]["content"], "msg-0")
+
+	def test_timestamps_are_iso8601_with_explicit_utc_suffix(self):
+		# BUG-002 regression: pre-fix the API returned Frappe's naive datetime
+		# str (e.g. "2026-05-16 17:12:35.041386") which JS parses as LOCAL,
+		# producing a different display time after reload vs. fresh send.
+		# Fix: emit ISO 8601 with explicit "Z" so `new Date(ts)` is unambiguous.
+		session = frappe.get_doc(
+			{
+				"doctype": "AI Chat Session",
+				"name": "test-session-ts",
+				"user": frappe.session.user,
+			}
+		).insert(ignore_permissions=True)
+		frappe.get_doc(
+			{
+				"doctype": "AI Chat Message",
+				"session": session.name,
+				"role": "user",
+				"content": "ts probe",
+			}
+		).insert(ignore_permissions=True)
+		out = chat.get_recent_messages()
+		ts = out["messages"][0]["timestamp"]
+		self.assertIsNotNone(ts)
+		# ISO 8601 with "T" separator and trailing "Z" (UTC):
+		# "YYYY-MM-DDTHH:MM:SS[.ffffff]Z"
+		self.assertRegex(ts, r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$")
 
 	def test_limit_clamped_to_safe_range(self):
 		session = frappe.get_doc(

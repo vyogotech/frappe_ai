@@ -196,12 +196,14 @@ describe("useChat", () => {
     fireChunk(listeners, { type: "done", tools_called: [] });
     await third;
 
-    const events = (
+    const chunkEvents = (
       g.frappe as { realtime: { on: { mock: { calls: unknown[][] } } } }
-    ).realtime.on.mock.calls.map((c) => c[0] as string);
+    ).realtime.on.mock.calls
+      .map((c) => c[0] as string)
+      .filter((ev) => ev.startsWith("frappe_ai:chunk:"));
     // First two turns share an event name; the third (post-clear) differs.
-    expect(events[0]).toBe(events[1]);
-    expect(events[2]).not.toBe(events[0]);
+    expect(chunkEvents[0]).toBe(chunkEvents[1]);
+    expect(chunkEvents[2]).not.toBe(chunkEvents[0]);
   });
 
   it("cancelMessage settles the stream without throwing", async () => {
@@ -212,6 +214,167 @@ describe("useChat", () => {
     await promise; // resolves cleanly
     expect(chat.isLoading.value).toBe(false);
     expect(chat.canCancel.value).toBe(false);
+  });
+
+  it("extracts the Frappe ValidationError message instead of rendering [object Object]", async () => {
+    // BUG-012 regression: Frappe rejects a `frappe.call` with a plain object
+    // shaped like { exc_type, _server_messages, exception, ... }. The pre-fix
+    // error handler did `new Error(String(err))`, which produced the literal
+    // string "[object Object]" as the user-visible bubble.
+    const listeners: CapturedListener[] = [];
+    g.frappe = {
+      call: vi.fn((opts: Record<string, unknown>) => {
+        if (opts.method === "frappe_ai.api.chat.start_stream") {
+          // Simulate Frappe's typical error response shape.
+          const errPayload = {
+            exc_type: "ValidationError",
+            _server_messages: JSON.stringify([
+              JSON.stringify({ message: "Message too long (max 10000 characters).", indicator: "red" }),
+            ]),
+            exception: "frappe.exceptions.ValidationError: Message too long (max 10000 characters).",
+          };
+          (opts as { error: (err: unknown) => void }).error(errPayload);
+          return Promise.resolve();
+        }
+        return Promise.resolve({ message: { session_id: null, messages: [] } });
+      }),
+      realtime: {
+        on: vi.fn((event: string, handler: (data: unknown) => void) => {
+          listeners.push({ event, handler });
+        }),
+        off: vi.fn(),
+      },
+    };
+
+    vi.resetModules();
+    const { useChat } = await import("./useChat");
+    const chat = useChat();
+
+    await chat.sendMessage("a".repeat(10001));
+
+    const errMsg = chat.messages.value.find((m) => m.role === "error");
+    expect(errMsg).toBeDefined();
+    expect(errMsg?.error?.message).toBe("Message too long (max 10000 characters).");
+    expect(errMsg?.error?.message).not.toBe("[object Object]");
+  });
+
+  it("clearMessages cancels an in-flight stream and unsubscribes its listener", async () => {
+    // BUG-009 / OBS-006 regression: pre-fix, clearMessages() emptied
+    // messages.value but did NOT call cancelMessage() / frappe.realtime.off().
+    // The orphan listener stayed alive and could intercept stray events.
+    // Worse, the in-flight stream's _resolveStream / settled state was not
+    // reset, so a subsequent sendMessage entered with isLoading already
+    // momentarily true via timing artifacts.
+    const { chat, listeners } = await setup();
+    const firstSend = chat.sendMessage("first");
+    expect(chat.isLoading.value).toBe(true);
+
+    // Capture which event was subscribed.
+    const offSpy = (g.frappe as { realtime: { off: { mock: { calls: unknown[][] } } } })
+      .realtime.off;
+    const onCallsBefore = (
+      g.frappe as { realtime: { on: { mock: { calls: unknown[][] } } } }
+    ).realtime.on.mock.calls.length;
+    const firstEvent = listeners[onCallsBefore - 1].event;
+
+    chat.clearMessages();
+
+    // clearMessages must have called realtime.off for the in-flight stream.
+    const offCalls = offSpy.mock.calls.map((c) => c[0] as string);
+    expect(offCalls).toContain(firstEvent);
+
+    // isLoading must be reset so a follow-up sendMessage can proceed.
+    expect(chat.isLoading.value).toBe(false);
+
+    // The first sendMessage's promise should settle without throwing.
+    await firstSend;
+  });
+
+  it("appends an inbound msg_added event for the active conversation when idle", async () => {
+    // BUG-004 regression: a second tab opened on the same session never sees
+    // messages sent in the first tab. Fix: server publishes
+    // frappe_ai:msg_added on every new AI Chat Message; client appends if the
+    // session matches and the message isn't already shown.
+    const { chat, listeners } = await setup();
+
+    // First turn — establishes _conversationId and the realtime subscription.
+    // The setup() helper has start_stream resolve with session_id=null which
+    // means the optimistic UUID stays; we just need _conversationId set.
+    const first = chat.sendMessage("hello");
+    fireChunk(listeners, { type: "done", tools_called: [] });
+    await first;
+
+    const initialCount = chat.messages.value.length;
+    const chunkCall = (
+      g.frappe as { realtime: { on: { mock: { calls: unknown[][] } } } }
+    ).realtime.on.mock.calls.find((c) =>
+      typeof c[0] === "string" && (c[0] as string).startsWith("frappe_ai:chunk:"),
+    );
+    const sessionId = (chunkCall![0] as string).replace("frappe_ai:chunk:", "");
+
+    // Simulate the global "msg_added" listener firing — a message saved by
+    // another tab arrives here while this tab is idle.
+    const msgAddedListener = listeners.find((l) => l.event === "frappe_ai:msg_added");
+    expect(msgAddedListener).toBeDefined();
+    msgAddedListener!.handler({
+      session_id: sessionId,
+      id: "server-msg-from-other-tab",
+      role: "user",
+      content: "ping from tab A",
+      timestamp: "2026-05-16T17:12:35Z",
+    });
+
+    expect(chat.messages.value.length).toBe(initialCount + 1);
+    const newMsg = chat.messages.value[chat.messages.value.length - 1];
+    expect(newMsg.id).toBe("server-msg-from-other-tab");
+    expect(newMsg.content).toBe("ping from tab A");
+  });
+
+  it("ignores msg_added for a different session_id", async () => {
+    const { chat, listeners } = await setup();
+    const first = chat.sendMessage("hi");
+    fireChunk(listeners, { type: "done", tools_called: [] });
+    await first;
+
+    const before = chat.messages.value.length;
+    const msgAddedListener = listeners.find((l) => l.event === "frappe_ai:msg_added");
+    msgAddedListener!.handler({
+      session_id: "unrelated-other-session",
+      id: "unrelated-msg",
+      role: "user",
+      content: "from a different conversation",
+      timestamp: "2026-05-16T17:12:35Z",
+    });
+    expect(chat.messages.value.length).toBe(before);
+  });
+
+  it("ignores msg_added while a stream is in flight (avoids duplicating own messages)", async () => {
+    const { chat, listeners } = await setup();
+    const sending = chat.sendMessage("first message"); // does not auto-settle
+
+    expect(chat.isLoading.value).toBe(true);
+    const before = chat.messages.value.length;
+
+    // While loading, an msg_added arrives for the same session — must skip.
+    const chunkCall2 = (
+      g.frappe as { realtime: { on: { mock: { calls: unknown[][] } } } }
+    ).realtime.on.mock.calls.find((c) =>
+      typeof c[0] === "string" && (c[0] as string).startsWith("frappe_ai:chunk:"),
+    );
+    const sessionId = (chunkCall2![0] as string).replace("frappe_ai:chunk:", "");
+    const msgAddedListener = listeners.find((l) => l.event === "frappe_ai:msg_added");
+    msgAddedListener!.handler({
+      session_id: sessionId,
+      id: "would-be-dupe",
+      role: "user",
+      content: "first message",
+      timestamp: "2026-05-16T17:12:35Z",
+    });
+    expect(chat.messages.value.length).toBe(before);
+
+    // settle and let the test exit cleanly.
+    fireChunk(listeners, { type: "done", tools_called: [] });
+    await sending;
   });
 
   it("CLIENT_TIMEOUT_MS triggers a typed error when the relay never settles", async () => {
