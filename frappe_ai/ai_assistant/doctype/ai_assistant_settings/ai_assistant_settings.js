@@ -4,8 +4,14 @@
 frappe.ui.form.on('AI Assistant Settings', {
 	refresh: function(frm) {
 		if (!frm.is_new()) {
+			// OBS-016: closure-scoped flag prevents stacked toasts and
+			// hammering the agent when the user mashes the button. The
+			// flag clears in test_agent_connection's settled() callback.
+			let test_in_flight = false;
 			frm.add_custom_button(__('Test Connection'), function() {
-				test_agent_connection(frm);
+				if (test_in_flight) return;
+				test_in_flight = true;
+				test_agent_connection(frm, () => { test_in_flight = false; });
 			});
 		}
 
@@ -32,13 +38,18 @@ frappe.ui.form.on('AI Assistant Settings', {
 	}
 });
 
-function test_agent_connection(frm) {
+function test_agent_connection(frm, on_settled) {
 	frappe.dom.freeze(__('Testing connection...'));
+
+	const settled = () => {
+		frappe.dom.unfreeze();
+		if (typeof on_settled === 'function') on_settled();
+	};
 
 	frappe.call({
 		method: 'frappe_ai.api.health.test_connection',
 		callback: function(r) {
-			frappe.dom.unfreeze();
+			settled();
 
 			if (r.message && r.message.success) {
 				// Single non-blocking toast; no modal stacked on top.
@@ -59,7 +70,7 @@ function test_agent_connection(frm) {
 			}
 		},
 		error: function() {
-			frappe.dom.unfreeze();
+			settled();
 			frappe.msgprint({
 				title: __('Connection Test Failed'),
 				message: __('An error occurred while testing the connection. Please check the console for details.'),
