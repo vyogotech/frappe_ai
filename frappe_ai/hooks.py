@@ -29,7 +29,7 @@ after_migrate = "frappe_ai.install.after_migrate"
 # subscribed to the same session can append without polling. The handler
 # itself does a best-effort `frappe.publish_realtime`; any failure is logged.
 doc_events = {
-    "AI Chat Message": {
-        "after_insert": "frappe_ai.api.realtime.broadcast_message_added",
-    },
+	"AI Chat Message": {
+		"after_insert": "frappe_ai.api.realtime.broadcast_message_added",
+	},
 }
