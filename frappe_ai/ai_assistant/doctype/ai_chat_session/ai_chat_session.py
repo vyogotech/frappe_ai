@@ -5,7 +5,6 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-
 # Fields that must never change after the session row is created. The DocType
 # JSON allows System Manager to write everything, but BUG-010 showed that lets
 # an admin reassign a session to another user or rewrite its grounding
