@@ -141,6 +141,45 @@ class TestValidateAgentUrl(unittest.TestCase):
 		frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = 1
 		chat._validate_agent_url("http://169.254.169.254/")
 
+	def test_rejects_rfc1918_private_addresses(self):
+		# The worker forwards the user's sid; a misconfigured agent URL on a
+		# private range would silently leak the session to whatever happens
+		# to be listening there.
+		for url in (
+			"http://10.0.0.5:8484",
+			"http://172.16.0.5:8484",
+			"http://192.168.1.5:8484",
+		):
+			with self.assertRaises(frappe.ValidationError, msg=f"should reject {url}"):
+				chat._validate_agent_url(url)
+
+	def test_rejects_loopback_without_escape(self):
+		# Loopback only makes sense in local dev, gated behind the escape
+		# hatch. Without it, a typo pointing at 127.0.0.1 is a sid leak.
+		with self.assertRaises(frappe.ValidationError):
+			chat._validate_agent_url("http://127.0.0.1:8484")
+		with self.assertRaises(frappe.ValidationError):
+			chat._validate_agent_url("http://127.0.0.5:8484")
+
+	def test_rejects_non_imds_link_local(self):
+		# 169.254.0.0/16 outside the IMDS literal — still link-local, still
+		# rejected.
+		with self.assertRaises(frappe.ValidationError):
+			chat._validate_agent_url("http://169.254.1.1:8484")
+
+	def test_rejects_ipv6_loopback_and_ula_without_escape(self):
+		# IPv6 loopback (::1) and Unique Local Addresses (fc00::/7) are
+		# private; cover them explicitly so an IPv6-first deployment can't
+		# regress the IPv4-only guard.
+		with self.assertRaises(frappe.ValidationError):
+			chat._validate_agent_url("http://[::1]:8484")
+		with self.assertRaises(frappe.ValidationError):
+			chat._validate_agent_url("http://[fd00::1]:8484")
+
+	def test_accepts_public_ip_literal(self):
+		# Sanity: a publicly-allocated IPv4 (Cloudflare DNS) is fine.
+		chat._validate_agent_url("http://1.1.1.1:8484")
+
 
 class TestAgentUrl(unittest.TestCase):
 	def setUp(self):
