@@ -218,6 +218,13 @@ class TestStartStream(unittest.TestCase):
 		# Establish a known-good baseline for the singleton + site_config.
 		self._original_url = frappe.local.conf.get("frappe_ai_agent_url")
 		frappe.local.conf["frappe_ai_agent_url"] = "http://localhost:8484"
+		# _validate_agent_url rejects loopback (::1, 127.0.0.0/8) outside
+		# the explicit escape hatch. These tests use a localhost URL and
+		# mock frappe.enqueue, so the URL is only validated, never reached.
+		# Setting the hatch keeps validation permissive without changing
+		# what the tests actually exercise.
+		self._original_escape = frappe.local.conf.get("frappe_ai_agent_url_unsafe_ok")
+		frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = 1
 
 		self.settings = frappe.get_single("AI Assistant Settings")
 		self._original_enabled = self.settings.enabled
@@ -232,6 +239,10 @@ class TestStartStream(unittest.TestCase):
 			frappe.local.conf.pop("frappe_ai_agent_url", None)
 		else:
 			frappe.local.conf["frappe_ai_agent_url"] = self._original_url
+		if self._original_escape is None:
+			frappe.local.conf.pop("frappe_ai_agent_url_unsafe_ok", None)
+		else:
+			frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = self._original_escape
 
 	def test_empty_message_throws(self):
 		with self.assertRaises(frappe.ValidationError):
