@@ -178,14 +178,22 @@ jobs:
           # private. The token has read access to the current repository
           # automatically.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Pass ref_name and repository through env vars so a maliciously
+          # named branch (e.g. `;rm -rf /`) cannot break out of the
+          # `bench get-app` command. With on.push.branches: ['**'] the
+          # trigger fires on any pushed branch including PRs from forks
+          # via the same actor — direct interpolation into a `run:` block
+          # would let the branch name execute as shell.
+          BRANCH: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
         run: |
           git config --global user.email "ci@example.com"
           git config --global user.name "CI"
           git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
           bench get-app \
-            --branch "${{ github.ref_name }}" \
+            --branch "$BRANCH" \
             --skip-assets \
-            "https://github.com/${{ github.repository }}.git"
+            "https://github.com/$REPO.git"
 
       - name: Create test site
         working-directory: frappe-bench

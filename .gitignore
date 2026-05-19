@@ -57,3 +57,6 @@ coverage/
 .env
 .env.local
 .mcp.json
+
+# Scanner output from `make audit`
+audit-out/
