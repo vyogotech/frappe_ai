@@ -18,6 +18,14 @@ class TestHealthEndpoint(unittest.TestCase):
 	def setUp(self):
 		self._original_url = frappe.local.conf.get("frappe_ai_agent_url")
 		frappe.local.conf["frappe_ai_agent_url"] = "http://localhost:8484"
+		# The SSRF guard in _validate_agent_url rejects loopback addresses
+		# (::1, 127.0.0.0/8) outside the explicit escape hatch. These tests
+		# mock requests.get, so the URL is only validated, never reached —
+		# but the validation still runs. Set the escape hatch in setUp so
+		# the test url passes validation and the mocked requests.get is
+		# what determines the test outcome.
+		self._original_escape = frappe.local.conf.get("frappe_ai_agent_url_unsafe_ok")
+		frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = 1
 
 		self.settings = frappe.get_single("AI Assistant Settings")
 		self._original_enabled = self.settings.enabled
@@ -32,6 +40,10 @@ class TestHealthEndpoint(unittest.TestCase):
 			frappe.local.conf.pop("frappe_ai_agent_url", None)
 		else:
 			frappe.local.conf["frappe_ai_agent_url"] = self._original_url
+		if self._original_escape is None:
+			frappe.local.conf.pop("frappe_ai_agent_url_unsafe_ok", None)
+		else:
+			frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = self._original_escape
 
 	def test_returns_disabled_when_assistant_off(self):
 		self.settings.enabled = 0
