@@ -98,10 +98,12 @@ def _validate_agent_url(url: str) -> None:
 		# multicast, reserved, unspecified, shared (CGNAT), benchmarking,
 		# and IETF-future ranges in a single check.
 		if not ip.is_global:
-			frappe.throw(_(
-				"AI agent URL resolves to a non-public address ({0}). "
-				"Set frappe_ai_agent_url_unsafe_ok in site_config.json for local development."
-			).format(ip))
+			frappe.throw(
+				_(
+					"AI agent URL resolves to a non-public address ({0}). "
+					"Set frappe_ai_agent_url_unsafe_ok in site_config.json for local development."
+				).format(ip)
+			)
 
 
 _CANCEL_KEY_PREFIX = "frappe_ai:cancel:"
