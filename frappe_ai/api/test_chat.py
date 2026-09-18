@@ -5,6 +5,7 @@
 whitelisted endpoints (with the agent + RQ enqueue mocked out)."""
 
 import json
+import pickle
 import unittest
 from unittest.mock import patch
 
@@ -330,6 +331,14 @@ class TestCancelStream(unittest.TestCase):
 		self.assertTrue(chat._is_stream_cancelled(self._sid))
 		# Second call returns False (flag consumed).
 		self.assertFalse(chat._is_stream_cancelled(self._sid))
+
+	def test_cancel_from_another_process_reaches_the_worker(self):
+		# The worker checks before Stop is clicked, and Frappe memoises that miss in
+		# frappe.local.cache; Stop then sets the flag from a web process, in Redis only.
+		self.assertFalse(chat._is_stream_cancelled(self._sid))
+		cache = frappe.cache()
+		cache.set(cache.make_key(chat._cancel_key(self._sid)), pickle.dumps("1"))
+		self.assertTrue(chat._is_stream_cancelled(self._sid))
 
 
 # ──────────────────────────────────────────────────────────────────────────

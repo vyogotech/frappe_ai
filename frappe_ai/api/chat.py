@@ -145,7 +145,8 @@ def _is_stream_cancelled(session_id: str) -> bool:
 		return False
 	key = _cancel_key(session_id)
 	cache = frappe.cache()
-	val = cache.get_value(key)
+	# the flag is set by another process, so this process's memo of the last miss is stale
+	val = cache.get_value(key, use_local_cache=False)
 	if val:
 		cache.delete_value(key)
 		return True
