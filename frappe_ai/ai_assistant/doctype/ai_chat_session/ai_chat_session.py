@@ -37,3 +37,8 @@ class AIChatSession(Document):
 					_("Field '{0}' on AI Chat Session is read-only after creation.").format(fieldname),
 					frappe.ValidationError,
 				)
+
+	def on_trash(self):
+		# messages link to their session, so they go first; whoever may delete the chat may delete them
+		for name in frappe.get_all("AI Chat Message", filters={"session": self.name}, pluck="name"):
+			frappe.delete_doc("AI Chat Message", name, ignore_permissions=True)
