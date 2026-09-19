@@ -20,11 +20,6 @@ app_include_css = ["frappe_ai_sidebar.bundle.css"]
 # literal `/frappe_ai.bundle.js` URL that 404s.
 app_include_js = ["frappe_ai.bundle.ts"]
 
-# Bootstrap the AI Assistant Settings singleton on first install and after
-# every migrate so the doctype is always present.
-after_install = "frappe_ai.install.after_install"
-after_migrate = "frappe_ai.install.after_migrate"
-
 # Cross-tab sync (BUG-004): broadcast inserted messages so other tabs
 # subscribed to the same session can append without polling. The handler
 # itself does a best-effort `frappe.publish_realtime`; any failure is logged.
