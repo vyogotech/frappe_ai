@@ -14,6 +14,7 @@ def _agent_url() -> str:
 @frappe.whitelist()
 def test_connection():
 	"""Test connectivity to the AI agent by calling its /health endpoint."""
+	frappe.only_for("System Manager")
 	settings = frappe.get_single("AI Assistant Settings")
 
 	if not settings.enabled:
