@@ -33,3 +33,13 @@ doc_events = {
 		"after_insert": "frappe_ai.api.realtime.broadcast_message_added",
 	},
 }
+
+# a Personal Data Deletion Request redacts these and a personal data download includes them
+user_data_fields = [
+	{"doctype": "AI Chat Session", "filter_by": "user", "redact_fields": ["title", "context_json"]},
+	{
+		"doctype": "AI Chat Message",
+		"filter_by": "owner",
+		"redact_fields": ["content", "tool_args_json", "tool_result_json"],
+	},
+]
