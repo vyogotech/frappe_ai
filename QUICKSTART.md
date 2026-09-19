@@ -17,7 +17,8 @@ Edit `sites/your-site.local/site_config.json`:
 
 ```json
 {
-  "frappe_ai_agent_url": "http://localhost:8484"
+  "frappe_ai_agent_url": "http://localhost:8484",
+  "frappe_ai_agent_url_unsafe_ok": 1
 }
 ```
 

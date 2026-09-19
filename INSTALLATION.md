@@ -40,9 +40,12 @@ Edit `sites/your-site.local/site_config.json`:
 
 ```json
 {
-  "frappe_ai_agent_url": "http://localhost:8484"
+  "frappe_ai_agent_url": "http://localhost:8484",
+  "frappe_ai_agent_url_unsafe_ok": 1
 }
 ```
+
+`frappe_ai_agent_url_unsafe_ok` lets the URL point at a private or loopback address, such as a local agent or one on the same Docker network; leave it out when the agent is on a public address, which must then use https. A cloud metadata or link-local address, or a host that does not resolve, is refused either way.
 
 The AI Assistant Settings form shows this value in a read-only **Agent URL** field; the `before_save` hook refreshes it from `site_config` on every save.
 
