@@ -44,3 +44,8 @@ class TestRelayEnd(unittest.TestCase):
 	def test_a_chunk_that_is_not_an_object_is_skipped(self):
 		events = self._relay(_agent("data: [1, 2]", 'data: {"type": "content"}'))
 		self.assertEqual(events, ["content", "done"])
+
+	def test_an_agent_that_is_down_fails_the_connect_in_seconds(self):
+		post = _agent('data: {"type": "done"}')
+		self._relay(post)
+		self.assertLessEqual(post.call_args.kwargs["timeout"][0], 5)

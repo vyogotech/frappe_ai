@@ -410,7 +410,8 @@ def _stream_to_agent(
 				"Content-Type": "application/json",
 				"Accept": "text/event-stream",
 			},
-			timeout=timeout_seconds,
+			# a down agent fails the connect in seconds, not the whole reply budget
+			timeout=(5, timeout_seconds),
 			stream=True,
 		) as response:
 			response.raise_for_status()
