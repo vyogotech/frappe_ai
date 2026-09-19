@@ -87,6 +87,7 @@ interface FrappeUI {
 }
 
 interface FrappeGlobal {
+  csrf_token?: string;
   router?: FrappeRouter;
   utils: FrappeUtils;
   boot?: FrappeBoot;

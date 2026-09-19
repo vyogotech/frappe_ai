@@ -341,7 +341,7 @@ export function useChat() {
       if (!isLoading.value || !_conversationId) return;
       try {
         const blob = new Blob(
-          [JSON.stringify({ session_id: _conversationId })],
+          [JSON.stringify({ session_id: _conversationId, csrf_token: frappe.csrf_token })],
           { type: "application/json" },
         );
         navigator.sendBeacon(
