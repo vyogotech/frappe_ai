@@ -440,6 +440,8 @@ def _stream_to_agent(
 					chunk = json.loads(line[6:])
 				except (json.JSONDecodeError, ValueError):
 					continue
+				if not isinstance(chunk, dict):
+					continue
 
 				chunk_count += 1
 				if chunk.get("type") == "done":
@@ -485,6 +487,15 @@ def _stream_to_agent(
 		)
 		done_received = True
 		done_source = "error"
+	except Exception:
+		# the job's own timeout (RQ raises it in here) or a bug: the user still gets an end, the job still fails
+		frappe.publish_realtime(
+			event_name,
+			{"type": "error", "message": "Failed to connect to AI agent."},
+			user=user,
+			after_commit=False,
+		)
+		raise
 
 	if not done_received:
 		frappe.publish_realtime(
