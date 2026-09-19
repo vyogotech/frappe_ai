@@ -65,7 +65,7 @@ The settings validator rejects shortcuts that Frappe v16 hard-binds in the desk 
 
 ## Step 5: Verify
 
-Click **Test Connection** on the AI Assistant Settings page. It calls `frappe_ai.api.health.test_connection`, which hits `<agent_url>/health` with the user's `sid` cookie.
+Click **Test Connection** on the AI Assistant Settings page. It calls `frappe_ai.api.health.test_connection`, which calls `<agent_url>/health` without any credentials.
 
 Then open the desk and click the AI button in the navbar.
 

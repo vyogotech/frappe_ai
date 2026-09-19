@@ -33,11 +33,7 @@ def test_connection():
 			# settings page caller renders the message verbatim.
 			return {"success": False, "message": str(e)}
 
-		health_response = requests.get(
-			f"{agent_url}/health",
-			cookies={"sid": frappe.session.sid},
-			timeout=10,
-		)
+		health_response = requests.get(f"{agent_url}/health", timeout=10)
 
 		if health_response.status_code == 200:
 			return {
