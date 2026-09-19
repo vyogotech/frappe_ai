@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from "vue";
-import { use } from "echarts/core";
+import { format, use } from "echarts/core";
 import { SVGRenderer } from "echarts/renderers";
 import { BarChart, LineChart, PieChart, FunnelChart, HeatmapChart } from "echarts/charts";
 import {
@@ -115,7 +115,7 @@ const chartOption = computed(() => {
 					...tooltipBase,
 					trigger: "item",
 					formatter: (p: { name: string; value: number }) =>
-						`${p.name}: ${formatValue(p.value, currency ? "currency" : "number", { currency })}`,
+						`${format.encodeHTML(p.name)}: ${formatValue(p.value, currency ? "currency" : "number", { currency })}`,
 				},
 				legend: { orient: "horizontal", bottom: 0, type: "scroll", textStyle: axisLabelStyle },
 				series: [
