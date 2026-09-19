@@ -312,6 +312,9 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 	_validate_agent_url(agent_url)
 
 	timeout_seconds = int(settings.timeout or 30)
+	# RQ keeps a job's arguments for days and shows them to System Managers, so the job gets a key to the sid instead
+	sid_key = frappe.generate_hash(length=32)
+	frappe.cache.set_value(_SID_KEY_PREFIX + sid_key, frappe.session.sid, expires_in_sec=timeout_seconds + 30)
 
 	frappe.enqueue(
 		"frappe_ai.api.chat._stream_to_agent",
@@ -323,7 +326,7 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 		message=message,
 		session_id=session_id,
 		user=user,
-		sid=frappe.session.sid,
+		sid_key=sid_key,
 		agent_url=agent_url,
 		timeout_seconds=timeout_seconds,
 		page_context=_sanitize_page_context(page_context),
@@ -332,11 +335,23 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 	return {"session_id": session_id}
 
 
+_SID_KEY_PREFIX = "frappe_ai:sid:"
+
+
+def _take_sid(sid_key: str) -> str:
+	"""The sid start_stream left for this job; gone after the first read."""
+	key = _SID_KEY_PREFIX + sid_key
+	try:
+		return frappe.cache.get_value(key, use_local_cache=False) or ""
+	finally:
+		frappe.cache.delete_value(key)
+
+
 def _stream_to_agent(
 	message: str,
 	session_id: str,
 	user: str,
-	sid: str,
+	sid_key: str,
 	agent_url: str,
 	timeout_seconds: int = 30,
 	page_context: dict | None = None,
@@ -383,7 +398,7 @@ def _stream_to_agent(
 		with requests.post(
 			f"{agent_url}/api/v1/chat",
 			json=payload,
-			cookies={"sid": sid},
+			cookies={"sid": _take_sid(sid_key)},
 			headers={
 				"Content-Type": "application/json",
 				"Accept": "text/event-stream",

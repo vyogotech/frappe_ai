@@ -68,7 +68,7 @@ The browser never holds a long SSE connection itself — `frappe.realtime` (sock
 
 ## Authentication
 
-The user's `sid` cookie is forwarded straight to the agent (`requests.post(..., cookies={"sid": sid})`). The agent is expected to validate the sid against Frappe — there is no OAuth client to provision and no shared secret.
+The user's `sid` cookie is forwarded to the agent (`requests.post(..., cookies={"sid": _take_sid(sid_key)})`): `start_stream` leaves the sid in the site cache under a one-time key and the job carries only that key, because RQ keeps job arguments for days and shows them to System Managers. The agent is expected to validate the sid against Frappe — there is no OAuth client to provision and no shared secret.
 
 `page_context` (route / doctype / docname / currency) is sanitised by `_sanitize_page_context` before being merged into the request `context`, so a malformed frontend can't smuggle non-grounding data into the system prompt.
 
