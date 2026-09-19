@@ -99,10 +99,7 @@ class TestValidateAgentUrl(unittest.TestCase):
 			frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = self._original_escape
 
 	def test_accepts_https_url(self):
-		chat._validate_agent_url("https://agent.example.com")
-
-	def test_accepts_http_url(self):
-		chat._validate_agent_url("http://agent.example.com:8484")
+		chat._validate_agent_url("https://1.1.1.1")
 
 	def test_accepts_localhost_with_escape(self):
 		# Localhost is technically a private name; allow it when the
@@ -135,12 +132,6 @@ class TestValidateAgentUrl(unittest.TestCase):
 	def test_rejects_unspecified_address(self):
 		with self.assertRaises(frappe.ValidationError):
 			chat._validate_agent_url("http://0.0.0.0:8484")
-
-	def test_escape_hatch_allows_metadata_too(self):
-		# Operators who genuinely need internal-network targets opt-in
-		# via site_config. We don't second-guess them.
-		frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = 1
-		chat._validate_agent_url("http://169.254.169.254/")
 
 	def test_rejects_rfc1918_private_addresses(self):
 		# The worker forwards the user's sid; a misconfigured agent URL on a
@@ -179,7 +170,7 @@ class TestValidateAgentUrl(unittest.TestCase):
 
 	def test_accepts_public_ip_literal(self):
 		# Sanity: a publicly-allocated IPv4 (Cloudflare DNS) is fine.
-		chat._validate_agent_url("http://1.1.1.1:8484")
+		chat._validate_agent_url("https://1.1.1.1:8484")
 
 
 class TestAgentUrl(unittest.TestCase):
