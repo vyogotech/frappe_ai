@@ -37,12 +37,14 @@ def _validate_agent_url(url: str) -> None:
 	resolves to, so an operator typo pointing at the cloud metadata
 	endpoint or an internal loopback service would leak the session.
 
-	Hard rules (always enforced):
-	  - Must parse as an absolute http(s) URL with a host.
-
-	Soft rules (skipped when site_config has `frappe_ai_agent_url_unsafe_ok`):
+	Hard rules (always enforced, ADR-005):
+	  - Must parse as an absolute http(s) URL with a host that resolves.
 	  - Must not target the cloud metadata names (169.254.169.254,
-	    fd00:ec2::254, metadata.google.internal).
+	    fd00:ec2::254, metadata.google.internal) or any link-local address.
+	  - A public address must use https, so the sid never crosses the
+	    internet in the clear.
+
+	Soft rule (skipped when site_config has `frappe_ai_agent_url_unsafe_ok`):
 	  - Every address the host resolves to must be `is_global`. Rejects
 	    RFC1918 private (10/8, 172.16/12, 192.168/16), loopback,
 	    link-local, multicast, reserved, unspecified, shared (CGNAT), and
@@ -58,9 +60,6 @@ def _validate_agent_url(url: str) -> None:
 		frappe.throw(_("AI agent URL must use http or https (got '{0}').").format(parsed.scheme or "(none)"))
 	if not parsed.hostname:
 		frappe.throw(_("AI agent URL must include a hostname."))
-
-	if frappe.local.conf.get("frappe_ai_agent_url_unsafe_ok"):
-		return
 
 	host = parsed.hostname  # str (guaranteed by the earlier `not parsed.hostname` check)
 	assert host is not None  # narrow for the type checker
@@ -78,26 +77,31 @@ def _validate_agent_url(url: str) -> None:
 	try:
 		candidate_ips.append(ipaddress.ip_address(host))
 	except ValueError:
-		# host is a name. Resolve it. A DNS failure is not on its own a
-		# sid-leak risk — let the actual outbound request surface the
-		# resolution error rather than masking it as a validation throw.
+		# host is a name. Resolve it; a name that does not resolve now could resolve anywhere later.
 		try:
 			port = parsed.port or (443 if parsed.scheme == "https" else 80)
 			infos = socket.getaddrinfo(host, port)
 		except socket.gaierror:
-			return
+			frappe.throw(_("AI agent URL host '{0}' does not resolve.").format(host))
 		for info in infos:
 			try:
 				candidate_ips.append(ipaddress.ip_address(info[4][0]))
 			except (ValueError, IndexError):
 				continue
 
+	private_ok = frappe.local.conf.get("frappe_ai_agent_url_unsafe_ok")
 	for ip in candidate_ips:
+		if ip.is_link_local:
+			frappe.throw(
+				_("AI agent URL resolves to a link-local address ({0}), which is not allowed.").format(ip)
+			)
+		if ip.is_global and parsed.scheme != "https":
+			frappe.throw(_("AI agent URL must use https for a public address ({0}).").format(ip))
 		# is_global is True iff the address is allocated for public networks.
 		# Catches loopback, link-local, RFC1918 private (and IPv6 ULA),
 		# multicast, reserved, unspecified, shared (CGNAT), benchmarking,
 		# and IETF-future ranges in a single check.
-		if not ip.is_global:
+		if not ip.is_global and not private_ok:
 			frappe.throw(
 				_(
 					"AI agent URL resolves to a non-public address ({0}). "
