@@ -16,8 +16,8 @@ _IMMUTABLE_AFTER_INSERT = ("user", "context_json")
 
 class AIChatSession(Document):
 	def before_insert(self):
-		if not self.user:
-			self.user = frappe.session.user
+		# a caller-supplied user would put this chat in someone else's sidebar
+		self.user = frappe.session.user
 		if not self.started_at:
 			self.started_at = frappe.utils.now_datetime()
 		if not self.last_activity:
