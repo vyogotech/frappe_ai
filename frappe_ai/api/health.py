@@ -58,5 +58,5 @@ def test_connection():
 		return {"success": False, "message": f"Cannot connect to AI agent: {e}"}
 
 	except Exception as e:
-		frappe.log_error(title="AI Agent Connection Test Failed", message=str(e))
+		frappe.log_error(title="AI Agent Connection Test Failed", message=frappe.get_traceback())
 		return {"success": False, "message": f"Connection test failed: {e}"}

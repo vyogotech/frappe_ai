@@ -45,6 +45,10 @@ class TestRelayEnd(unittest.TestCase):
 		# without a message, Frappe logs every frame's variables
 		self.assertIn("RuntimeError: job timeout", self.logged.call_args.kwargs["message"])
 
+	def test_an_agent_that_fails_is_logged_with_the_stack(self):
+		self._relay(_agent(fail=chat.requests.ConnectionError("agent down")))
+		self.assertIn("chat.py", self.logged.call_args.kwargs["message"])
+
 	def test_a_chunk_that_is_not_an_object_is_skipped(self):
 		events = self._relay(_agent("data: [1, 2]", 'data: {"type": "content"}'))
 		self.assertEqual(events, ["content", "done"])

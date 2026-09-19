@@ -482,7 +482,7 @@ def _stream_to_agent(
 			chunk_count,
 			e,
 		)
-		frappe.log_error(title="AI Agent Stream Failed", message=str(e))
+		frappe.log_error(title="AI Agent Stream Failed", message=frappe.get_traceback())
 		frappe.publish_realtime(
 			event_name,
 			{"type": "error", "message": "Failed to connect to AI agent."},
