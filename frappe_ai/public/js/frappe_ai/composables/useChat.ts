@@ -279,10 +279,10 @@ export function useChat() {
         // timeout that flows through `settle()` like every other
         // settlement path, so a late chunk arriving after the timer
         // can't add a second error bubble.
-        timerId = setTimeout(
-          () => settle("reject", new Error("Response timed out. Please try again.")),
-          CLIENT_TIMEOUT_MS,
-        );
+        timerId = setTimeout(() => {
+          _serverCancelInFlight(); // the worker would otherwise go on calling tools for an answer nobody waits for
+          settle("reject", new Error("Response timed out. Please try again."));
+        }, CLIENT_TIMEOUT_MS);
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to get response";

@@ -315,6 +315,9 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 		frappe.throw(_("AI agent URL is not configured. Set frappe_ai_agent_url in site_config."))
 	_validate_agent_url(agent_url)
 
+	# a Stop that landed after the previous answer's last line would otherwise cancel this one
+	frappe.cache.delete_value(_cancel_key(session_id))
+
 	timeout_seconds = int(settings.timeout or 30)
 	# RQ keeps a job's arguments for days and shows them to System Managers, so the job gets a key to the sid instead
 	sid_key = frappe.generate_hash(length=32)
