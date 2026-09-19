@@ -113,10 +113,11 @@ _CANCEL_KEY_TTL_SECONDS = 300
 
 
 def _cancel_key(session_id: str) -> str:
-	return _CANCEL_KEY_PREFIX + session_id
+	# the worker runs as the user who enqueued it, so a cancel reaches only that user's own stream
+	return f"{_CANCEL_KEY_PREFIX}{frappe.session.user}:{session_id}"
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def cancel_stream(session_id: str) -> dict:
 	"""Signal the running worker for ``session_id`` to stop relaying chunks.
 
@@ -275,7 +276,7 @@ def _sanitize_page_context(raw) -> dict:
 	return out
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def start_stream(message: str, session_id: str | None = None, page_context=None) -> dict:
 	"""Enqueue an agent SSE relay in the background and return the session_id immediately.
 
