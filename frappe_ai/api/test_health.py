@@ -70,9 +70,9 @@ class TestHealthEndpoint(unittest.TestCase):
 		self.assertTrue(out["success"])
 		self.assertEqual(out["details"]["health"], {"status": "ok", "build": "abc123"})
 		self.assertEqual(out["details"]["user"], frappe.session.user)
-		# sid cookie forwarded.
+		# the agent's /health reads no cookie, so the user's session id must not travel with it
 		_, kwargs = mock_get.call_args
-		self.assertEqual(kwargs["cookies"], {"sid": frappe.session.sid})
+		self.assertNotIn("cookies", kwargs)
 		self.assertEqual(kwargs["timeout"], 10)
 
 	@patch("requests.get")
