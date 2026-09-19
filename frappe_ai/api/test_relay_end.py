@@ -29,17 +29,21 @@ class TestRelayEnd(unittest.TestCase):
 			patch.object(chat.requests, "post", post),
 			patch.object(chat, "_is_stream_cancelled", return_value=False),
 			patch.object(frappe, "publish_realtime") as publish,
+			patch.object(frappe, "log_error") as self.logged,
 		):
-			try:
-				chat._stream_to_agent("q", "s-1", "u@example.com", "k", "http://agent:8484")
-			except RuntimeError:
-				pass
+			chat._stream_to_agent("the private question", "s-1", "u@example.com", "k", "http://agent:8484")
 		return [c.args[1]["type"] for c in publish.call_args_list]
 
 	def test_an_unexpected_failure_still_ends_the_stream(self):
 		self.assertEqual(
 			self._relay(_agent('data: {"type": "content"}', fail=RuntimeError("job timeout")))[-1], "error"
 		)
+
+	def test_a_failure_is_logged_without_the_question(self):
+		self._relay(_agent(fail=RuntimeError("job timeout")))
+		self.assertNotIn("the private question", str(self.logged.call_args))
+		# without a message, Frappe logs every frame's variables
+		self.assertIn("RuntimeError: job timeout", self.logged.call_args.kwargs["message"])
 
 	def test_a_chunk_that_is_not_an_object_is_skipped(self):
 		events = self._relay(_agent("data: [1, 2]", 'data: {"type": "content"}'))

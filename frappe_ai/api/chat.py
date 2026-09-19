@@ -492,14 +492,17 @@ def _stream_to_agent(
 		done_received = True
 		done_source = "error"
 	except Exception:
-		# the job's own timeout (RQ raises it in here) or a bug: the user still gets an end, the job still fails
+		# the job's own timeout (RQ raises it in here) or a bug: the user still gets an end. Logged here, not re-raised:
+		# Frappe's job log records every frame's variables, and this frame holds the user's question
+		frappe.log_error(title="AI Agent Stream Failed", message=frappe.get_traceback())
 		frappe.publish_realtime(
 			event_name,
 			{"type": "error", "message": "Failed to connect to AI agent."},
 			user=user,
 			after_commit=False,
 		)
-		raise
+		done_received = True
+		done_source = "error"
 
 	if not done_received:
 		frappe.publish_realtime(
