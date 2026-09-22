@@ -83,7 +83,9 @@ const chartOption = computed(() => {
 	// an empty token (before mount) becomes undefined so echarts keeps its own default
 	const base = {
 		color: t.palette.length ? t.palette : undefined,
-		textStyle: t.fontFamily ? { fontFamily: t.fontFamily, color: t.textColor || undefined } : undefined,
+		textStyle: t.fontFamily
+			? { fontFamily: t.fontFamily, color: t.textColor || undefined }
+			: undefined,
 	};
 	const axisLabelStyle = {
 		fontFamily: t.fontFamily || undefined,
@@ -106,7 +108,12 @@ const chartOption = computed(() => {
 					formatter: (p: { name: string; value: number }) =>
 						`${format.encodeHTML(p.name)}: ${formatValue(p.value, currency ? "currency" : "number", { currency })}`,
 				},
-				legend: { orient: "horizontal", bottom: 0, type: "scroll", textStyle: axisLabelStyle },
+				legend: {
+					orient: "horizontal",
+					bottom: 0,
+					type: "scroll",
+					textStyle: axisLabelStyle,
+				},
 				series: [
 					{
 						type: "pie",
@@ -181,7 +188,10 @@ const chartOption = computed(() => {
 					type: "heatmap",
 					data: heatData,
 					label: { show: true, color: t.textColor || undefined },
-					itemStyle: { borderColor: t.cellBg || t.borderColor || undefined, borderWidth: 1 },
+					itemStyle: {
+						borderColor: t.cellBg || t.borderColor || undefined,
+						borderWidth: 1,
+					},
 				},
 			],
 		};
@@ -277,12 +287,7 @@ const chartOption = computed(() => {
 	<div class="frappe-ai-chart">
 		<div v-if="block.title" class="frappe-ai-chart-title">{{ block.title }}</div>
 		<div v-if="!hasData" class="frappe-ai-chart-empty">No data available</div>
-		<VChart
-			v-else
-			class="frappe-ai-chart-canvas"
-			:option="chartOption"
-			:autoresize="true"
-		/>
+		<VChart v-else class="frappe-ai-chart-canvas" :option="chartOption" :autoresize="true" />
 	</div>
 </template>
 

@@ -14,8 +14,13 @@
 			/>
 			<span class="frappe-ai-tool-name">{{ toolCall.name }}</span>
 			<span class="frappe-ai-tool-time">{{ formattedTime }}</span>
-			<!-- eslint-disable-next-line vue/no-v-html -- frappeIcon returns the desk's own <svg><use> markup -->
-			<span class="frappe-ai-tool-chevron" aria-hidden="true" v-html="frappeIcon('chevron-right', 'xs')" />
+			<!-- eslint-disable vue/no-v-html -- frappeIcon returns the desk's own <svg><use> markup -->
+			<span
+				class="frappe-ai-tool-chevron"
+				aria-hidden="true"
+				v-html="frappeIcon('chevron-right', 'xs')"
+			/>
+			<!-- eslint-enable vue/no-v-html -->
 		</button>
 		<div v-if="expanded">
 			<div class="frappe-ai-tool-section">
@@ -33,8 +38,9 @@
 					type="button"
 					@click.stop="resultExpanded = !resultExpanded"
 				>
-					<!-- eslint-disable-next-line vue/no-v-html -->
+					<!-- eslint-disable vue/no-v-html -- frappeIcon returns the desk's own <svg><use> markup -->
 					<span aria-hidden="true" v-html="frappeIcon('chevron-right', 'xs')" />
+					<!-- eslint-enable vue/no-v-html -->
 					Result
 				</button>
 				<div v-if="resultExpanded">

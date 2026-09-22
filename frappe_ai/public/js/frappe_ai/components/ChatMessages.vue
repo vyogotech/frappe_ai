@@ -55,10 +55,7 @@ function pickPrompt(text: string) {
 
 // length and the last content only: a deep watch walks the whole array on every chunk
 watch(
-	[
-		() => props.messages.length,
-		() => props.messages[props.messages.length - 1]?.content,
-	],
+	[() => props.messages.length, () => props.messages[props.messages.length - 1]?.content],
 	() => {
 		nextTick(() => {
 			if (container.value) {

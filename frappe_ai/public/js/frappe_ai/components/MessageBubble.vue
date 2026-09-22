@@ -61,8 +61,13 @@ const isPendingEmpty = computed(
              below, which puts everything in a single text block. -->
 				<template v-if="message.parts && message.parts.length > 0">
 					<template v-for="(part, i) in message.parts" :key="i">
-						<!-- eslint-disable-next-line vue/no-v-html -- renderMarkdown runs markdown-it with html:false -->
-						<div v-if="part.kind === 'text'" class="frappe-ai-markdown" v-html="renderMarkdown(part.text)" />
+						<!-- eslint-disable vue/no-v-html -- renderMarkdown runs markdown-it with html:false -->
+						<div
+							v-if="part.kind === 'text'"
+							class="frappe-ai-markdown"
+							v-html="renderMarkdown(part.text)"
+						/>
+						<!-- eslint-enable vue/no-v-html -->
 						<component
 							v-else-if="part.kind === 'block'"
 							:is="getBlockComponent(part.block.type)"
@@ -71,8 +76,13 @@ const isPendingEmpty = computed(
 					</template>
 				</template>
 				<template v-else>
-					<!-- eslint-disable-next-line vue/no-v-html -- renderMarkdown runs markdown-it with html:false -->
-					<div v-if="message.content" class="frappe-ai-markdown" v-html="renderMarkdown(message.content)" />
+					<!-- eslint-disable vue/no-v-html -- renderMarkdown runs markdown-it with html:false -->
+					<div
+						v-if="message.content"
+						class="frappe-ai-markdown"
+						v-html="renderMarkdown(message.content)"
+					/>
+					<!-- eslint-enable vue/no-v-html -->
 					<template v-if="message.blocks && message.blocks.length > 0">
 						<component
 							v-for="(block, i) in message.blocks"

@@ -9,13 +9,13 @@ import StatusList from "./StatusList.vue";
 import ChartBlock from "./ChartBlock.vue";
 
 export const blockComponentMap: Record<BlockType, Component> = {
-  text: TextBlock,
-  chart: ChartBlock,
-  table: TableBlock,
-  kpi: KPICards,
-  status_list: StatusList,
+	text: TextBlock,
+	chart: ChartBlock,
+	table: TableBlock,
+	kpi: KPICards,
+	status_list: StatusList,
 };
 
 export function getBlockComponent(type: string): Component | undefined {
-  return blockComponentMap[type as BlockType];
+	return blockComponentMap[type as BlockType];
 }
