@@ -28,10 +28,7 @@ def broadcast_message_added(doc: Any, method: str | None = None) -> None:
 		user = frappe.db.get_value("AI Chat Session", doc.session, "user")
 		if not user:
 			return
-		# `doc.creation` may be a datetime (in-process insert) or a string
-		# (resource-API insert path) depending on the caller; both are
-		# serialised through `_to_iso_utc` so the wire format matches what
-		# the FE expects (Z-suffixed UTC).
+		# creation is a datetime from an in-process insert but a string from the REST API; _to_iso_utc takes both
 		from frappe_ai.api.chat import _to_iso_utc
 
 		payload = {

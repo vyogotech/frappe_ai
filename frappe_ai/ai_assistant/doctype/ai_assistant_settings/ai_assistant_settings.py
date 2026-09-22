@@ -9,11 +9,7 @@ from frappe.model.document import Document
 
 class AIAssistantSettings(Document):
 	def onload(self):
-		# Populate the read-only agent_url display from site_config on every
-		# form load. Without this, the field is empty on first open and
-		# Frappe applies `hide-control` to empty read-only fields — the
-		# admin can never see what URL the agent is wired to until they
-		# click Save once. Refreshing on load keeps display + truth aligned.
+		# Frappe hides an empty read-only field, so without this the agent URL shows only after a Save
 		self._sync_agent_url_from_conf()
 
 	def before_save(self):

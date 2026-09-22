@@ -120,17 +120,9 @@ interface FrappeList {
   doctype?: string;
 }
 
-// jQuery is intentionally NOT declared as a global. Frappe v16.16+
-// scopes it into `libs.bundle.js` as a module, so `window.$` is
-// undefined when app bundles run. The bundle entry uses vanilla DOM
-// APIs (querySelector / addEventListener / MutationObserver) instead.
-// Leaving `$` undeclared turns any regression `$(...)` call into a
-// tsc error — the cheapest possible regression guard.
+// $ is left undeclared on purpose: v16.16+ scopes jQuery out of app bundles, so any $(...) must fail tsc
 
-// `frappe` is loaded by Frappe's bundle before our `app_ready` hook fires, so
-// every site we touch can treat it as defined. Defensive `typeof frappe ===
-// "undefined"` guards in context.ts / formatters.ts still narrow at runtime
-// even though the static type asserts presence.
+// declared as always present, which tsc cannot check; keep the runtime typeof frappe guards anyway
 declare const frappe: FrappeGlobal;
 declare const cur_frm: FrappeForm | undefined;
 declare const cur_list: FrappeList | undefined;

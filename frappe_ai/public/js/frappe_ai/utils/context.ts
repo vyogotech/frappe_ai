@@ -32,14 +32,7 @@ export function getPageContext(): PageContext {
       ctx.doctype = cur_list.doctype;
     }
 
-    // Currency: derived in priority order from
-    //   1. the bound document (if it carries a `currency` field, e.g.
-    //      Sales Invoice, Purchase Order — most accurate per-document)
-    //   2. the system default (Company.default_currency, exposed via
-    //      frappe.boot.sysdefaults)
-    //   3. frappe.defaults.get_default — older Frappe versions
-    // The agent uses this to render prose currency consistently with the
-    // table/kpi cell formatter (which also defaults to INR).
+    // the document's own currency first; frappe.defaults is for older Frappe without boot.sysdefaults
     let currency = "";
     if (typeof cur_frm !== "undefined" && cur_frm?.doc?.currency) {
       currency = cur_frm.doc.currency;

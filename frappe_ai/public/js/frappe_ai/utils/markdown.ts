@@ -24,10 +24,7 @@ const md = new MarkdownIt({
   typographer: true,
 });
 
-// Open all rendered links in a new tab so the sidebar doesn't navigate away.
-// We forward params to the original rule by inferring its signature instead
-// of importing `Token` / `Renderer` from subpaths (`@types/markdown-it`
-// exposes them only as namespace members, not as separate modules).
+// inferred, not imported: @types/markdown-it has Token and Renderer only as namespace members, not subpath modules
 type LinkOpenRule = NonNullable<typeof md.renderer.rules.link_open>;
 const defaultLinkOpen: LinkOpenRule =
   md.renderer.rules.link_open ||

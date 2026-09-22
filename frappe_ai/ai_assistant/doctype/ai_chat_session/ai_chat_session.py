@@ -5,12 +5,8 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-# Fields that must never change after the session row is created. The DocType
-# JSON allows System Manager to write everything, but BUG-010 showed that lets
-# an admin reassign a session to another user or rewrite its grounding
-# context_json — both serious integrity holes that the API would never
-# generate. We enforce immutability here so the Python layer is the floor,
-# regardless of role.
+# the DocType lets System Manager write every field; this is the only guard against reassigning a session
+# or rewriting its grounding context after insert
 _IMMUTABLE_AFTER_INSERT = ("user", "context_json")
 
 

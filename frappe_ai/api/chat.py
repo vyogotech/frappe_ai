@@ -8,10 +8,7 @@ import frappe
 import requests
 from frappe import _
 
-# Upper bound on the user's single-message payload. Mirrors the agent's
-# own 32 000-char Pydantic cap with a stricter ceiling because the relay
-# also has to serialise this to RQ. Settable per-site via
-# `frappe_ai_message_max_chars` in site_config.json.
+# below the agent's own 32 000-char cap because the relay also serialises the message into RQ
 _DEFAULT_MESSAGE_MAX_CHARS = 10_000
 
 
@@ -69,10 +66,7 @@ def _validate_agent_url(url: str) -> None:
 	if host in ("169.254.169.254", "fd00:ec2::254", "metadata.google.internal"):
 		frappe.throw(_("AI agent URL targets a cloud metadata endpoint, which is not allowed."))
 
-	# Collect every IP the host could resolve to. For IP literals there is
-	# exactly one; for hostnames we ask the resolver and check each entry,
-	# because round-robin DNS or AAAA records can mix public and private
-	# addresses.
+	# every address, not the first: round-robin DNS or AAAA records can mix public and private
 	candidate_ips: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = []
 	try:
 		candidate_ips.append(ipaddress.ip_address(host))
@@ -98,10 +92,7 @@ def _validate_agent_url(url: str) -> None:
 			)
 		if ip.is_global and parsed.scheme != "https":
 			frappe.throw(_("AI agent URL must use https for a public address ({0}).").format(ip))
-		# is_global is True iff the address is allocated for public networks.
-		# Catches loopback, link-local, RFC1918 private (and IPv6 ULA),
-		# multicast, reserved, unspecified, shared (CGNAT), benchmarking,
-		# and IETF-future ranges in a single check.
+		# is_global, not is_private: is_private is False for shared (CGNAT) 100.64.0.0/10
 		if not ip.is_global and not private_ok:
 			frappe.throw(
 				_(
@@ -186,10 +177,7 @@ def get_recent_messages(limit: int = 50) -> dict:
 		return {"session_id": None, "messages": []}
 
 	session_id = sessions[0]["name"]
-	# Frappe v16's @whitelist wrapper coerces query-string args to the
-	# declared type before the endpoint runs (pydantic-backed), so `limit`
-	# arrives as a real int. Unparseable input is rejected upstream with
-	# FrappeTypeError — see test_unparseable_limit_raises_frappe_type_error.
+	# the int annotation is what makes v16's @whitelist coerce limit (test_unparseable_limit_raises_frappe_type_error)
 	safe_limit = max(1, min(limit, 200))
 
 	rows = frappe.get_all(
@@ -418,11 +406,6 @@ def _stream_to_agent(
 			response.raise_for_status()
 
 			for line in response.iter_lines(decode_unicode=True):
-				# Cooperative cancel: the client posts to cancel_stream when
-				# the user clicks Stop, hits New conversation mid-flight,
-				# or closes the tab (beforeunload). The flag is consumed on
-				# read so a follow-up turn on the same session isn't
-				# pre-cancelled. See BUG-003 + BUG-008.
 				if _is_stream_cancelled(session_id):
 					logger.info(
 						"stream.cancelled session=%s after=%dms chunks=%d",

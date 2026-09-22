@@ -5,10 +5,7 @@ import type { TextBlock } from "../../types/blocks";
 
 const props = defineProps<{ block: TextBlock }>();
 
-// `renderMarkdown` runs markdown-it with `html: false`, which escapes
-// any raw HTML in the agent's text instead of rendering it. That's the
-// sole sanitization layer for this v-html; if anyone weakens that flag
-// in utils/markdown.ts, this block becomes an XSS vector.
+// this v-html is safe only while utils/markdown.ts keeps markdown-it's html: false
 const rendered = computed(() => renderMarkdown(props.block.content || ""));
 </script>
 

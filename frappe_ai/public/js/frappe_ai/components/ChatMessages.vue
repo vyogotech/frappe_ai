@@ -16,11 +16,7 @@ const emit = defineEmits<{
 
 const container = ref<HTMLElement>();
 
-// Bumped whenever Frappe announces a route change so `starterPrompts`
-// re-evaluates with the freshly-loaded `cur_frm`. Without this, the first
-// chip on a form view shows the generic fallback because getPageContext()
-// runs once at sidebar-mount time (before any form has loaded) and Vue
-// has no signal that the page context has since changed.
+// getPageContext() is not reactive, so this tick is what re-evaluates starterPrompts after a route change
 const routeTick = ref(0);
 const onRouteChange = () => {
 	routeTick.value++;
@@ -57,11 +53,7 @@ function pickPrompt(text: string) {
 	emit("send", text);
 }
 
-// Scroll-to-bottom triggers on (a) a new bubble appearing and (b) the
-// last bubble's content changing as chunks arrive. Watching just
-// `messages.length` and the last item's `content` is cheaper than the
-// previous deep watch over the whole array — deep traversal was O(N)
-// per chunk while the assistant message was being typed.
+// length and the last content only: a deep watch walks the whole array on every chunk
 watch(
 	[
 		() => props.messages.length,

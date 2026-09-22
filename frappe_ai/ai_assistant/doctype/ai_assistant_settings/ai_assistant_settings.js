@@ -4,9 +4,7 @@
 frappe.ui.form.on('AI Assistant Settings', {
 	refresh: function(frm) {
 		if (!frm.is_new()) {
-			// OBS-016: closure-scoped flag prevents stacked toasts and
-			// hammering the agent when the user mashes the button. The
-			// flag clears in test_agent_connection's settled() callback.
+			// a mashed button would stack toasts and requests; test_agent_connection's settled() clears the flag
 			let test_in_flight = false;
 			frm.add_custom_button(__('Test Connection'), function() {
 				if (test_in_flight) return;

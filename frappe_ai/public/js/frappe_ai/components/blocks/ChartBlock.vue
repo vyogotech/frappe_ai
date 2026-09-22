@@ -37,11 +37,7 @@ const hasData = computed(() => {
 	return props.block.data.datasets.length > 0 && props.block.data.labels.length > 0;
 });
 
-// Pull the chart palette + typography from Frappe's CSS variables so
-// charts live inside the Desk theme rather than fighting it. Read once
-// on mount — Frappe doesn't hot-swap themes mid-session.
-//   --text-color, --text-muted, --border-color, --bg-light-gray come
-// from Frappe core. --ai-* tokens live in frappe_ai_sidebar.bundle.css.
+// ponytail: read once on mount, so a live theme switch recolours only charts drawn after it; watch data-theme if that matters
 const theme = ref({
 	textColor: "",
 	textMuted: "",
@@ -62,10 +58,7 @@ onMounted(() => {
 		// Cell-separator background for heatmap/calendar grids — uses the
 		// panel/card surface so cells appear cut out of the panel.
 		cellBg: read("--card-bg") || read("--bg-color"),
-		// Text color drawn on top of filled chart segments (funnel inside
-		// labels). Frappe's --white or --bg-color works for the dark Frappe
-		// palette colors; falls through to echarts' own default if neither
-		// token is defined (so frappe_ai stays usable outside Desk).
+		// label colour on filled funnel segments; empty outside the Desk, where echarts' default applies
 		onFill: read("--ai-chart-on-fill") || read("--white"),
 		fontFamily: read("--font-stack") || read("--font-family"),
 		// echarts color cycle — read the AI accent + a few semantic Frappe
@@ -87,11 +80,7 @@ const chartOption = computed(() => {
 	const currency = options?.currency;
 	const t = theme.value;
 
-	// Shared base — applied to every chart type so colors, fonts, and
-	// tooltip behavior come from Frappe's design tokens, not echarts
-	// defaults. Empty strings fall through to echarts' own defaults
-	// (which is what we want during SSR / pre-mount when CSS vars
-	// haven't been read yet).
+	// an empty token (before mount) becomes undefined so echarts keeps its own default
 	const base = {
 		color: t.palette.length ? t.palette : undefined,
 		textStyle: t.fontFamily ? { fontFamily: t.fontFamily, color: t.textColor || undefined } : undefined,

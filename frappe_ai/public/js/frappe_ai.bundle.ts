@@ -19,11 +19,7 @@ function injectNavbarButton(keyboardShortcut: string): void {
     return btn;
   }
 
-  // Use Frappe's own icon helper (via the shared `frappeIcon` wrapper) so the
-  // AI button picks up the host theme's symbol stroke — exactly like the bell
-  // sibling. Avoid inline `<svg stroke="currentColor">` because that inherits
-  // whichever colour the wrapping anchor happens to have, which gave us the
-  // invisible grey-on-red icon on Invox.
+  // frappeIcon, not an inline <svg stroke="currentColor">, which takes the anchor's colour and vanishes on red themes
   function buildTopBtn(): HTMLElement {
     // `btn-reset nav-link text-muted` matches the bell — same hit-area, same
     // colour-inheritance path, same hover affordance — so the AI button reads
@@ -37,19 +33,7 @@ function injectNavbarButton(keyboardShortcut: string): void {
   }
 
   function buildSidebarBtn(): HTMLElement {
-    // Mirrors Frappe's own "Getting Started" entry (`a.onboarding-sidebar`
-    // inside `.body-sidebar-bottom`):
-    //
-    //   * `.onboarding-sidebar` + `.px-2` give the canonical layout (display:
-    //     flex, align-items:center, 8px horizontal padding, 10px gap between
-    //     svg and label).
-    //   * `text-ink-gray-7 current-color` on the SVG keeps the icon stroke
-    //     gray (`--ink-gray-7`) regardless of the anchor's `color` — peers
-    //     have gray icons + themed text, so an unstyled SVG that follows the
-    //     anchor's red `currentColor` reads as visually different.
-    //   * `.frappe-ai-nav-link` is a scoping hook for our own CSS rules
-    //     (currently only the collapsed-label hide and a margin-bottom that
-    //     mimics Getting Started's `<p>` wrapper margin).
+    // mirrors Frappe's "Getting Started" entry; text-ink-gray-7 current-color keeps the icon gray, not the anchor's colour
     return makeButton(
       `<a id="frappe-ai-nav-btn" class="onboarding-sidebar frappe-ai-nav-link px-2"
           title="Frappe AI (${keyboardShortcut})">
@@ -59,17 +43,7 @@ function injectNavbarButton(keyboardShortcut: string): void {
     );
   }
 
-  // Idempotent: prefers the top navbar slot next to a *visibly mounted*
-  // `.desktop-avatar`, falls back to the left sidebar slot otherwise.
-  //
-  // Visibility matters because Frappe v16 leaves the previous route's
-  // `header.desktop-navbar` (with its `.desktop-avatar` child) in the DOM at
-  // 0×0 after SPA route changes — so a bare `querySelector('.desktop-avatar')`
-  // would happily match the orphan and strand the button in a hidden subtree
-  // until the next hard refresh.
-  //
-  // jQuery is intentionally not used — Frappe v16.16+ scopes jQuery into
-  // a module bundle, so `window.$` is undefined in app bundles.
+  // a visible .desktop-avatar only: v16 leaves the previous route's navbar in the DOM at 0x0 after a route change
   function tryInject(): void {
     const existing = document.getElementById("frappe-ai-nav-btn");
     const topAvatar = Array.from(
@@ -105,15 +79,8 @@ function injectNavbarButton(keyboardShortcut: string): void {
 
   tryInject();
 
-  // Two triggers, both needed:
-  //   - MutationObserver catches the host re-painting the navbar on initial
-  //     boot (before the router has finished setting up).
-  //   - frappe.router.on('change') is the canonical SPA route signal — fires
-  //     deterministically when navigating /desk ↔ /app/* ↔ /desk/* Builder
-  //     views, where MutationObserver alone can miss the right moment to
-  //     re-evaluate the orphaned `.desktop-avatar` from the previous route.
-  //     A double-rAF chase handles routes whose chrome paints a couple
-  //     frames after the route event.
+  // both: the observer catches the boot repaint, the route event the SPA navigations the observer misses;
+  // the double rAF covers chrome painted a couple of frames after the route event
   const observer = new MutationObserver(tryInject);
   observer.observe(document.body, { childList: true, subtree: true });
   frappe.router?.on?.("change", () => {
@@ -138,11 +105,7 @@ function syncHostChromeHeight(): void {
   const pageHead = document.querySelector(".page-head") as HTMLElement | null;
   const host = navbar?.offsetHeight ? navbar : pageHead?.offsetHeight ? pageHead : null;
   if (!host) {
-    // Neither host chrome is rendered for this route — e.g. v16 Builder
-    // workspaces under /desk/* paint their own header inside .main-section.
-    // Drop the inline var so the CSS fallback (--page-head-height + 1px,
-    // ≈46px) governs, instead of leaving a stale measurement from the
-    // previously-visited route.
+    // no host chrome here (v16 Builder under /desk/*): drop the var so the CSS fallback wins over the last route's height
     document.documentElement.style.removeProperty("--frappe-ai-host-chrome-h");
     return;
   }
@@ -161,11 +124,7 @@ function mountSidebar(sidebarWidth: number, keyboardShortcut: string): void {
   el.style.setProperty("--frappe-ai-width", `${sidebarWidth}px`);
   document.body.appendChild(el);
 
-  // Initial sync + keep in lock-step with viewport resizes and SPA route
-  // changes. `frappe.router.on('change')` is the canonical signal for SPA
-  // navigation; the double-rAF chase covers v16 Builder routes that paint
-  // their chrome a couple frames after the route event fires. ResizeObserver
-  // catches viewport resizes (host theme breakpoints, dev-tools toggling).
+  // the double rAF covers v16 Builder routes that paint their chrome a couple of frames after the route event
   syncHostChromeHeight();
   new ResizeObserver(syncHostChromeHeight).observe(document.body);
   frappe.router?.on?.("change", () => {
@@ -175,23 +134,8 @@ function mountSidebar(sidebarWidth: number, keyboardShortcut: string): void {
     );
   });
 
-  // Sync the container's hidden attribute with App.vue's visible state.
-  // On open: unhide immediately so Vue's enter-transition has a visible element to animate.
-  // On close: delay until after the CSS leave-transition (250ms) finishes, otherwise
-  // setting hidden=true collapses the container before the slide-out can play.
-  //
-  // The visibility controller owns the hide-timer cancellation so a rapid
-  // close→open within the 300ms grace doesn't leave a stale timer that fires
-  // AFTER the second open and silently re-hides the container. See BUG-001
-  // and sidebar-visibility.test.ts.
-  //
-  // Re-run syncHostChromeHeight on open and after the next paint. The host's
-  // navbar/page-head only reaches its final painted height once the desk has
-  // finished its own layout pass — measuring at mount time alone can race the
-  // theme's `.navbar { height }` rule and stamp the wrong value into
-  // --frappe-ai-host-chrome-h. Resyncing here guarantees the sidebar header
-  // bottom lands on the same baseline as the host chrome every time the panel
-  // opens.
+  // the controller holds el.hidden past the slide-out and cancels that on a quick reopen (sidebar-visibility.ts);
+  // measure again on open and after the next paint, since at mount the chrome may not have its themed height yet
   const visibility = createSidebarVisibilityController(el);
   document.addEventListener("frappe-ai-opened", () => {
     visibility.onOpen();
@@ -207,12 +151,7 @@ function mountSidebar(sidebarWidth: number, keyboardShortcut: string): void {
 
   injectNavbarButton(keyboardShortcut);
 
-  // Frappe normalizes keydown events to a lowercase shortcut string (e.g.
-  // `alt+/`) before dispatching to `frappe.ui.keys.handlers`. The settings
-  // doctype stores user-friendly mixed case (default `Alt+/`), so registering
-  // verbatim leaves an entry under `Alt+/` that the dispatcher never reaches.
-  // Lowercasing at registration time keeps the displayed default friendly
-  // while ensuring the handler actually fires.
+  // Frappe dispatches by the lowercase key string (alt+/), so the stored Alt+/ never fires unless lowercased
   frappe.ui.keys.add_shortcut({
     shortcut: keyboardShortcut.toLowerCase(),
     action: toggleSidebar,
@@ -227,17 +166,8 @@ function toggleSidebar(): void {
   document.dispatchEvent(new CustomEvent("frappe-ai-toggle"));
 }
 
-// Wait for Frappe to finish booting before mounting. The `app_ready` event
-// is dispatched via jQuery (`$(document).trigger("app_ready")`) which used
-// to be picked up by `$(document).on("app_ready", …)` — but Frappe v16.16+
-// scoped jQuery into a module bundle, so `window.$` no longer exists when
-// app bundles run.
-//
-// Poll for `frappe.boot` (set very early during desk init) + `document.body`
-// being non-empty. `frappe.app` would be tempting but it's only set by the
-// desk controller and isn't reliable across dev/prod environments. boot is
-// enough — once boot is in place, the desk's `frappe.call` / `frappe.realtime`
-// helpers we depend on are wired up.
+// polled: app_ready is a jQuery event, and v16.16+ scopes jQuery out of app bundles (window.$ is undefined);
+// frappe.boot, not frappe.app, which only the desk controller sets and is not reliable across dev and prod
 function onFrappeReady(handler: () => void): void {
   const tick = (attempts: number) => {
     if (

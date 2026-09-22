@@ -99,10 +99,7 @@ function send() {
 	if (!content) return;
 	emit("send", content);
 	text.value = "";
-	// Clear the persisted draft immediately so a refresh between the send
-	// and the assistant reply doesn't re-populate the textarea with what
-	// the user just sent. The watch above would also fire (debounced), but
-	// the explicit clear avoids the 500ms window of staleness.
+	// now, not via the debounced watch: a refresh in its 500ms window would restore the sent text
 	draft.clear();
 	nextTick(() => {
 		if (inputEl.value) inputEl.value.style.height = "auto";

@@ -40,22 +40,11 @@ interface StreamResult {
   session_id: string;
 }
 
-// Frontend safety-net: bound how long sendMessage() can hang before
-// settle("reject") fires. Keep this generous (and >= the server-side
-// `AI Assistant Settings.timeout` so the relay surfaces its own error
-// first when it can), since chart prompts that fan out to multiple
-// tools routinely take 60–90s end-to-end. A user-visible "timed out"
-// is preferable to a never-resolving spinner if everything else
-// breaks; 2 minutes is the upper bound we want to wait.
+// keep >= AI Assistant Settings.timeout, so the relay's own error reaches the user first
+// ponytail: fixed at that field's 120 s default though it accepts up to 300 s; read it via useSettings if raised
 const CLIENT_TIMEOUT_MS = 120_000;
 
-// Frappe's `frappe.call` rejects with a plain object (not Error) shaped like
-//   { exc_type, _server_messages, exception, message? }
-// where `_server_messages` is a JSON-encoded array of JSON-encoded message
-// objects (yes, double-encoded). The naive `new Error(String(err))` then
-// renders as the literal string "[object Object]" in the error bubble.
-// _toError normalises any of these shapes into an Error with a human-readable
-// message — see BUG-012 regression test.
+// frappe.call rejects with a plain object whose _server_messages is double-encoded JSON; String(err) is "[object Object]"
 function _toError(err: unknown): Error {
   if (err instanceof Error) return err;
   if (typeof err === "string") return new Error(err);
@@ -97,11 +86,7 @@ export function useChat() {
   let _resolveStream: (() => void) | null = null;
   let _activeEventName: string | null = null;
 
-  // Conversation-scoped session id. Reused across sendMessage() calls so
-  // Frappe groups all turns under the same AI Chat Session row, and so
-  // the agent's FrappeHistoryClient can pull prior messages back into
-  // the LLM context for that session. Cleared by clearMessages()
-  // ("New conversation") to start a fresh row.
+  // reused across turns, or the agent loses the conversation's history
   let _conversationId: string | null = null;
 
   async function sendMessage(content: string): Promise<void> {
@@ -130,31 +115,17 @@ export function useChat() {
     };
     messages.value.push(assistantMessage);
 
-    // Per-call settlement guard. Every path that finalises the stream
-    // (done chunk, error chunk, frappe.call error, client timeout, cancel)
-    // sets this true and short-circuits any later attempts. Two error
-    // bubbles can otherwise appear when, for example, an "error" chunk
-    // arrives just before the client timeout fires and both rejection
-    // paths run their side effects before Promise.race could disambiguate.
+    // every ending (done, error chunk, call error, timeout, cancel) goes through settle(), or two error bubbles appear
     let settled = false;
     let timerId: ReturnType<typeof setTimeout> | undefined;
 
     try {
-      // Reuse the conversation's session id if we already have one so the
-      // agent loads prior turns for the same AI Chat Session row. First
-      // message in a conversation mints a fresh id; subsequent ones reuse
-      // it. The agent's "session" chunk (below) may override with the
-      // canonical id it persisted.
       const sessionId = _conversationId ?? crypto.randomUUID();
       _conversationId = sessionId;
       const eventName = `frappe_ai:chunk:${sessionId}`;
       _activeEventName = eventName;
 
       await new Promise<void>((resolve, reject) => {
-        // Centralised teardown so every settlement path looks identical:
-        // unsubscribe, clear the safety-net timer, drop the cancel
-        // affordance, mark settled. Subsequent calls (from a late chunk,
-        // a stale timer, a duplicate frappe.call error) become no-ops.
         const settle = (kind: "resolve" | "reject", payload?: unknown) => {
           if (settled) return;
           settled = true;
@@ -194,10 +165,7 @@ export function useChat() {
           } else if (chunk.type === "content" && chunk.text) {
             _updateMessage(assistantId, (m) => {
               m.content += chunk.text;
-              // Merge consecutive text chunks into the same fragment so a
-              // streaming reply still renders as one markdown block. Only
-              // start a new text part when the last fragment was a block —
-              // that's what preserves the arrival order in the renderer.
+              // one text part per run of chunks, so markdown split across chunks still renders as one block
               if (!m.parts) m.parts = [];
               const last = m.parts[m.parts.length - 1];
               if (last && last.kind === "text") {
@@ -208,12 +176,7 @@ export function useChat() {
               m.pending = false;
             });
           } else if (chunk.type === "content_block" && chunk.block) {
-            // Structured blocks (table/chart/kpi/status) — append to the
-            // message so MessageBubble.vue renders them via getBlockComponent.
-            // The fragment is also pushed onto `parts` at its arrival
-            // position so subsequent text chunks render BELOW it instead
-            // of being silently inserted above (the historical bug where
-            // late text "jumped over" an already-rendered table).
+            // also pushed onto parts in arrival order, or text that comes later renders above the block
             const block = chunk.block as unknown as import("../types").ContentBlock;
             _updateMessage(assistantId, (m) => {
               if (!m.blocks) m.blocks = [];
@@ -223,17 +186,8 @@ export function useChat() {
               m.pending = false;
             });
           } else if (chunk.type === "tool_call" && chunk.name) {
-            // Surface tool invocations as their own bubble so the user can
-            // see what the agent looked up. The relay only emits the call
-            // (no separate result event today); render in "done" state so
-            // the card isn't stuck in a perpetual "running" spinner.
-            //
-            // Insert just before the assistant placeholder so the visible
-            // order matches the agent's actual sequence. If the placeholder
-            // isn't found (e.g. an error path removed it before a late tool
-            // chunk arrived), drop the card rather than appending out of
-            // order — the `settled` short-circuit above should normally
-            // prevent reaching this branch in that state.
+            // status "done": the relay sends no tool-result event, so "running" would spin forever;
+            // no placeholder left means an error removed it, so drop the card rather than append it out of order
             const assistantIdx = messages.value.findIndex((m) => m.id === assistantId);
             if (assistantIdx < 0) return;
             const toolCallMessage: Message = {
@@ -274,11 +228,7 @@ export function useChat() {
           error: (err: unknown) => settle("reject", _toError(err)),
         });
 
-        // Safety net: if the RQ worker dies without emitting "done" or
-        // "error", the promise above never settles. Schedule a hard
-        // timeout that flows through `settle()` like every other
-        // settlement path, so a late chunk arriving after the timer
-        // can't add a second error bubble.
+        // a worker that dies without "done" or "error" would leave the promise pending forever
         timerId = setTimeout(() => {
           _serverCancelInFlight(); // the worker would otherwise go on calling tools for an answer nobody waits for
           settle("reject", new Error("Response timed out. Please try again."));
@@ -298,10 +248,7 @@ export function useChat() {
   }
 
   function _serverCancelInFlight(): void {
-    // Fire-and-forget signal to the worker so it stops relaying chunks and
-    // stops burning Ollama cycles for a turn the user no longer wants.
-    // See BUG-003 + BUG-008. Client-side settle handles the bubble cleanup;
-    // this is the server-side counterpart.
+    // settle() only ends the stream in this tab; without this the worker keeps relaying and the model keeps generating
     if (!_conversationId) return;
     frappe.call({
       method: "frappe_ai.api.chat.cancel_stream",
@@ -315,13 +262,7 @@ export function useChat() {
   }
 
   function clearMessages(): void {
-    // If a stream is in flight, settle it cleanly first. settle() calls
-    // frappe.realtime.off(eventName), clears the safety timer, drops
-    // _resolveStream / _activeEventName, and resolves the awaited promise.
-    // Without this, the listener leaked (OBS-006) and a follow-up
-    // sendMessage could race the orphan listener (BUG-009: stray chunks
-    // routed at the previous message's assistantId that no longer exists,
-    // leaving the new assistant bubble empty).
+    // settle an in-flight stream first, or its orphaned chunk listener races the next sendMessage and empties its bubble
     if (isLoading.value) _serverCancelInFlight();
     if (_resolveStream) _resolveStream();
     messages.value = [];
@@ -332,10 +273,7 @@ export function useChat() {
     _conversationId = null;
   }
 
-  // Stop the worker if the tab is closing or navigating away mid-stream.
-  // Uses sendBeacon when available so the request survives unload. See
-  // BUG-003: without this, the worker kept relaying SSE chunks to a defunct
-  // channel and the agent kept generating tokens for no consumer.
+  // sendBeacon survives the unload, so a tab closed mid-stream still stops the worker
   if (typeof window !== "undefined") {
     window.addEventListener("beforeunload", () => {
       if (!isLoading.value || !_conversationId) return;
@@ -405,20 +343,10 @@ export function useChat() {
     if (idx < 0) return;
     const target = messages.value[idx];
     if (target.role !== "assistant") return;
-    // Mutate in place. Vue 3's reactive proxy detects nested property
-    // writes, so the splice-clone pattern used previously was wasteful:
-    // for a long streamed response it copied the message object on every
-    // chunk and triggered a deep watch in ChatMessages.vue (O(N²) over
-    // message length). In-place mutation drops both costs.
+    // in place: Vue tracks nested writes, and copying the message on every chunk is quadratic over a long reply
     updater(target);
   }
 
-  // Cross-tab sync: server publishes `frappe_ai:msg_added` whenever an AI
-  // Chat Message row is inserted (see the `doc_events` hook in
-  // frappe_ai.api.realtime). The handler appends the new message if it
-  // belongs to the conversation this tab is currently showing AND we're not
-  // mid-stream (the streaming tab already renders these via chunk events;
-  // appending again would duplicate the bubble).
   interface MsgAddedPayload {
     session_id: string;
     id: string;
