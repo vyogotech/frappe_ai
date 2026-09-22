@@ -25,7 +25,8 @@ format:
 	uvx ruff format
 
 typecheck:
-	uvx pyrefly check
+	# in the project's environment, so the declared dependencies (requests) resolve
+	uv run --frozen --with pyrefly pyrefly check
 	npm run type-check
 
 test-js:

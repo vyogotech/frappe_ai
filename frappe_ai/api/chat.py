@@ -83,11 +83,12 @@ def _validate_agent_url(url: str) -> None:
 			infos = socket.getaddrinfo(host, port)
 		except socket.gaierror:
 			frappe.throw(_("AI agent URL host '{0}' does not resolve.").format(host))
-		for info in infos:
-			try:
-				candidate_ips.append(ipaddress.ip_address(info[4][0]))
-			except (ValueError, IndexError):
-				continue
+		else:
+			for info in infos:
+				try:
+					candidate_ips.append(ipaddress.ip_address(info[4][0]))
+				except (ValueError, IndexError):
+					continue
 
 	private_ok = frappe.local.conf.get("frappe_ai_agent_url_unsafe_ok")
 	for ip in candidate_ips:
