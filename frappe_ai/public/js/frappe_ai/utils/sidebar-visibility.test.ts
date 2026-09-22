@@ -29,10 +29,7 @@ describe("createSidebarVisibilityController", () => {
   });
 
   it("BUG-001: triple-toggle does NOT leave element hidden after final open", () => {
-    // Reproduce the confused-elderly triple-click pattern:
-    //   open → close → open  (3 toggles, all faster than the 300ms hide-timer)
-    // Pre-fix: stale hide-timer from the close fires AFTER the second open,
-    //          re-hiding the element while Vue still thinks it's visible.
+    // three toggles inside 300ms: the close's stale hide-timer must not re-hide the element after the reopen
     const el = document.createElement("div");
     el.hidden = true;
     const ctrl = createSidebarVisibilityController(el);

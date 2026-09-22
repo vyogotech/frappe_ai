@@ -181,10 +181,7 @@ describe("useChat", () => {
     fireChunk(listeners, { type: "done", tools_called: [] });
     await first;
 
-    // Second turn (no clear) — must reuse the same _conversationId so
-    // the agent groups both turns under the same AI Chat Session and
-    // its FrappeHistoryClient can replay turn 1 into the LLM context.
-    // Subscribes to UUID-1 again.
+    // second turn (no clear) reuses UUID-1, or the agent cannot replay turn 1 from the same AI Chat Session
     const second = chat.sendMessage("second");
     fireChunk(listeners, { type: "done", tools_called: [] });
     await second;
@@ -217,10 +214,7 @@ describe("useChat", () => {
   });
 
   it("extracts the Frappe ValidationError message instead of rendering [object Object]", async () => {
-    // BUG-012 regression: Frappe rejects a `frappe.call` with a plain object
-    // shaped like { exc_type, _server_messages, exception, ... }. The pre-fix
-    // error handler did `new Error(String(err))`, which produced the literal
-    // string "[object Object]" as the user-visible bubble.
+    // Frappe rejects frappe.call with a plain object, so String(err) would show "[object Object]"
     const listeners: CapturedListener[] = [];
     g.frappe = {
       call: vi.fn((opts: Record<string, unknown>) => {
@@ -259,12 +253,7 @@ describe("useChat", () => {
   });
 
   it("clearMessages cancels an in-flight stream and unsubscribes its listener", async () => {
-    // BUG-009 / OBS-006 regression: pre-fix, clearMessages() emptied
-    // messages.value but did NOT call cancelMessage() / frappe.realtime.off().
-    // The orphan listener stayed alive and could intercept stray events.
-    // Worse, the in-flight stream's _resolveStream / settled state was not
-    // reset, so a subsequent sendMessage entered with isLoading already
-    // momentarily true via timing artifacts.
+    // clearing without cancelling leaves an orphan listener and isLoading still true for the next send
     const { chat, listeners } = await setup();
     const firstSend = chat.sendMessage("first");
     expect(chat.isLoading.value).toBe(true);
@@ -291,10 +280,7 @@ describe("useChat", () => {
   });
 
   it("appends an inbound msg_added event for the active conversation when idle", async () => {
-    // BUG-004 regression: a second tab opened on the same session never sees
-    // messages sent in the first tab. Fix: server publishes
-    // frappe_ai:msg_added on every new AI Chat Message; client appends if the
-    // session matches and the message isn't already shown.
+    // a second tab on the same session sees the first tab's messages only through frappe_ai:msg_added
     const { chat, listeners } = await setup();
 
     // First turn — establishes _conversationId and the realtime subscription.

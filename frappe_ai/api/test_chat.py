@@ -210,11 +210,7 @@ class TestStartStream(unittest.TestCase):
 		# Establish a known-good baseline for the singleton + site_config.
 		self._original_url = frappe.local.conf.get("frappe_ai_agent_url")
 		frappe.local.conf["frappe_ai_agent_url"] = "http://localhost:8484"
-		# _validate_agent_url rejects loopback (::1, 127.0.0.0/8) outside
-		# the explicit escape hatch. These tests use a localhost URL and
-		# mock frappe.enqueue, so the URL is only validated, never reached.
-		# Setting the hatch keeps validation permissive without changing
-		# what the tests actually exercise.
+		# _validate_agent_url rejects loopback without the hatch; enqueue is mocked, so the URL is never reached
 		self._original_escape = frappe.local.conf.get("frappe_ai_agent_url_unsafe_ok")
 		frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = 1
 
@@ -378,10 +374,7 @@ class TestGetRecentMessages(unittest.TestCase):
 		self.assertEqual(out["messages"][0]["content"], "msg-0")
 
 	def test_timestamps_are_iso8601_with_explicit_utc_suffix(self):
-		# BUG-002 regression: pre-fix the API returned Frappe's naive datetime
-		# str (e.g. "2026-05-16 17:12:35.041386") which JS parses as LOCAL,
-		# producing a different display time after reload vs. fresh send.
-		# Fix: emit ISO 8601 with explicit "Z" so `new Date(ts)` is unambiguous.
+		# JS parses Frappe's naive datetime string as local time, so the API must send ISO 8601 with a "Z"
 		session = frappe.get_doc(
 			{
 				"doctype": "AI Chat Session",
@@ -400,8 +393,6 @@ class TestGetRecentMessages(unittest.TestCase):
 		out = chat.get_recent_messages()
 		ts = out["messages"][0]["timestamp"]
 		self.assertIsNotNone(ts)
-		# ISO 8601 with "T" separator and trailing "Z" (UTC):
-		# "YYYY-MM-DDTHH:MM:SS[.ffffff]Z"
 		self.assertRegex(ts, r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$")
 
 	def test_limit_clamped_to_safe_range(self):
@@ -429,10 +420,7 @@ class TestGetRecentMessages(unittest.TestCase):
 		self.assertLessEqual(len(out["messages"]), 200)
 
 	def test_string_limit_coerced_by_frappe_typing(self):
-		# Frappe v16 wraps whitelisted endpoints in pydantic-based type
-		# validation. A numeric string from the HTTP query layer is
-		# coerced to int before the function runs, so a caller-supplied
-		# "100" works identically to an integer 100.
+		# v16's @whitelist type validation coerces the query-string "100" to int before the endpoint runs
 		session = frappe.get_doc(
 			{
 				"doctype": "AI Chat Session",

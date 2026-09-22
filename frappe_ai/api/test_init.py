@@ -48,10 +48,7 @@ class TestGetSettings(unittest.TestCase):
 		self.assertIs(out["enabled"], False)
 
 	def test_returns_int_for_sidebar_width(self):
-		# Doctype default is 380; validation enforces 300-600, so we can't
-		# coerce a falsy value into storage to exercise the `or 380` fallback
-		# directly. Cover the live path instead - the endpoint must hand
-		# back a real int the frontend can use as a width.
+		# validation keeps a falsy width out of storage, so the `or 380` fallback is unreachable from a test
 		out = api.get_settings()
 		self.assertIsInstance(out["sidebar_width"], int)
 		self.assertGreaterEqual(out["sidebar_width"], 300)

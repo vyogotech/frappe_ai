@@ -18,12 +18,7 @@ class TestHealthEndpoint(unittest.TestCase):
 	def setUp(self):
 		self._original_url = frappe.local.conf.get("frappe_ai_agent_url")
 		frappe.local.conf["frappe_ai_agent_url"] = "http://localhost:8484"
-		# The SSRF guard in _validate_agent_url rejects loopback addresses
-		# (::1, 127.0.0.0/8) outside the explicit escape hatch. These tests
-		# mock requests.get, so the URL is only validated, never reached —
-		# but the validation still runs. Set the escape hatch in setUp so
-		# the test url passes validation and the mocked requests.get is
-		# what determines the test outcome.
+		# the SSRF guard rejects loopback without the hatch, and it runs even though requests.get is mocked
 		self._original_escape = frappe.local.conf.get("frappe_ai_agent_url_unsafe_ok")
 		frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = 1
 
