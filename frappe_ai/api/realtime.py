@@ -31,7 +31,7 @@ def broadcast_message_added(doc: Any, method: str | None = None) -> None:
 			user=user,
 			after_commit=False,
 		)
-	except Exception:
+	except Exception:  # noqa: BLE001 - runs in the message's after_insert hook, so anything raised loses the saved message
 		frappe.log_error(
 			title="frappe_ai broadcast_message_added failed",
 			message=frappe.get_traceback(),

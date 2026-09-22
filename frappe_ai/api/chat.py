@@ -184,15 +184,12 @@ def _to_iso_utc(value) -> str | None:
 
 	if dt.tzinfo is None:
 		# Naive Frappe datetime: localise to the system timezone first.
-		try:
-			system_tz = get_system_timezone()
-			# get_system_timezone returns a string like "Asia/Kolkata".
-			# Use zoneinfo for the actual conversion (Python 3.9+).
-			from zoneinfo import ZoneInfo
+		from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-			dt = dt.replace(tzinfo=ZoneInfo(system_tz))
-		except Exception:
-			# Fallback: assume UTC if anything goes wrong getting the tz.
+		try:
+			dt = dt.replace(tzinfo=ZoneInfo(get_system_timezone()))
+		except (ZoneInfoNotFoundError, ValueError):
+			# a System Settings time_zone this host's tz database has no entry for; anything else is a bug
 			dt = dt.replace(tzinfo=_dt.timezone.utc)
 
 	utc_dt = dt.astimezone(_dt.timezone.utc)
@@ -415,9 +412,8 @@ def _stream_to_agent(
 		)
 		done_received = True
 		done_source = "error"
-	except Exception:
-		# the job's own timeout (RQ raises it in here) or a bug: the user still gets an end. Logged here, not re-raised:
-		# Frappe's job log records every frame's variables, and this frame holds the user's question
+	except Exception:  # noqa: BLE001 - whatever failed, the browser is waiting on an end-of-stream only this job sends
+		# Logged here, not re-raised: Frappe's job log records every frame's variables, and this frame holds the question
 		frappe.log_error(title="AI Agent Stream Failed", message=frappe.get_traceback())
 		frappe.publish_realtime(
 			event_name,

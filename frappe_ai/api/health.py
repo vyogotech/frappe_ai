@@ -57,6 +57,7 @@ def test_connection():
 	except requests.exceptions.ConnectionError as e:
 		return {"success": False, "message": f"Cannot connect to AI agent: {e}"}
 
-	except Exception as e:
+	# not Exception: a bug must not read as unreachable. ValueError: .json(), and getaddrinfo's UnicodeError
+	except (requests.RequestException, ValueError) as e:
 		frappe.log_error(title="AI Agent Connection Test Failed", message=frappe.get_traceback())
 		return {"success": False, "message": f"Connection test failed: {e}"}
