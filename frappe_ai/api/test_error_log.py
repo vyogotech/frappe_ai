@@ -15,7 +15,11 @@ class TestErrorLog(unittest.TestCase):
 			patch.object(frappe, "get_single", return_value=SimpleNamespace(enabled=1)),
 			patch.object(health, "_agent_url", return_value="http://agent:8484"),
 			patch.object(health, "_validate_agent_url"),
-			patch.object(health.requests, "get", side_effect=RuntimeError("unexpected")),
+			patch.object(
+				health.requests,
+				"get",
+				side_effect=health.requests.exceptions.TooManyRedirects("unexpected"),
+			),
 			patch.object(frappe, "log_error") as logged,
 		):
 			health.test_connection()

@@ -90,7 +90,7 @@ class TestHealthEndpoint(unittest.TestCase):
 		self.assertFalse(out["success"])
 		self.assertIn("Cannot connect", out["message"])
 
-	@patch("requests.get", side_effect=RuntimeError("unexpected"))
+	@patch("requests.get", side_effect=requests.exceptions.TooManyRedirects("unexpected"))
 	def test_unexpected_error_is_caught_and_logged(self, _mock_get):
 		# Should not raise — endpoint always returns a structured response.
 		out = health.test_connection()
