@@ -41,12 +41,13 @@ repos:
             )$
 
 
-  - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: v8.44.0
+  - repo: local
     hooks:
       - id: eslint
+        name: "Run eslint"
+        entry: npx eslint --quiet
+        language: system
         types_or: [javascript, ts, vue]
-        args: ['--quiet']
         exclude: |
             (?x)^(
                 .*node_modules.*

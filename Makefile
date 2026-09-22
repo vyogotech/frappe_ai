@@ -9,7 +9,7 @@ AUDIT_DIR ?= audit-out
 
 help:
 	@echo "Available targets:"
-	@echo "  lint       - ruff check + ruff format --check + TypeScript type-check"
+	@echo "  lint       - ruff check + ruff format --check + eslint + TypeScript type-check"
 	@echo "  format     - ruff format (in-place)"
 	@echo "  typecheck  - pyrefly (Python) + tsc --noEmit (TS)"
 	@echo "  test-js    - vitest run"
@@ -19,7 +19,8 @@ help:
 lint:
 	uvx ruff check
 	uvx ruff format --check
-	npm run type-check
+	npm run lint
+	npm run typecheck
 
 format:
 	uvx ruff format
@@ -27,7 +28,7 @@ format:
 typecheck:
 	# in the project's environment, so the declared dependencies (requests) resolve
 	uv run --frozen --with pyrefly pyrefly check
-	npm run type-check
+	npm run typecheck
 
 test-js:
 	npm test -- --run

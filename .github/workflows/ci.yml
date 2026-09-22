@@ -57,8 +57,11 @@ jobs:
       - name: pyrefly check
         run: uvx pyrefly check
 
+      - name: eslint
+        run: npm run lint
+
       - name: TypeScript type-check
-        run: npm run type-check
+        run: npm run typecheck
 
       - name: Vitest (frontend unit tests)
         run: npm test

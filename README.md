@@ -51,6 +51,26 @@ Click the AI button in the navbar (or press your configured shortcut) and type a
 | AI Assistant Settings | `sidebar_width` | Sidebar width in px (300–600) |
 | AI Assistant Settings | `keyboard_shortcut` | Toggle combo (e.g. `Alt+/`) |
 
+## Linting
+
+`npm run lint` runs ESLint 9 from `eslint.config.mjs`: `eslint-plugin-vue`'s `flat/recommended` for Vue 3,
+`typescript-eslint`, and `eslint-plugin-vuejs-accessibility`. The Vue preset's layout rules stay warnings —
+a formatter owns those — while `no-console`, `no-empty`, `vue/no-v-html` and the accessibility rules are errors,
+so `npm run lint` is clean at zero errors. `make lint` and CI run it alongside ruff and `npm run typecheck`.
+
+What the first run caught, and what was done about it:
+
+| Finding | Where | Fix |
+| --- | --- | --- |
+| `no-console` | `composables/useChat.ts` | Dropped: the `catch` already documents that a failed history restore is best-effort, and the desk has no browser-side logger to route it to. |
+| `no-console` | `components/MessageBubble.vue` | Dropped: `onErrorCaptured` already sets `renderError`, which renders "Could not render response" in the bubble. |
+| `vue/no-v-html` | `MessageBubble.vue` ×2, `ToolCallCard.vue` | Kept, with the disable comment moved onto the line the rule reports. The comments sat above a multi-line opening tag, three lines from the `v-html` attribute, so they silenced nothing. Each now carries its reason: markdown-it runs with `html: false`, and `frappeIcon` returns the desk's own `<svg><use>` markup. |
+| `vuejs-accessibility/click-events-have-key-events`, `no-static-element-interactions` | `App.vue` | The click-to-dismiss overlay is `aria-hidden="true"`. It is a decorative scrim; the header's labelled Close button is the accessible way out. |
+| `vuejs-accessibility/click-events-have-key-events`, `no-static-element-interactions` | `blocks/StatusList.vue` | A row that carries a route now gets `role="button"`, `tabindex="0"` and Enter/Space handlers. The role is bound rather than static — a row without a route is not interactive — which the rule cannot evaluate, so that one site carries a disable comment saying so. |
+| `@typescript-eslint/no-unused-vars` | `App.vue`, `blocks/KPICards.vue`, `blocks/StatusList.vue` | `const props = defineProps(...)` where nothing read `props`; the templates read the prop names directly. Now plain `defineProps(...)`. |
+| `@typescript-eslint/no-unused-vars` | `composables/useChat.ts` | `_activeEventName` was written in three places and never read. Removed. |
+| `no-undef` | `ai_assistant_settings.js` | Not a code change: the desk client script's `frappe` and `__` globals are declared in `eslint.config.mjs`. |
+
 ## License
 
 MIT
