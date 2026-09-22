@@ -33,6 +33,8 @@ ignore-missing-imports = ["frappe", "frappe.*"]
 [tool.ruff]
 line-length = 110
 target-version = "py310"
+# 0.15 reads a tab-indented "word: text" comment as commented-out code (ERA001)
+required-version = ">=0.16"
 
 [tool.ruff.lint]
 select = [
@@ -43,6 +45,14 @@ select = [
     "UP",
     "B",
     "RUF",
+    "S110",   # try-except-pass: a failure swallowed with no log
+    "BLE001", # blind `except Exception`; a deliberate one carries a noqa saying why nothing may escape
+    "E722",   # bare `except:`
+    "T20",    # print() instead of the site logger
+    "G",      # an f-string or .format() in a logging call, which breaks log aggregation by message
+    "ERA001", # commented-out code
+    "TD003",  # a TODO with no issue link
+    "FIX002", # a TODO left in the tree
 ]
 ignore = [
     "B017", # assertRaises(Exception) - should be more specific
