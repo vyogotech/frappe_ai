@@ -6,7 +6,7 @@ from frappe.tests import IntegrationTestCase
 
 
 class TestAIChatMessage(IntegrationTestCase):
-	"""Regression tests for AI Chat Message — tenant-isolation column gap (BUG-018)."""
+	"""AI Chat Message keeps its tenant_id column: saas_platform's permission query filters on it."""
 
 	def setUp(self):
 		email = "tenant_test_user@example.com"

@@ -44,12 +44,7 @@ _RESERVED_SHORTCUTS = {
 
 
 def _validate_shortcut(shortcut: str) -> None:
-	"""Accept modifier+key combos: e.g. Alt+/, Mod+Shift+A, Alt+;
-
-	Rejects shortcuts already claimed by Frappe v16 (Ctrl+/, Ctrl+K, etc.) —
-	the OS still delivers the keystroke, but Frappe's handler runs first and
-	the AI toggle never fires.
-	"""
+	"""Throw unless shortcut is modifiers plus one key (Alt+/, Mod+Shift+A) and not one the desk binds."""
 	pattern = r"^(Mod|Ctrl|Alt|Shift)(\+(Mod|Ctrl|Alt|Shift))*\+\S$"
 	if not re.match(pattern, shortcut, re.IGNORECASE):
 		frappe.throw(frappe._("Invalid keyboard shortcut format. Use e.g. Alt+/ or Mod+Shift+A."))

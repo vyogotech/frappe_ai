@@ -1,5 +1,4 @@
-"""A stored message is the record of what was asked and what the agent's tools returned: its owner may delete it with
-the chat, but not rewrite it."""
+"""A stored message records what was asked and what tools returned: its owner may not rewrite it."""
 
 import frappe
 from frappe.tests import IntegrationTestCase

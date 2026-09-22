@@ -4,14 +4,7 @@ type FormatOptions = {
   currency?: string;
 };
 
-/**
- * Resolve the currency to use for formatting. Priority:
- *   1. caller-supplied options.currency
- *   2. frappe.boot.sysdefaults.currency (Company.default_currency)
- *   3. frappe.defaults.get_default("currency")
- *   4. INR fallback (matches the agent prompt fallback so prose text and
- *      table cells stay consistent)
- */
+/** The currency to format in; the INR fallback matches the agent prompt's, so the prose and the table cells agree. */
 function resolveCurrency(supplied?: string): string {
   if (supplied) return supplied;
   try {

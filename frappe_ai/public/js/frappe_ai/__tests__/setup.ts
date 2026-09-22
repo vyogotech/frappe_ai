@@ -1,12 +1,4 @@
-/**
- * Vitest setup — runs before every test. Frappe's runtime globals don't
- * exist in jsdom, so we stub the minimum surface our code touches.
- *
- * The globals' types are declared in `../types/frappe-globals.d.ts`;
- * here we just assign default runtime values via the globalThis bag.
- * Individual tests can override these with `vi.spyOn(...)` or by
- * reassigning specific properties.
- */
+/** Vitest setup: jsdom has no Frappe, so stub the globals our code touches (typed in ../types/frappe-globals.d.ts). */
 
 import { vi } from "vitest";
 

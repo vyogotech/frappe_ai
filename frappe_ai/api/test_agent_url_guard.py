@@ -1,4 +1,4 @@
-"""The agent URL guard (ADR-005): the escape hatch allows private addresses only, and the sid never goes out in the clear."""
+"""The agent URL guard: the escape hatch allows private addresses only, and the sid never goes out in the clear."""
 
 import socket
 import unittest

@@ -89,17 +89,7 @@ function injectNavbarButton(keyboardShortcut: string): void {
   });
 }
 
-/** Publish the host chrome's measured height as a CSS variable so the
- * sidebar header can match whichever bar the current route renders.
- *
- * On `/desk` the chrome is `header.navbar` (the Invox red top bar — 52px on
- * that theme, 48px on the default theme). On `/app/*` the chrome is
- * `.page-head` (46px). Frappe v16 only exposes one of those as a CSS custom
- * property (`--page-head-height`), and it's just the unthemed default — so
- * reading the variable alone doesn't match what a custom theme actually
- * paints. Measuring the rendered element is the only way to align robustly
- * across themes, routes, and viewport changes.
- */
+/** Publish the bar's measured height: Frappe's --page-head-height is the unthemed default, not what a theme paints. */
 function syncHostChromeHeight(): void {
   const navbar = document.querySelector("header.navbar") as HTMLElement | null;
   const pageHead = document.querySelector(".page-head") as HTMLElement | null;
@@ -186,12 +176,7 @@ function onFrappeReady(handler: () => void): void {
   tick(0);
 }
 
-/** Inject a small "AI is disabled — open settings" link in the navbar.
- *
- * OBS-015: System Managers who toggle Enabled off lose the chat icon and
- * have no in-UI clue how to turn it back on. This marker fills that gap
- * — for them only; regular users can't enable it so they see nothing.
- */
+/** Inject a small "AI is disabled — open settings" link in the navbar. */
 function injectDisabledHint(): void {
   function build(): HTMLElement {
     const tpl = document.createElement("template");

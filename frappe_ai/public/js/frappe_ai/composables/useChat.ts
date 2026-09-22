@@ -1,19 +1,4 @@
-/**
- * Message state with socketio-relay streaming support.
- *
- * Flow:
- *   1. Browser subscribes frappe.realtime.on("frappe_ai:chunk:<session_id>", handler)
- *   2. Browser calls frappe_ai.api.chat.start_stream — server enqueues the relay
- *      and returns {session_id} immediately, freeing the gunicorn worker.
- *   3. Background worker (queue=long) consumes the agent SSE stream and publishes
- *      each chunk via frappe.publish_realtime("frappe_ai:chunk:<session_id>", chunk).
- *   4. Browser receives chunks via the existing realtime subscription.
- *
- * Chunk types from the relay:
- *   {type:"content",  text:"..."}          – plain-text token
- *   {type:"done",     tools_called:[]}     – stream complete
- *   {type:"error",    message:"..."}       – agent or relay error
- */
+/** Chat state; a reply streams from the server's relay (api.chat.start_stream) over frappe.realtime. */
 
 import { ref, readonly } from "vue";
 import type { AssistantMessage, Message } from "../types/messages";
@@ -331,13 +316,7 @@ export function useChat() {
     }
   }
 
-  /** Update an assistant message in-place by id.
-   *
-   * Restricted to assistant messages because that's the only role that
-   * receives streamed chunks. Tightening the callback parameter type
-   * means callers can write `m.blocks` / `m.pending` without manual
-   * narrowing.
-   */
+  /** Update the assistant message with this id in place; no-op for another role, which gets no chunks. */
   function _updateMessage(id: string, updater: (m: AssistantMessage) => void): void {
     const idx = messages.value.findIndex((m) => m.id === id);
     if (idx < 0) return;

@@ -6,13 +6,7 @@ from frappe.tests import IntegrationTestCase
 
 
 class TestAIChatSession(IntegrationTestCase):
-	"""Regression tests for AI Chat Session — tenant-isolation column gap (BUG-018).
-
-	The saas_platform `permission_query_conditions` hook injects
-	`tabAI Chat Session.tenant_id = <value>` into every list query made by a
-	non-admin user. If the DocType has no `tenant_id` column, the query raises
-	MySQL 1054 "Unknown column" and the user sees a Server Error modal.
-	"""
+	"""AI Chat Session keeps its tenant_id column: saas_platform's permission query filters on it."""
 
 	def setUp(self):
 		# Ensure a known non-admin user exists.

@@ -1,9 +1,7 @@
 # Copyright (c) 2026, Vyogo and contributors
 # For license information, please see license.txt
 
-"""Tests for frappe_ai.api.health.test_connection — the Settings page's
-'Test Connection' button. Mocks the outbound requests.get call so CI
-doesn't depend on a reachable agent."""
+"""Tests for the Settings page's Test Connection (api.health.test_connection), with requests.get mocked."""
 
 import unittest
 from unittest.mock import MagicMock, patch

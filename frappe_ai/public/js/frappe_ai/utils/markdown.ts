@@ -1,19 +1,4 @@
-/** Shared markdown-to-HTML renderer backed by markdown-it.
- *
- * Used by MessageBubble for plain-text assistant responses. The agent
- * delivers prose as `content` SSE events and structured payloads as
- * separate `content_block` events, so this renderer only ever sees
- * markdown text. Supports the common commonmark surface plus GFM-style
- * pipe tables and task lists.
- *
- * Structured responses (charts, KPIs, typed tables) arrive as separate
- * `content_block` chunks from the agent and render via the components in
- * components/blocks/ — not through this renderer.
- *
- * Sanitization: `html: false` escapes any raw HTML in the agent's text.
- * That's the single XSS guarantee here; do not flip the flag without
- * adding DOMPurify or equivalent.
- */
+/** The agent's prose to HTML. html: false is the only XSS guard here: never turn it on without a sanitiser. */
 
 import MarkdownIt from "markdown-it";
 

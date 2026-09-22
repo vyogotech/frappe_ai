@@ -1,12 +1,4 @@
-/** Block component registry — maps block type strings to Vue components.
- *
- *  Frappe's esbuild build doesn't emit a separate chunk for dynamic
- *  `import()`; the previous `defineAsyncComponent(() => import(...))`
- *  wrapper resolved to a loader that never produced output, so chart
- *  blocks silently rendered nothing while KPI/table/status_list (eager)
- *  worked. Eager-import ChartBlock to match — echarts is already inlined
- *  into the main bundle anyway, so there's no size win to recover.
- */
+/** Block type to component, all imported eagerly: Frappe's esbuild emits no chunk for a dynamic import(). */
 
 import type { Component } from "vue";
 import type { BlockType } from "../../types/blocks";

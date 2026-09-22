@@ -3,9 +3,7 @@ import type { AssistantMessage, Message } from "../types/messages";
 
 const g = globalThis as Record<string, unknown>;
 
-/** Narrow a Message to its AssistantMessage variant in tests where we
- *  asserted the role on the line above. Throws if the runtime shape
- *  doesn't match, which is what we want — the test should fail loudly. */
+/** Narrow a Message to AssistantMessage; any other role throws, failing the test. */
 function asAssistant(m: Message): AssistantMessage {
   if (m.role !== "assistant") throw new Error(`Expected assistant message, got ${m.role}`);
   return m;
@@ -16,9 +14,7 @@ interface CapturedListener {
   handler: (data: unknown) => void;
 }
 
-/** Helper: stand up a fresh useChat() with controllable frappe.call /
- *  realtime stubs. Returns the captured realtime listener + the chat
- *  composable for assertions. */
+/** A fresh useChat() over stubbed frappe.call and realtime, with the listeners it registers. */
 async function setup() {
   const listeners: CapturedListener[] = [];
   const startStreamCall = vi.fn(({ args }) => {

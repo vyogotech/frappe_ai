@@ -1,8 +1,7 @@
 # Copyright (c) 2026, Vyogo and contributors
 # For license information, please see license.txt
 
-"""Tests for frappe_ai.api.chat — both the pure-Python sanitiser and the
-whitelisted endpoints (with the agent + RQ enqueue mocked out)."""
+"""Tests for frappe_ai.api.chat, with the agent and the RQ enqueue mocked out."""
 
 import json
 import pickle
@@ -288,7 +287,7 @@ class TestStartStream(unittest.TestCase):
 
 
 class TestCancelStream(unittest.TestCase):
-	"""BUG-003 + BUG-008: client must be able to signal cancel to the worker."""
+	"""The client can signal a cancel to the worker."""
 
 	def setUp(self):
 		self._sid = "test-cancel-session-id"

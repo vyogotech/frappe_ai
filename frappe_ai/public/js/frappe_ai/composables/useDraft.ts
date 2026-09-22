@@ -1,14 +1,4 @@
-/**
- * Chat-input draft persistence (NOTE-005).
- *
- * Saves the user's unsent textarea content to localStorage on a 500ms
- * debounce, scoped per Frappe user so multiple accounts on the same
- * browser don't see each other's drafts. Survives hard reload — Vue's
- * in-memory ref alone is lost on F5.
- *
- * The storage key is namespaced (`frappe_ai:draft:<user>`) so we can
- * extend with other per-user prefs later without collision.
- */
+/** The chat input's unsent draft, kept across reloads in localStorage under a key per Frappe user. */
 
 const STORAGE_PREFIX = "frappe_ai:draft:";
 const SAVE_DEBOUNCE_MS = 500;

@@ -1,12 +1,4 @@
-/**
- * Ambient declarations for the Frappe globals injected into the desk page.
- *
- * The actual runtime objects come from Frappe's bundle (loaded by ERPNext
- * before our bootstrap runs); this file only describes the surface we touch.
- * Everything else in the Frappe global is unmodelled and intentionally not
- * exposed — accessing an unknown member should be a type error so we notice
- * before shipping.
- */
+/** The desk's Frappe globals, only the members we use, so an unmodelled one is a type error. */
 
 interface FrappeCallArgs<TResponse = unknown> {
   method: string;
@@ -25,12 +17,7 @@ interface FrappeCallError {
 }
 
 interface FrappeUtils {
-  /**
-   * Frappe accepts arbitrary size hints; common values are "sm" / "md" / "lg".
-   * Trailing positional args: `useClass` (5th-position `<use>` class), `style`
-   * (inline CSS), `svgClass` (extra classes on `<svg>`). Only the SVG-class
-   * slot is exposed here — the rest are passed as empty strings by callers.
-   */
+  /** useClass goes on the <use> element and svgClass on the <svg>; size is "sm", "md", "lg" or the like. */
   icon: (
     name: string,
     size?: string,
@@ -54,21 +41,13 @@ interface FrappeDefaults {
 
 interface FrappeRouter {
   current_route?: string[];
-  /**
-   * Frappe wraps the router with `make_event_emitter`, exposing on/off/trigger.
-   * The "change" event fires after every SPA navigation, including the first
-   * desk load.
-   */
+  /** "change" fires after every SPA navigation, the first desk load included. */
   on?: (event: "change" | string, handler: (...args: unknown[]) => void) => void;
   off?: (event: "change" | string, handler?: (...args: unknown[]) => void) => void;
 }
 
 interface FrappeRealtime {
-  /**
-   * Subscribe to a realtime event. `T` is the caller's expected payload
-   * shape — the framework hands the handler an arbitrary JSON value, so
-   * type-narrowing inside the handler is the caller's responsibility.
-   */
+  /** T is not checked: the handler gets whatever JSON was published and must narrow it. */
   on: <T = unknown>(event: string, handler: (data: T) => void) => void;
   off: (event: string, handler?: (data: unknown) => void) => void;
 }
@@ -96,11 +75,7 @@ interface FrappeGlobal {
   ui: FrappeUI;
   /** Navigate the desk to a route — accepts segments like ("Form", doctype, name). */
   set_route: (...path: string[]) => void;
-  /**
-   * Frappe call. Returns a Promise<{ message?: T }> when `async: true`; the
-   * callback / error handlers are also invoked. Callers who use only
-   * callbacks can ignore the returned Promise.
-   */
+  /** The Promise is for async: true; callback and error are invoked either way. */
   call: <TResponse = unknown>(
     args: FrappeCallArgs<TResponse>,
   ) => Promise<{ message?: TResponse }>;

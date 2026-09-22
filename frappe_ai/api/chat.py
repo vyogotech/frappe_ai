@@ -28,29 +28,12 @@ def _message_max_chars() -> int:
 
 
 def _validate_agent_url(url: str) -> None:
-	"""Refuse agent URLs that look misconfigured or unsafe.
+	"""Throw unless url is safe to receive the user's sid, which the worker sends to it as a cookie.
 
-	The worker forwards the user's `sid` cookie to whatever this URL
-	resolves to, so an operator typo pointing at the cloud metadata
-	endpoint or an internal loopback service would leak the session.
-
-	Hard rules (always enforced, ADR-005):
-	  - Must parse as an absolute http(s) URL with a host that resolves.
-	  - Must not target the cloud metadata names (169.254.169.254,
-	    fd00:ec2::254, metadata.google.internal) or any link-local address.
-	  - A public address must use https, so the sid never crosses the
-	    internet in the clear.
-
-	Soft rule (skipped when site_config has `frappe_ai_agent_url_unsafe_ok`):
-	  - Every address the host resolves to must be `is_global`. Rejects
-	    RFC1918 private (10/8, 172.16/12, 192.168/16), loopback,
-	    link-local, multicast, reserved, unspecified, shared (CGNAT), and
-	    benchmarking ranges in one check — so an internal-hostname like
-	    `internal-svc:8080` cannot exfiltrate the sid.
-
-	The "unsafe_ok" escape hatch exists because local dev legitimately
-	targets http://host.docker.internal:NNNN or http://127.0.0.1:NNNN,
-	which would otherwise trip the private-network check.
+	Raises:
+		frappe.ValidationError: not http(s), no host or one that does not resolve, a cloud metadata or
+			link-local address, http to a public address, or a non-public address without
+			frappe_ai_agent_url_unsafe_ok in site_config.
 	"""
 	parsed = urlparse(url)
 	if parsed.scheme not in ("http", "https"):
@@ -115,12 +98,7 @@ def _cancel_key(session_id: str) -> str:
 
 @frappe.whitelist(methods=["POST"])
 def cancel_stream(session_id: str) -> dict:
-	"""Signal the running worker for ``session_id`` to stop relaying chunks.
-
-	Used by the sidebar's ``cancelMessage`` (e.g. user clicked Stop) and by
-	the ``beforeunload`` hook (BUG-003). The worker checks the cache flag
-	between agent SSE reads and exits the loop when the flag appears.
-	"""
+	"""Flag the caller's relay for session_id to stop; the worker checks it between the agent's SSE lines."""
 	if not session_id or not session_id.strip():
 		return {"ok": False}
 	# Use site cache so all worker processes for this site see the flag.
@@ -133,11 +111,7 @@ def cancel_stream(session_id: str) -> dict:
 
 
 def _is_stream_cancelled(session_id: str) -> bool:
-	"""Return True if a cancel was requested for ``session_id``.
-
-	Consumes the flag on read so subsequent turns on the same session start
-	fresh — preventing a stale cancel from killing a brand new turn.
-	"""
+	"""Return True once per cancel: reading consumes the flag, so it cannot stop a later turn."""
 	if not session_id:
 		return False
 	key = _cancel_key(session_id)
@@ -152,15 +126,11 @@ def _is_stream_cancelled(session_id: str) -> bool:
 
 @frappe.whitelist()
 def get_recent_messages(limit: int = 50) -> dict:
-	"""Return the caller's most recent AI Chat Session and its messages.
+	"""Return the caller's last modified chat and the first limit (1 to 200) of its messages, oldest first.
 
-	Powers the sidebar's restore-on-mount: the user reopens the desk, the
-	sidebar hydrates from this endpoint so the conversation history isn't
-	thrown away each page-load.
-
-	Returns {"session_id": str | None, "messages": [{role, content, timestamp}]}.
-	An empty session_id with empty messages means the user has no prior
-	conversation — the sidebar renders the empty state.
+	Returns:
+		{"session_id": str | None, "messages": [{"id", "role", "content", "timestamp"}]}, where session_id is
+		None when the caller has no chat and timestamp is ISO 8601 UTC.
 	"""
 	user = frappe.session.user
 	if user == "Guest":
@@ -200,19 +170,7 @@ def get_recent_messages(limit: int = 50) -> dict:
 
 
 def _to_iso_utc(value) -> str | None:
-	"""Serialise a Frappe datetime as ISO 8601 with an explicit UTC suffix.
-
-	Frappe writes ``creation`` naively in ``System Settings.time_zone`` (NOT
-	the container's OS TZ). ``str(dt)`` therefore returns e.g.
-	``"2026-05-16 16:17:20.101924"`` with no tz suffix even when the container
-	is UTC. JavaScript's ``new Date(str)`` parses that as LOCAL time, which
-	produced BUG-002: fresh-sent bubbles (rendered with ``new Date()``) showed
-	a different time than restored bubbles after reload.
-
-	Convert from the configured system tz to UTC, then emit ISO 8601 with
-	``Z`` so the FE's ``new Date(ts)`` resolves to the same instant on every
-	device and renders in the user's local timezone consistently.
-	"""
+	"""ISO 8601 UTC with a Z: a naive Frappe time is in System Settings' zone, and JS reads it as local."""
 	import datetime as _dt
 
 	from frappe.utils import get_datetime, get_system_timezone
@@ -246,13 +204,7 @@ _ALLOWED_PAGE_CONTEXT_KEYS = ("route", "doctype", "docname", "currency")
 
 
 def _sanitize_page_context(raw) -> dict:
-	"""Accept only a flat dict of expected page-context fields with string values.
-
-	frappe.whitelist serialises JSON args, so `page_context` may arrive as a
-	dict or as a JSON string. Anything else (lists, nested dicts, non-strings)
-	gets dropped so a malformed frontend can't bloat the agent payload or
-	smuggle non-grounding data into the system prompt.
-	"""
+	"""Keep the allowed keys with non-empty string values; raw is a dict or, over HTTP, its JSON string."""
 	if isinstance(raw, str):
 		try:
 			raw = json.loads(raw)
@@ -271,16 +223,7 @@ def _sanitize_page_context(raw) -> dict:
 
 @frappe.whitelist(methods=["POST"])
 def start_stream(message: str, session_id: str | None = None, page_context=None) -> dict:
-	"""Enqueue an agent SSE relay in the background and return the session_id immediately.
-
-	The browser subscribes to frappe_ai:chunk:<session_id> via frappe.realtime.on
-	before calling this endpoint. The background worker (queue=long) consumes the
-	agent's SSE stream and publishes each chunk via frappe.publish_realtime.
-
-	`page_context` (optional) is a dict {route, doctype, docname, currency}
-	captured from the browser; forwarded into the agent's context so the
-	system prompt can ground answers in the user's current page.
-	"""
+	"""Enqueue the agent relay and return {"session_id"}; subscribe to frappe_ai:chunk:<session_id> first."""
 	if not message or not message.strip():
 		frappe.throw(_("Message is required"))
 
@@ -352,10 +295,7 @@ def _stream_to_agent(
 	timeout_seconds: int = 30,
 	page_context: dict | None = None,
 ) -> None:
-	"""Background worker: relay agent SSE chunks to the browser via frappe.realtime.
-
-	Not a whitelisted endpoint — only called via frappe.enqueue.
-	"""
+	"""The RQ job relaying the agent's chunks to user over realtime; never whitelist it: it trusts user."""
 	import time
 
 	logger = frappe.logger("frappe_ai", allow_site=True)

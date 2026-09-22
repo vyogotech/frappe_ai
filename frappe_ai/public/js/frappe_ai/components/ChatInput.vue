@@ -68,17 +68,8 @@ watch(text, (v) => {
 	draft.save(v);
 });
 
-/** Stop button is shown only when busy AND cancel is possible. */
 const showStop = computed(() => props.busy && props.canCancel);
 
-/**
- * Send button is disabled when:
- *   - busy but the turn can't be cancelled (no point in clicking)
- *   - idle but no text typed
- * It is enabled when:
- *   - showStop (so the user can click to abort)
- *   - idle with non-empty text
- */
 const sendDisabled = computed(() => {
 	if (showStop.value) return false;
 	if (props.busy) return true;
