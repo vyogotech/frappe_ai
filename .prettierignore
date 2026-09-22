@@ -1,0 +1,19 @@
+# Not ours to format.
+node_modules/
+.venv/
+audit-out/
+frappe_ai/public/dist/
+
+# Prettier owns the languages .pre-commit-config.yaml already gave it: javascript, ts,
+# vue, css, scss. Everything below keeps the owner it already has, or has none yet;
+# widening Prettier's reach is a separate decision, not part of adopting it.
+#
+# Markdown: markdownlint (.markdownlint.json, run in CI) owns it, and Prettier would
+# re-pad every table cell it lints.
+*.md
+# YAML: no style is declared for it, and reflowing a workflow file is not a format fix.
+*.yml
+*.yaml
+# JSON: Frappe rewrites the DocType and workspace schemas on every save, and
+# .editorconfig keeps JSON without a final newline, which Prettier always adds.
+*.json

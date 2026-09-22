@@ -30,19 +30,20 @@ repos:
       - id: ruff-format
         name: "Run ruff formatter"
 
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v2.7.1
+  - repo: local
     hooks:
+      # mirrors-prettier is archived upstream and its last rev pins Prettier 2, whose
+      # output differs from the Prettier 3 in package.json; run the repo's own copy.
       - id: prettier
+        name: "Run prettier"
+        entry: npx prettier --write --ignore-unknown
+        language: system
         types_or: [javascript, ts, vue, css, scss]
         exclude: |
             (?x)^(
                 .*node_modules.*
             )$
 
-
-  - repo: local
-    hooks:
       - id: eslint
         name: "Run eslint"
         entry: npx eslint --quiet

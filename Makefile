@@ -9,8 +9,8 @@ AUDIT_DIR ?= audit-out
 
 help:
 	@echo "Available targets:"
-	@echo "  lint       - ruff check + ruff format --check + eslint + TypeScript type-check"
-	@echo "  format     - ruff format (in-place)"
+	@echo "  lint       - ruff check + ruff format --check + eslint + prettier --check + TypeScript type-check"
+	@echo "  format     - ruff format + prettier --write (in-place)"
 	@echo "  typecheck  - pyrefly (Python) + tsc --noEmit (TS)"
 	@echo "  test-js    - vitest run"
 	@echo "  audit      - Full scanner suite: ruff, bandit, pip-audit, npm audit, trivy, gitleaks"
@@ -20,10 +20,12 @@ lint:
 	uvx ruff check
 	uvx ruff format --check
 	npm run lint
+	npm run format:check
 	npm run typecheck
 
 format:
 	uvx ruff format
+	npm run format
 
 typecheck:
 	# in the project's environment, so the declared dependencies (requests) resolve

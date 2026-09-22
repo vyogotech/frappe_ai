@@ -18,12 +18,13 @@ Quick sanity check before touching anything:
 ```bash
 uvx ruff check && uvx ruff format --check
 uvx pyrefly check
-npm run type-check
+npm run lint && npm run format:check
+npm run typecheck
 npm test                      # vitest unit tests (~1s)
 npx markdownlint-cli README.md QUICKSTART.md INSTALLATION.md APP_STRUCTURE.md
 ```
 
-All five should be green. If they aren't on `main`, that's a bug — open an issue.
+All six should be green. If they aren't on `main`, that's a bug — open an issue.
 
 ## Running the test suite against a real bench
 

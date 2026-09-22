@@ -51,14 +51,24 @@ Click the AI button in the navbar (or press your configured shortcut) and type a
 | AI Assistant Settings | `sidebar_width` | Sidebar width in px (300–600) |
 | AI Assistant Settings | `keyboard_shortcut` | Toggle combo (e.g. `Alt+/`) |
 
-## Linting
+## Linting and formatting
 
 `npm run lint` runs ESLint 9 from `eslint.config.mjs`: `eslint-plugin-vue`'s `flat/recommended` for Vue 3,
-`typescript-eslint`, and `eslint-plugin-vuejs-accessibility`. The Vue preset's layout rules stay warnings —
-a formatter owns those — while `no-console`, `no-empty`, `vue/no-v-html` and the accessibility rules are errors,
-so `npm run lint` is clean at zero errors. `make lint` and CI run it alongside ruff and `npm run typecheck`.
+`typescript-eslint`, and `eslint-plugin-vuejs-accessibility`, with `no-console`, `no-empty`, `vue/no-v-html`
+and the accessibility rules raised to errors. `eslint-config-prettier` is last in the config, so every layout
+rule is off and ESLint reports only findings.
 
-What the first run caught, and what was done about it:
+`npm run format:check` runs Prettier 3 over the JavaScript, TypeScript, Vue and CSS (`npm run format` writes).
+Prettier's defaults apply except for three values taken from `.editorconfig`, which the repo already had:
+tabs, width 4, 99 columns. Tabs, not Prettier's spaces, because `.editorconfig` is the repo's own declaration,
+it is what `ruff format` (`indent-style = "tab"`) already enforces for the Python half, and it is Frappe's
+house style; the `.ts` and `.css` files had drifted to spaces only because nothing was checking them.
+`.prettierignore` keeps Prettier to the languages `.pre-commit-config.yaml` already gave it — Markdown stays
+with markdownlint, and the DocType JSON stays with Frappe, which regenerates it.
+
+`make lint` and CI run both alongside ruff and `npm run typecheck`.
+
+What the first ESLint run caught, and what was done about it:
 
 | Finding | Where | Fix |
 | --- | --- | --- |

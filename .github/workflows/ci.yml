@@ -60,6 +60,9 @@ jobs:
       - name: eslint
         run: npm run lint
 
+      - name: prettier --check
+        run: npm run format:check
+
       - name: TypeScript type-check
         run: npm run typecheck
 
