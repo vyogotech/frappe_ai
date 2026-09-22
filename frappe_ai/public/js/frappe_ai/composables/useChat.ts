@@ -69,7 +69,6 @@ export function useChat() {
 
   // Holds a resolve callback so cancelMessage() can cleanly settle the stream promise.
   let _resolveStream: (() => void) | null = null;
-  let _activeEventName: string | null = null;
 
   // reused across turns, or the agent loses the conversation's history
   let _conversationId: string | null = null;
@@ -108,7 +107,6 @@ export function useChat() {
       const sessionId = _conversationId ?? crypto.randomUUID();
       _conversationId = sessionId;
       const eventName = `frappe_ai:chunk:${sessionId}`;
-      _activeEventName = eventName;
 
       await new Promise<void>((resolve, reject) => {
         const settle = (kind: "resolve" | "reject", payload?: unknown) => {
@@ -121,7 +119,6 @@ export function useChat() {
           frappe.realtime.off(eventName);
           canCancel.value = false;
           _resolveStream = null;
-          _activeEventName = null;
           if (kind === "resolve") {
             resolve();
           } else {
@@ -310,9 +307,8 @@ export function useChat() {
           content: m.content,
           timestamp: m.timestamp ? new Date(m.timestamp) : null,
         }));
-    } catch (err) {
+    } catch {
       // Swallow — restoring history is a nice-to-have, not a blocker.
-      console.warn("[Frappe AI] loadRecentConversation failed", err);
     }
   }
 

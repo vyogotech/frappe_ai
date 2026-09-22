@@ -2,7 +2,7 @@
 import { formatValue } from "../../utils/formatters";
 import type { KPIBlock, TrendDirection } from "../../types/blocks";
 
-const props = defineProps<{ block: KPIBlock }>();
+defineProps<{ block: KPIBlock }>();
 
 const trendArrows: Record<TrendDirection, string> = {
 	up: "\u2191",
