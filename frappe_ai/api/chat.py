@@ -247,7 +247,7 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 	# a Stop that landed after the previous answer's last line would otherwise cancel this one
 	frappe.cache.delete_value(_cancel_key(session_id))
 
-	timeout_seconds = int(settings.timeout or 30)
+	timeout_seconds = settings.agent_timeout()
 	# RQ keeps a job's arguments for days and shows them to System Managers, so the job gets a key to the sid instead
 	sid_key = frappe.generate_hash(length=32)
 	frappe.cache.set_value(_SID_KEY_PREFIX + sid_key, frappe.session.sid, expires_in_sec=timeout_seconds + 30)
@@ -289,7 +289,7 @@ def _stream_to_agent(
 	user: str,
 	sid_key: str,
 	agent_url: str,
-	timeout_seconds: int = 30,
+	timeout_seconds: int,
 	page_context: dict | None = None,
 ) -> None:
 	"""The RQ job relaying the agent's chunks to user over realtime; never whitelist it: it trusts user."""

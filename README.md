@@ -47,7 +47,7 @@ Click the AI button in the navbar (or press your configured shortcut) and type a
 | --- | --- | --- |
 | `site_config.json` | `frappe_ai_agent_url` | Agent endpoint (authoritative) |
 | AI Assistant Settings | `enabled` | Master switch |
-| AI Assistant Settings | `timeout` | Per-request timeout (1–300s) |
+| AI Assistant Settings | `timeout` | Seconds the relay waits for the agent between chunks (1–300s) |
 | AI Assistant Settings | `sidebar_width` | Sidebar width in px (300–600) |
 | AI Assistant Settings | `keyboard_shortcut` | Toggle combo (e.g. `Alt+/`) |
 

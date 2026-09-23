@@ -22,6 +22,10 @@ class AIAssistantSettings(Document):
 		conf_url = frappe.local.conf.get("frappe_ai_agent_url", "")
 		self.agent_url = conf_url.rstrip("/") if conf_url else ""
 
+	def agent_timeout(self) -> int:
+		"""Seconds the relay gives the agent: this setting, or the field's own default while it is unset."""
+		return int(self.timeout or self.meta.get_field("timeout").default)
+
 	def validate(self):
 		if self.timeout is not None and (self.timeout < 1 or self.timeout > 300):
 			frappe.throw(frappe._("Timeout must be between 1 and 300 seconds."))

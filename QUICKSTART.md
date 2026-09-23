@@ -57,7 +57,7 @@ bench restart
 
 ### Streaming hangs / times out
 
-- Bump `timeout` in AI Assistant Settings (max 300s)
+- Bump `timeout` in AI Assistant Settings (max 300s); the sidebar waits that long for a chunk, plus 30s
 - Inspect `bench logs` — the long-queue worker logs request failures to the Error Log
 
 ## Architecture overview

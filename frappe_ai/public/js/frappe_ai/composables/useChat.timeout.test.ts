@@ -12,7 +12,7 @@ it("asks the server to stop the stream when the sidebar times out", async () => 
 	const { useChat } = await import("./useChat");
 
 	void useChat().sendMessage("hi");
-	await vi.advanceTimersByTimeAsync(121_000);
+	await vi.advanceTimersByTimeAsync(151_000);
 
 	expect(call).toHaveBeenCalledWith(
 		expect.objectContaining({ method: "frappe_ai.api.chat.cancel_stream" }),

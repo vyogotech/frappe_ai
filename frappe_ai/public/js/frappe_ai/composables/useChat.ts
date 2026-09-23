@@ -3,6 +3,7 @@
 import { ref, readonly } from "vue";
 import type { AssistantMessage, Message } from "../types/messages";
 import { getPageContext } from "../utils/context";
+import { useSettings } from "./useSettings";
 
 interface Chunk {
 	type: "content" | "content_block" | "tool_call" | "done" | "error" | "session";
@@ -25,9 +26,9 @@ interface StreamResult {
 	session_id: string;
 }
 
-// keep >= AI Assistant Settings.timeout, so the relay's own error reaches the user first
-// ponytail: fixed at that field's 120 s default though it accepts up to 300 s; read it via useSettings if raised
-const CLIENT_TIMEOUT_MS = 120_000;
+// the buffer chat.py gives the worker over the agent's budget (timeout + 30), so the relay's own error
+// reaches the user before the sidebar gives up on a silent stream
+const SILENCE_MARGIN_MS = 30_000;
 
 // frappe.call rejects with a plain object whose _server_messages is double-encoded JSON; String(err) is "[object Object]"
 function _toError(err: unknown): Error {
@@ -106,6 +107,7 @@ export function useChat() {
 		// every ending (done, error chunk, call error, timeout, cancel) goes through settle(), or two error bubbles appear
 		let settled = false;
 		let timerId: ReturnType<typeof setTimeout> | undefined;
+		const silenceMs = useSettings().timeout.value * 1000 + SILENCE_MARGIN_MS;
 
 		try {
 			const sessionId = _conversationId ?? crypto.randomUUID();
@@ -130,6 +132,16 @@ export function useChat() {
 					}
 				};
 
+				// a worker that dies without "done" or "error" would leave the promise pending forever;
+				// the window is silence, not the whole reply, or a long answer is cut off while it streams
+				const armSilenceTimer = () => {
+					if (timerId !== undefined) clearTimeout(timerId);
+					timerId = setTimeout(() => {
+						_serverCancelInFlight(); // the worker would otherwise go on calling tools for an answer nobody waits for
+						settle("reject", new Error("Response timed out. Please try again."));
+					}, silenceMs);
+				};
+
 				// Expose cancel capability before the realtime listener is registered
 				// so the stop button can appear as soon as the request is in-flight.
 				_resolveStream = () => {
@@ -143,6 +155,7 @@ export function useChat() {
 
 				frappe.realtime.on(eventName, (chunk: Chunk) => {
 					if (settled) return;
+					armSilenceTimer();
 					if (chunk.type === "session" && chunk.id) {
 						// The agent persisted the conversation under this canonical id
 						// (which may differ from the optimistic UUID we minted). Adopt
@@ -214,11 +227,7 @@ export function useChat() {
 					error: (err: unknown) => settle("reject", _toError(err)),
 				});
 
-				// a worker that dies without "done" or "error" would leave the promise pending forever
-				timerId = setTimeout(() => {
-					_serverCancelInFlight(); // the worker would otherwise go on calling tools for an answer nobody waits for
-					settle("reject", new Error("Response timed out. Please try again."));
-				}, CLIENT_TIMEOUT_MS);
+				armSilenceTimer();
 			});
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : "Failed to get response";

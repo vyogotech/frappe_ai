@@ -52,7 +52,7 @@ function fireChunk(listeners: CapturedListener[], chunk: Record<string, unknown>
 
 describe("useChat", () => {
 	beforeEach(() => {
-		// Speed up CLIENT_TIMEOUT_MS race in case a test forgets to settle.
+		// Speed up the silence timer race in case a test forgets to settle.
 		vi.useFakeTimers();
 	});
 
@@ -362,11 +362,11 @@ describe("useChat", () => {
 		await sending;
 	});
 
-	it("CLIENT_TIMEOUT_MS triggers a typed error when the relay never settles", async () => {
+	it("the silence timer triggers a typed error when the relay never settles", async () => {
 		const { chat } = await setup();
 		const promise = chat.sendMessage("hang");
-		// CLIENT_TIMEOUT_MS is 120_000; advance just past it.
-		vi.advanceTimersByTime(121_000);
+		// the silence window is the settings timeout (120 s) plus the worker's buffer; advance just past it.
+		vi.advanceTimersByTime(151_000);
 		await promise; // settles via catch → _addErrorMessage
 		const errMsg = chat.messages.value.find((m) => m.role === "error");
 		expect(errMsg).toBeDefined();

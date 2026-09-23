@@ -31,7 +31,9 @@ class TestRelayEnd(unittest.TestCase):
 			patch.object(frappe, "publish_realtime") as publish,
 			patch.object(frappe, "log_error") as self.logged,
 		):
-			chat._stream_to_agent("the private question", "s-1", "u@example.com", "k", "http://agent:8484")
+			chat._stream_to_agent(
+				"the private question", "s-1", "u@example.com", "k", "http://agent:8484", 120
+			)
 		return [c.args[1]["type"] for c in publish.call_args_list]
 
 	def test_an_unexpected_failure_still_ends_the_stream(self):

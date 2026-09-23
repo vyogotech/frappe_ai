@@ -12,7 +12,11 @@ interface FrappeAISettingsResponse {
 	enabled?: boolean;
 	sidebar_width?: number;
 	keyboard_shortcut?: string;
+	timeout?: number;
 }
+
+// the doctype's own default, for the moment before the settings arrive and for when they do not
+const DEFAULT_TIMEOUT_SECONDS = 120;
 
 const DEFAULT_SETTINGS: FrappeAISettings = {
 	enabled: false,
@@ -23,6 +27,8 @@ const DEFAULT_SETTINGS: FrappeAISettings = {
 
 const settings: Ref<FrappeAISettings> = ref({ ...DEFAULT_SETTINGS });
 const loaded = ref(false);
+/** Seconds the relay gives the agent; the sidebar sizes its own limit from it, so it is not a sidebar setting. */
+const timeout = ref(DEFAULT_TIMEOUT_SECONDS);
 
 export function useSettings() {
 	async function loadSettings(): Promise<void> {
@@ -42,6 +48,7 @@ export function useSettings() {
 					sidebarWidth: msg.sidebar_width ?? 380,
 					keyboardShortcut: msg.keyboard_shortcut ?? "Alt+/",
 				};
+				timeout.value = msg.timeout ?? DEFAULT_TIMEOUT_SECONDS;
 			}
 		} catch {
 			// fall back to defaults
@@ -53,6 +60,7 @@ export function useSettings() {
 	return {
 		settings: readonly(settings),
 		loaded: readonly(loaded),
+		timeout: readonly(timeout),
 		loadSettings,
 	};
 }

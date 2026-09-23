@@ -56,7 +56,7 @@ Open `/app/ai-assistant-settings` and configure:
 | Field | Description | Range |
 | --- | --- | --- |
 | Enabled | Master switch — APIs throw if false | — |
-| Timeout | Per-request timeout forwarded to the agent | 1–300 seconds |
+| Timeout | Seconds the relay waits for the agent between chunks; the job, and the sidebar's own window, allow 30 s more | 1–300 seconds |
 | Sidebar Width | Chat sidebar width in pixels | 300–600 |
 | Keyboard Shortcut | Toggle combo, e.g. `Alt+/` or `Mod+Shift+A` | See "Reserved shortcuts" below |
 
