@@ -4,7 +4,7 @@ End-to-end install and configuration of the Frappe AI app.
 
 ## Prerequisites
 
-1. Frappe / ERPNext bench (v15 or higher)
+1. Frappe / ERPNext bench, v16 (the range `pyproject.toml` declares, and the only line CI tests)
 2. An AI agent reachable over HTTP that exposes:
    - `POST /api/v1/chat` accepting `{message, session_id, context}` and replying with `text/event-stream` chunks
    - `GET /health` returning 200 when ready
@@ -30,7 +30,7 @@ bench --site your-site.local install-app frappe_ai
 bench restart
 ```
 
-`install.py:after_install` creates the **AI Assistant Settings** singleton on first install. The same logic runs in `after_migrate` so the singleton survives migrations.
+**AI Assistant Settings** is a Single DocType, so Frappe creates the document itself the first time anything reads or saves it. There is nothing to run after the install.
 
 ## Step 3: Set the agent URL
 
@@ -47,7 +47,9 @@ Edit `sites/your-site.local/site_config.json`:
 
 `frappe_ai_agent_url_unsafe_ok` lets the URL point at a private or loopback address, such as a local agent or one on the same Docker network; leave it out when the agent is on a public address, which must then use https. A cloud metadata or link-local address, or a host that does not resolve, is refused either way.
 
-The AI Assistant Settings form shows this value in a read-only **Agent URL** field; the `before_save` hook refreshes it from `site_config` on every save.
+One more key is optional: `frappe_ai_message_max_chars` caps the length of a question, in characters. It defaults to 10000, and a value that is not a positive integer falls back to that default.
+
+The AI Assistant Settings form shows this value in a read-only **Agent URL** field, refreshed from `site_config` when the form loads and again when it is saved.
 
 ### One agent per site
 
@@ -84,11 +86,21 @@ All endpoints live under `frappe_ai.api.*`. Authentication is the standard Frapp
 
 | Endpoint | Purpose |
 | --- | --- |
-| `frappe_ai.api.chat.start_stream` | Enqueue a background worker that relays agent SSE chunks via `frappe.realtime`. Returns `{session_id}`. |
+| `frappe_ai.api.chat.start_stream` | Enqueue a background worker that relays agent SSE chunks via `frappe.realtime`. Returns `{session_id, currency}`. |
+| `frappe_ai.api.chat.cancel_stream` | Flag the caller's own relay for a session to stop between chunks. |
 | `frappe_ai.api.chat.get_recent_messages` | Hydrate the sidebar from the user's most recent `AI Chat Session`. Returns `{session_id, messages}`. |
-| `frappe_ai.api.health.test_connection` | Settings page health check. |
+| `frappe_ai.api.confirm.respond` | Record the user's Allow or Deny for a write the agent asked to make. |
+| `frappe_ai.api.confirm.redeem` | Exchange an allowed confirmation for the one-time token the agent spends on the write. |
+| `frappe_ai.api.health.test_connection` | Settings page health check. System Managers only. |
 
-The browser subscribes to `frappe_ai:chunk:<session_id>` via `frappe.realtime.on` before calling `start_stream`. The worker then publishes each agent SSE chunk to that channel and finally emits a `{type: "done"}` marker.
+Two realtime channels carry everything the sidebar receives:
+
+| Event | Published by | Carries |
+| --- | --- | --- |
+| `frappe_ai:chunk:<session_id>` | the relay worker, `frappe_ai.api.chat` | one agent SSE chunk each, then a `{type: "done"}` marker |
+| `frappe_ai:msg_added` | `frappe_ai.api.realtime.broadcast_message_added`, on every `AI Chat Message` insert | the new message, so a second tab on the same chat appends it without polling |
+
+The browser subscribes to `frappe_ai:chunk:<session_id>` via `frappe.realtime.on` before calling `start_stream`. It generates the session id itself, so it can subscribe before it asks.
 
 ## Troubleshooting
 
@@ -101,7 +113,7 @@ The browser subscribes to `frappe_ai:chunk:<session_id>` via `frappe.realtime.on
 ### Chat sends but nothing streams back
 
 - The realtime channel is `frappe_ai:chunk:<session_id>` — confirm Frappe's socketio server is running (`bench start` includes it; production uses the `socketio` supervisor process)
-- Check `bench logs` for the long-queue worker; SSE failures get logged as "AI Agent Stream Failed"
+- Read the Error Log at `/app/error-log`: SSE failures are logged there under "AI Agent Stream Failed". The worker's own output is in `logs/worker.*.log` under the bench directory (`bench` has no `logs` command)
 
 ### Sidebar button doesn't appear
 
@@ -110,7 +122,7 @@ The browser subscribes to `frappe_ai:chunk:<session_id>` via `frappe.realtime.on
 
 ### "AI Assistant is not enabled"
 
-- The **Enabled** checkbox in AI Assistant Settings is off, or the singleton hasn't been created. Re-run `bench --site your-site migrate` to trigger `after_migrate`.
+- The **Enabled** checkbox in AI Assistant Settings is off. Open `/app/ai-assistant-settings`, tick it and save; opening the form is also what creates the Single document on a fresh site.
 
 ## Uninstallation
 

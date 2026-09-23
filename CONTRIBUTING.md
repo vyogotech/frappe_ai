@@ -9,22 +9,22 @@ You need Python 3.14, Node 24, and either a bench at hand or Docker.
 ```bash
 # clone + install dev deps
 git clone https://github.com/vyogotech/frappe_ai && cd frappe_ai
-uv sync --group dev
-npm install
+uv sync --locked --group dev
+npm ci
 ```
 
 Quick sanity check before touching anything:
 
 ```bash
-uvx ruff check && uvx ruff format --check
-uvx pyrefly check
-npm run lint && npm run format:check
-npm run typecheck
-npm test                      # vitest unit tests (~1s)
-npx markdownlint-cli README.md QUICKSTART.md INSTALLATION.md APP_STRUCTURE.md
+make lint          # ruff check, ruff format --check, eslint, prettier --check
+make typecheck     # pyrefly, tsc --noEmit
+make boundaries    # the import-linter contracts in .importlinter
+make test-js       # vitest unit tests (~2s)
+npx markdownlint-cli@0.49.1 README.md QUICKSTART.md INSTALLATION.md APP_STRUCTURE.md CONTRIBUTING.md SECURITY.md
 ```
 
-All six should be green. If they aren't on `main`, that's a bug — open an issue.
+These are the same commands `.github/workflows/ci.yml` runs, and the tools come from `uv.lock`.
+All five should be green. If they aren't on `main`, that's a bug — open an issue.
 
 ## Running the test suite against a real bench
 
@@ -47,7 +47,7 @@ Browser-driven end-to-end testing is intentionally not part of the test suite. W
 │ browser  │ ──────▶ │ chat.py     │ ──────▶ │ _stream_to_  │
 │ (Vue SFC)│         │ start_stream│ (long)  │ agent worker │
 └────▲─────┘         └─────────────┘         └──────┬───────┘
-     │ realtime: frappe_ai:chunk:<sid>              │ POST /api/v1/chat
+     │ realtime: frappe_ai:chunk:<session_id>       │ POST /api/v1/chat
      │                                              │ + sid cookie
      │                                              ▼
      └──────────────────────────────────────  external AI agent
@@ -80,12 +80,12 @@ If your change touches the user-visible flow, walk through it manually against a
 
 - Branch off `main`. Rebase if `main` moves; don't merge `main` into a feature branch.
 - PR title matches the conventional-commit format.
-- Tick the boxes in the PR template (or add a quick "Test plan" if there isn't one).
+- Add a "Test plan" section: what you ran, and what it printed. There is no PR template.
 - CI must be green. The lint tier (1–2 min) and integration tier (~10 min) run on every push.
 
 ## Releasing
 
-Versions are tracked in `frappe_ai/__init__.py`. Bench reads them for the assets pipeline. Bump the version, update the changelog if applicable, and tag.
+Versions are tracked in `frappe_ai/__init__.py`. Bench reads them for the assets pipeline. Bump the version and tag; the repository keeps no changelog file, so the tag and the commits on `main` are the record.
 
 ## Anti-patterns (things I've removed and don't want to see come back)
 
@@ -97,4 +97,4 @@ Versions are tracked in `frappe_ai/__init__.py`. Bench reads them for the assets
 
 ## Questions
 
-For substantive design questions, open an issue with the `discussion` label before writing code. The senior-review notes in `APP_STRUCTURE.md` and the commit messages on `main` are good context.
+For substantive design questions, open an issue with the `discussion` label before writing code. `APP_STRUCTURE.md` and the commit messages on `main` are good context.

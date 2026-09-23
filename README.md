@@ -46,6 +46,8 @@ Click the AI button in the navbar (or press your configured shortcut) and type a
 | Where | Key | Purpose |
 | --- | --- | --- |
 | `site_config.json` | `frappe_ai_agent_url` | Agent endpoint (authoritative) |
+| `site_config.json` | `frappe_ai_agent_url_unsafe_ok` | Accept a private or loopback agent address. Without it the URL must be public and https |
+| `site_config.json` | `frappe_ai_message_max_chars` | Longest question accepted, in characters (default 10000) |
 | AI Assistant Settings | `enabled` | Master switch |
 | AI Assistant Settings | `timeout` | Seconds the relay waits for the agent between chunks (1–300s) |
 | AI Assistant Settings | `sidebar_width` | Sidebar width in px (300–600) |
@@ -66,7 +68,7 @@ house style; the `.ts` and `.css` files had drifted to spaces only because nothi
 `.prettierignore` keeps Prettier to the languages `.pre-commit-config.yaml` already gave it — Markdown stays
 with markdownlint, and the DocType JSON stays with Frappe, which regenerates it.
 
-`make lint` and CI run both alongside ruff and `npm run typecheck`.
+`make lint` runs both alongside ruff; `make typecheck` runs pyrefly and `tsc`. CI calls the same targets.
 
 What the first ESLint run caught, and what was done about it:
 

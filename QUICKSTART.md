@@ -58,7 +58,7 @@ bench restart
 ### Streaming hangs / times out
 
 - Bump `timeout` in AI Assistant Settings (max 300s); the sidebar waits that long for a chunk, plus 30s
-- Inspect `bench logs` — the long-queue worker logs request failures to the Error Log
+- Read the Error Log at `/app/error-log` — the long-queue worker logs request failures there; its own output is in `logs/worker.*.log` under the bench directory
 
 ## Architecture overview
 
@@ -67,7 +67,7 @@ bench restart
 │  Browser │ ──────────────▶ │ Frappe backend │
 └────▲─────┘                 │  chat.py       │
      │ realtime              └────┬───────────┘
-     │ frappe_ai:chunk:<sid>      │ enqueue (long queue)
+     │ chunk:<session_id>         │ enqueue (long queue)
      │                            ▼
      │                    ┌────────────────┐
      └────────────────────│ Background     │  POST /api/v1/chat
@@ -77,7 +77,7 @@ bench restart
                           └────────────────┘
 ```
 
-The worker reads SSE chunks from the agent and republishes each chunk to a `frappe_ai:chunk:<session_id>` realtime event. The browser subscribes via `frappe.realtime.on` before kicking off the stream, so it never holds an SSE connection open itself.
+The channel drawn as `chunk:<session_id>` is `frappe_ai:chunk:<session_id>` in full. The worker reads SSE chunks from the agent and republishes each chunk to that realtime event. The browser subscribes via `frappe.realtime.on` before kicking off the stream, so it never holds an SSE connection open itself.
 
 ## What's next?
 
