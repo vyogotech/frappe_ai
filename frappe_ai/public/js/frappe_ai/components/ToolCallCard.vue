@@ -19,15 +19,11 @@
 				<button
 					type="button"
 					class="frappe-ai-tool-allow"
-					@click="emit('allow', toolCall.confirm!.id)"
+					@click="emit('allow', confirmId)"
 				>
 					Allow
 				</button>
-				<button
-					type="button"
-					class="frappe-ai-tool-deny"
-					@click="emit('deny', toolCall.confirm!.id)"
-				>
+				<button type="button" class="frappe-ai-tool-deny" @click="emit('deny', confirmId)">
 					Deny
 				</button>
 			</span>
@@ -100,6 +96,10 @@ const confirming = computed(
 		!!props.toolCall.confirm &&
 		(props.toolCall.status === "waiting" || props.toolCall.status === "cancelled"),
 );
+
+// the id lives here, not in the template: frappe's esbuild parses a template expression as plain JavaScript,
+// where TypeScript's `!` is a syntax error and the whole desk bundle fails to build
+const confirmId = computed(() => props.toolCall.confirm?.id ?? "");
 
 const confirmLabel = computed(() =>
 	props.toolCall.status === "waiting"
