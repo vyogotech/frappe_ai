@@ -4,14 +4,8 @@
  * mocked `use()` would assert the registration instead of the outcome.
  */
 import { describe, expect, it, vi } from "vitest";
-
-vi.mock("vue-echarts", () => ({
-	default: { name: "VChart", props: ["option"], template: "<div />" },
-}));
-
-import { mount } from "@vue/test-utils";
-import * as echarts from "echarts/core";
-import ChartBlock from "./ChartBlock.vue";
+import { init } from "./chart-echarts";
+import { buildChartOption, readChartTheme } from "./chart-option";
 import type { ChartBlock as ChartBlockType } from "../../types/blocks";
 
 // jsdom has no canvas, and zrender measures every label through one
@@ -19,13 +13,13 @@ HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
 	measureText: () => ({ width: 10 }),
 })) as unknown as typeof HTMLCanvasElement.prototype.getContext;
 
-/** Render the block's own option through a real echarts and return its container. */
+/** Draw the block's own option with a real echarts and return its container. */
 function render(block: ChartBlockType): HTMLElement {
-	const wrapper = mount(ChartBlock, { props: { block } });
-	const option = wrapper.findComponent({ name: "VChart" }).props("option");
 	const el = document.createElement("div");
 	document.body.appendChild(el);
-	echarts.init(el, undefined, { renderer: "svg", width: 400, height: 300 }).setOption(option);
+	init(el, undefined, { renderer: "svg", width: 400, height: 300 }).setOption(
+		buildChartOption(block, readChartTheme()),
+	);
 	return el;
 }
 
