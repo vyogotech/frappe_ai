@@ -5,6 +5,7 @@
 
 import json
 from contextlib import ExitStack
+from inspect import signature
 from unittest.mock import MagicMock, patch
 
 import frappe
@@ -64,7 +65,10 @@ class TestFrappeAIWritesTheChat(IntegrationTestCase):
 			chat.start_stream(message=message, session_id=self.session)
 		# the worker that would release it never runs here
 		chat._release_the_answer(frappe.session.user)
-		return enqueue.call_args.kwargs
+		# queue, job_id, timeout and enqueue_after_commit are enqueue's own and never reach the job;
+		# taken from the signature rather than named here, because a list of them goes stale silently
+		takes = signature(chat._stream_to_agent).parameters
+		return {k: v for k, v in enqueue.call_args.kwargs.items() if k in takes}
 
 	def _rows(self):
 		return frappe.get_all(
@@ -145,7 +149,7 @@ class TestFrappeAIWritesTheChat(IntegrationTestCase):
 		# the answer it has just watched stream in renders a second time
 		rows_when_done_went_out = []
 
-		def publish(event, message=None, user=None, after_commit=False):
+		def publish(_event, message=None, **_kwargs):
 			if isinstance(message, dict) and message.get("type") == "done":
 				filters = {"session": self.session, "role": "assistant"}
 				rows_when_done_went_out.append(frappe.db.count("AI Chat Message", filters))
