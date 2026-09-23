@@ -4,22 +4,21 @@ authors = [
     { name = "Vyogo", email = "developers@vyogo.com"}
 ]
 description = "In-desk AI assistant for Frappe/ERPNext — streams responses from a configured AI agent into a chat sidebar."
-requires-python = ">=3.10"
+requires-python = ">=3.14,<3.15"
 readme = "README.md"
 dynamic = ["version"]
 dependencies = [
-    # Frappe itself is provided by the bench at runtime (`bench get-app` clones
-    # this app into a bench that already has frappe installed). We pin the
-    # supported framework range here purely as documentation — pip/uv won't
-    # see frappe in the venv, but the value tells humans + tooling which
-    # major-version line this app targets.
-    # "frappe>=16.0.0,<17"
-    "requests",
+    # the bound frappe version-16 puts on the same package, whose venv this app is installed into
+    "requests~=2.33.0",
 ]
 
 [build-system]
 requires = ["flit_core >=3.4,<4"]
 build-backend = "flit_core.buildapi"
+
+# the table bench reads (bench 5.29.1 app.py:547, get_required_frappe_version); a comment is not read
+[tool.bench.frappe-dependencies]
+frappe = ">=16.0.0,<17.0.0"
 
 # These dependencies are only installed when developer mode is enabled
 [tool.bench.dev-dependencies]
@@ -33,7 +32,9 @@ ignore-missing-imports = ["frappe", "frappe.*", "erpnext", "erpnext.*"]
 
 [tool.ruff]
 line-length = 110
-target-version = "py310"
+# one below requires-python on purpose: at py314 the formatter writes PEP 758 `except A, B:`, which
+# every analyser on an older interpreter (uvx defaults to 3.13) refuses to parse
+target-version = "py313"
 # 0.15 reads a tab-indented "word: text" comment as commented-out code (ERA001)
 required-version = ">=0.16"
 

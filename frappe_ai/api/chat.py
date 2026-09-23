@@ -223,7 +223,7 @@ def _system_tzinfo(name: str) -> _dt.tzinfo:
 			"chat timestamps fall back to UTC: System Settings time zone %r is not in this host's tz database",
 			name,
 		)
-		return _dt.timezone.utc
+		return _dt.UTC
 
 
 def _to_iso_utc(value) -> str | None:
@@ -241,7 +241,7 @@ def _to_iso_utc(value) -> str | None:
 		# Naive Frappe datetime: localise to the system timezone first.
 		dt = dt.replace(tzinfo=_system_tzinfo(get_system_timezone()))
 
-	utc_dt = dt.astimezone(_dt.timezone.utc)
+	utc_dt = dt.astimezone(_dt.UTC)
 	# Replace "+00:00" with "Z" for the canonical UTC suffix the FE expects.
 	return utc_dt.isoformat().replace("+00:00", "Z")
 

@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "description": "Runtime deps for the frappe_ai bundle (resolved by Frappe's esbuild).",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "lint": "eslint .",
     "format": "prettier --write .",
