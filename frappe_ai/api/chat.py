@@ -24,6 +24,12 @@ _STARTS_PER_MINUTE = 30
 # one line, two callers: api/confirm.py refuses an allowed write with the same words start_stream refuses a question
 _ANSWER_IN_PROGRESS = "A response is already in progress. Wait for it to finish or stop it, then try again."
 
+# the newest turns a question is answered against, and the cap on the blocks appended to one of them
+_HISTORY_TURNS = 20
+_HISTORY_BLOCK_CHARS = 4000
+# how much of its first question names a chat in the sidebar
+_TITLE_CHARS = 60
+
 
 def _agent_url() -> str:
 	return frappe.local.conf.get("frappe_ai_agent_url", "").rstrip("/")
@@ -278,6 +284,134 @@ def _default_currency() -> str:
 	return currency or frappe.db.get_default("currency") or ""
 
 
+def _source_ref(item: dict) -> dict:
+	"""A source as it is saved: the file and the passage's place in it, never the passage itself."""
+	ref = {"file": item.get("file"), "seq": item.get("seq")}
+	if item.get("attachment"):
+		# a chat's attachment is in no Drive listing, so this row is the only copy of its name
+		ref |= {"file_name": item.get("file_name"), "attachment": True}
+	# no score rather than no field: a reader computes relevance from it, and a missing one is NaN
+	return ref | {"distance": None}
+
+
+def _tool_result_json(sources: list, blocks: list, usage: dict) -> str | None:
+	"""What an answer carries besides its text, or None when it carries nothing; rag.status reads "usage"."""
+	if not (sources or blocks or usage):
+		return None
+	# one ref per passage: the same file and seq can come back from more than one search in a turn
+	refs = list({(s.get("file"), s.get("seq")): _source_ref(s) for s in sources}.values())
+	return json.dumps({"sources": refs, "blocks": blocks} | ({"usage": usage} if usage else {}))
+
+
+def _saved_answer(text: str, note: str) -> str:
+	"""The row a turn leaves: the text that arrived and, when it stopped early, why it stops there."""
+	if not note:
+		return text
+	text = text.rstrip()
+	return f"{text}\n\n[incomplete] {note}" if text else f"[error] {note}"
+
+
+def _with_blocks(content: str, tool_result_json) -> str:
+	"""The answer as shown, blocks included: a follow-up such as "the first one" points at them."""
+	try:
+		blocks = json.loads(tool_result_json or "{}").get("blocks") or []
+	except (json.JSONDecodeError, ValueError, AttributeError):
+		return content
+	if not blocks:
+		return content
+	shown = json.dumps({"blocks": blocks}, separators=(",", ":"), ensure_ascii=False)[:_HISTORY_BLOCK_CHARS]
+	return f"{content}\n\n{shown}" if content else shown
+
+
+def _prior_turns(session_id: str, exclude: str = "") -> list[dict]:
+	"""The chat's last turns as {"role", "content"}, oldest first: the context this turn is answered in."""
+	rows = frappe.get_all(
+		"AI Chat Message",
+		filters={"session": session_id},
+		fields=["name", "role", "content", "tool_result_json"],
+		order_by="creation desc, name desc",
+		limit=_HISTORY_TURNS,
+	)
+	turns = []
+	for row in rows:
+		content = row.content or ""
+		if row.name == exclude or row.role not in ("user", "assistant"):
+			continue
+		if row.role == "assistant":
+			if content.startswith("[error]"):
+				continue  # a failed turn's error text was for the user, not an answer
+			content = _with_blocks(content, row.tool_result_json)
+		if content:
+			turns.append({"role": row.role, "content": content})
+	turns.reverse()
+	return turns
+
+
+def _collect(chunk: dict, saved: dict) -> None:
+	"""Keep from this frame whatever the answer's row needs; a frame it needs nothing from is skipped."""
+	kind = chunk.get("type")
+	if kind == "content":
+		saved["answer"].append(str(chunk.get("text") or ""))
+	elif kind == "content_block" and isinstance(chunk.get("block"), dict):
+		saved["blocks"].append(chunk["block"])
+	elif kind == "sources":
+		saved["sources"] += [s for s in (chunk.get("items") or []) if isinstance(s, dict)]
+	elif kind == "error":
+		# the agent's own line for a turn that stopped early, kept with the text that arrived
+		saved["note"] = str(chunk.get("message") or "")
+	elif kind == "done":
+		saved["usage"] = chunk.get("usage") or {}
+
+
+def _save_message(session_id: str, role: str, content: str, tool_result_json: str | None = None) -> str:
+	"""Insert the turn's row and return its name, or "" when this chat already holds that row."""
+	row = {"doctype": "AI Chat Message", "session": session_id, "role": role, "content": content}
+	if tool_result_json:
+		row["tool_result_json"] = tool_result_json
+	try:
+		return frappe.get_doc(row).insert().name
+	# ponytail: the agent writes these rows too until ADR-011's other half lands, and a question it
+	# copies is refused here; a question resent before any answer is refused with it, and goes unsaved
+	except frappe.DuplicateEntryError:
+		frappe.clear_last_message()
+		return ""
+
+
+def _save_the_answer(session_id: str, saved: dict) -> None:
+	"""Write the turn's answer row; a chat deleted while it was answered has nowhere left to put one."""
+	if not frappe.db.exists("AI Chat Session", session_id):
+		return
+	try:
+		_save_message(
+			session_id,
+			"assistant",
+			_saved_answer("".join(saved["answer"]), saved["note"]),
+			_tool_result_json(saved["sources"], saved["blocks"], saved["usage"]),
+		)
+	except Exception:  # noqa: BLE001 - the answer is on screen; what is left to protect is the claim
+		frappe.log_error(
+			title="AI Chat Message Not Saved",
+			message=frappe.get_traceback(),
+			reference_doctype="AI Chat Session",
+			reference_name=session_id,
+		)
+
+
+def _open_session(session_id: str, title: str, context_json: str) -> None:
+	"""Open the chat if this is its first turn; a session id that is not the caller's is refused."""
+	if frappe.db.exists("AI Chat Session", session_id):
+		# get_doc applies no permission of its own, and session_id came from the caller
+		frappe.get_doc("AI Chat Session", session_id).check_permission("write")
+		return
+	session = {
+		"doctype": "AI Chat Session",
+		"name": session_id,
+		"title": title.strip()[:_TITLE_CHARS],
+		"context_json": context_json,
+	}
+	frappe.get_doc(session).insert()
+
+
 @frappe.whitelist(methods=["POST"])
 @rate_limit(limit=_STARTS_PER_MINUTE, seconds=60)
 def start_stream(message: str, session_id: str | None = None, page_context=None) -> dict:
@@ -326,6 +460,11 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 			if currency:
 				page_context["currency"] = currency
 
+		# frappe_ai owns both doctypes (ADR-011): the question is recorded here, before the worker
+		# exists, so a worker that never runs still leaves the chat the user can see
+		_open_session(session_id, message, json.dumps({"user_id": user} | page_context))
+		question_row = _save_message(session_id, "user", message)
+
 		frappe.enqueue(
 			"frappe_ai.api.chat._stream_to_agent",
 			queue="long",
@@ -341,6 +480,7 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 			agent_url=agent_url,
 			timeout_seconds=timeout_seconds,
 			page_context=page_context,
+			question_row=question_row,
 		)
 	# broad on purpose: it re-raises, so nothing is swallowed, and any narrower list would strand the claim
 	except Exception:
@@ -394,6 +534,7 @@ def _stream_to_agent(
 	timeout_seconds: int,
 	page_context: dict | None = None,
 	confirmation: dict | None = None,
+	question_row: str = "",
 ) -> None:
 	"""Relay the agent's chunks to user; never whitelist it: it trusts user, and a `confirmation` carries no message."""
 	import time
@@ -409,11 +550,11 @@ def _stream_to_agent(
 		context.update(page_context)
 
 	payload = {
-		# Forward session_id so the agent groups all turns under the same
-		# AI Chat Session row, and so its FrappeHistoryClient can pull
-		# prior messages back into the LLM context for this session.
+		# Forward session_id so the agent groups all turns under the same AI Chat Session row, and
+		# the turns before this one so it never has to read them back out of Frappe (ADR-011).
 		"session_id": session_id,
 		"context": context,
+		"history": _prior_turns(session_id, exclude=question_row),
 	}
 	# the agent takes exactly one of the two: a confirmed turn runs a call the user already saw
 	if confirmation:
@@ -425,6 +566,8 @@ def _stream_to_agent(
 
 	event_name = f"frappe_ai:chunk:{session_id}"
 	done_received = False
+	# the answer's row, assembled from the frames on their way to the browser
+	saved: dict = {"answer": [], "blocks": [], "sources": [], "usage": {}, "note": ""}
 	chunk_count = 0
 	stream_start = time.monotonic()
 	done_source = "fallback"  # set to "agent" when the agent emits the done chunk
@@ -483,6 +626,7 @@ def _stream_to_agent(
 					continue
 
 				chunk_count += 1
+				_collect(chunk, saved)
 				if chunk.get("type") == "done":
 					done_received = True
 					done_source = "agent"
@@ -553,6 +697,11 @@ def _stream_to_agent(
 			user=user,
 			after_commit=False,
 		)
+
+	# ponytail: the agent saves this row itself, one statement before it sends done, so only the ending
+	# it reported is ours to write; the rest become ours when ADR-011's other half lands
+	if done_source == "agent":
+		_save_the_answer(session_id, saved)
 
 	logger.info(
 		"stream.done session=%s user=%s duration_ms=%d chunks=%d done_source=%s",
