@@ -4,11 +4,11 @@
 """frappe_ai writes its own chat rows and hands the agent the turns before this one (ADR-011)."""
 
 import json
-import unittest
 from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 import frappe
+from frappe.tests import IntegrationTestCase
 
 from frappe_ai.api import chat
 
@@ -28,7 +28,7 @@ def _frame(**fields):
 	return "data: " + json.dumps(fields)
 
 
-class TestFrappeAIWritesTheChat(unittest.TestCase):
+class TestFrappeAIWritesTheChat(IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
@@ -37,6 +37,7 @@ class TestFrappeAIWritesTheChat(unittest.TestCase):
 			frappe.get_doc(user | {"roles": [{"role": "All"}]}).insert(ignore_permissions=True)
 
 	def setUp(self):
+		super().setUp()
 		frappe.set_user(USER)
 		self.addCleanup(frappe.set_user, "Administrator")
 		self.session = frappe.generate_hash(length=12)
@@ -138,6 +139,26 @@ class TestFrappeAIWritesTheChat(unittest.TestCase):
 		self.assertEqual(self._rows()[-1].content, "[error] Answer failed.")
 		body = self._relay(job=self._start("try again"))
 		self.assertEqual(body["history"], [{"role": "user", "content": "what is the total"}])
+
+	def test_the_answer_row_is_written_before_the_browser_is_told_the_turn_ended(self):
+		# a row inserted after `done` reaches the tab as msg_added with an id it cannot match, and
+		# the answer it has just watched stream in renders a second time
+		rows_when_done_went_out = []
+
+		def publish(event, message=None, user=None, after_commit=False):
+			if isinstance(message, dict) and message.get("type") == "done":
+				filters = {"session": self.session, "role": "assistant"}
+				rows_when_done_went_out.append(frappe.db.count("AI Chat Message", filters))
+
+		post = _agent(_frame(type="content", text="1,240.00"), _frame(type="done", tools_called=[]))
+		with (
+			patch.object(chat, "_take_sid", return_value="sid"),
+			patch.object(chat.requests, "post", post),
+			patch.object(chat, "_is_stream_cancelled", return_value=False),
+			patch.object(frappe, "publish_realtime", publish),
+		):
+			chat._stream_to_agent(**self._start("what is the total"))
+		self.assertEqual(rows_when_done_went_out, [1])
 
 	def test_a_session_id_that_is_not_the_callers_is_refused(self):
 		frappe.set_user("Administrator")

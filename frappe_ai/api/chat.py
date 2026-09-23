@@ -315,7 +315,7 @@ def _with_blocks(content: str, tool_result_json) -> str:
 	"""The answer as shown, blocks included: a follow-up such as "the first one" points at them."""
 	try:
 		blocks = json.loads(tool_result_json or "{}").get("blocks") or []
-	except (json.JSONDecodeError, ValueError, AttributeError):
+	except (ValueError, AttributeError):
 		return content
 	if not blocks:
 		return content
@@ -329,7 +329,7 @@ def _prior_turns(session_id: str, exclude: str = "") -> list[dict]:
 		"AI Chat Message",
 		filters={"session": session_id},
 		fields=["name", "role", "content", "tool_result_json"],
-		order_by="creation desc, name desc",
+		order_by="creation desc",
 		limit=_HISTORY_TURNS,
 	)
 	turns = []
@@ -551,7 +551,8 @@ def _stream_to_agent(
 
 	payload = {
 		# Forward session_id so the agent groups all turns under the same AI Chat Session row, and
-		# the turns before this one so it never has to read them back out of Frappe (ADR-011).
+		# the turns before this one so that nothing is lost when it stops reading them back out of
+		# Frappe itself — which it still does, until ADR-011's other half lands and it reads these.
 		"session_id": session_id,
 		"context": context,
 		"history": _prior_turns(session_id, exclude=question_row),
@@ -630,6 +631,9 @@ def _stream_to_agent(
 				if chunk.get("type") == "done":
 					done_received = True
 					done_source = "agent"
+					# before the frame the browser settles on: a row inserted after it reaches the
+					# tab as msg_added with an id it cannot match, and the answer renders twice
+					_save_the_answer(session_id, saved)
 				elif chunk.get("type") == "tool_confirm":
 					# recorded before it is published: this record, not the chunk the browser holds, is
 					# what a click is answered from, so a forged click can only name an id
@@ -697,11 +701,6 @@ def _stream_to_agent(
 			user=user,
 			after_commit=False,
 		)
-
-	# ponytail: the agent saves this row itself, one statement before it sends done, so only the ending
-	# it reported is ours to write; the rest become ours when ADR-011's other half lands
-	if done_source == "agent":
-		_save_the_answer(session_id, saved)
 
 	logger.info(
 		"stream.done session=%s user=%s duration_ms=%d chunks=%d done_source=%s",
