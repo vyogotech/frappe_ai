@@ -10,6 +10,10 @@ import {
 	VisualMapComponent,
 	CalendarComponent,
 } from "echarts/components";
+// echarts' own entry point for the aria component, which registers itself on import.
+// Taking AriaComponent from the "echarts/components" barrel instead would oblige every
+// vi.mock of that barrel to enumerate it.
+import "echarts/lib/component/aria";
 import VChart from "vue-echarts";
 import { formatValue } from "../../utils/formatters";
 import type { ChartBlock } from "../../types/blocks";
@@ -82,6 +86,18 @@ const chartOption = computed(() => {
 
 	// an empty token (before mount) becomes undefined so echarts keeps its own default
 	const base = {
+		// role="img" plus a description echarts builds from the series names, the
+		// category labels and the values it is about to draw (WCAG 2.2 SC 1.1.1).
+		// decal is left off: hatching the marks would change what a sighted user sees.
+		aria: {
+			enabled: true,
+			// on a cartesian series dimension 0 is the category index, which the
+			// description already reads out by name — spread, not `label: undefined`,
+			// which would keep echarts from filling in its own label defaults
+			...((chart_type === "bar" || chart_type === "line") && {
+				label: { data: { excludeDimensionId: [0] } },
+			}),
+		},
 		color: t.palette.length ? t.palette : undefined,
 		textStyle: t.fontFamily
 			? { fontFamily: t.fontFamily, color: t.textColor || undefined }
