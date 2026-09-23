@@ -25,6 +25,8 @@ interface FrappeUtils {
 		style?: string,
 		svgClass?: string,
 	) => string;
+	/** The desk address of a document. Optional: a test environment has no desk utils. */
+	get_form_link?: (doctype: string, name: string) => string;
 }
 
 interface FrappeBootSysDefaults {

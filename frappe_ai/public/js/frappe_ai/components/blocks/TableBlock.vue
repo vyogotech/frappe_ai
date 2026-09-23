@@ -31,6 +31,19 @@ function toggleSort(key: string) {
 	}
 }
 
+function sortState(key: string): "ascending" | "descending" | undefined {
+	if (sortKey.value !== key) return undefined;
+	return sortAsc.value ? "ascending" : "descending";
+}
+
+const firstKey = computed(() => props.block.columns[0]?.key);
+
+/** The desk address of a row's document, so the cell can be a real link. */
+function formLink(row: TableRow): string {
+	if (!row.route || typeof frappe === "undefined") return "";
+	return frappe.utils.get_form_link?.(row.route.doctype, row.route.name) ?? "";
+}
+
 function navigate(row: TableRow) {
 	if (row.route && typeof frappe !== "undefined") {
 		frappe.set_route("Form", row.route.doctype, row.route.name);
@@ -49,12 +62,15 @@ function navigate(row: TableRow) {
 						<th
 							v-for="col in block.columns"
 							:key="col.key"
+							:aria-sort="sortState(col.key)"
 							@click="toggleSort(col.key)"
 						>
-							{{ col.label }}
-							<span v-if="sortKey === col.key">{{
-								sortAsc ? "\u2191" : "\u2193"
-							}}</span>
+							<button type="button" class="frappe-ai-table-sort">
+								{{ col.label }}
+								<span v-if="sortKey === col.key" aria-hidden="true">{{
+									sortAsc ? "\u2191" : "\u2193"
+								}}</span>
+							</button>
 						</th>
 					</tr>
 				</thead>
@@ -66,7 +82,17 @@ function navigate(row: TableRow) {
 						@click="navigate(row)"
 					>
 						<td v-for="col in block.columns" :key="col.key">
-							{{ formatValue(row.values[col.key], col.format) }}
+							<!-- href is what makes this a link: without one the cell is neither focusable nor a link -->
+							<a
+								v-if="row.route && col.key === firstKey"
+								:href="formLink(row)"
+								class="frappe-ai-table-link"
+								@click.prevent.stop="navigate(row)"
+								>{{ formatValue(row.values[col.key], col.format) }}</a
+							>
+							<template v-else>{{
+								formatValue(row.values[col.key], col.format)
+							}}</template>
 						</td>
 					</tr>
 				</tbody>
@@ -114,7 +140,9 @@ function navigate(row: TableRow) {
 	color: var(--text-muted);
 	font-weight: 600;
 	text-align: left;
-	padding: 6px 10px;
+	/* the sort button carries the cell's padding, so it fills the header and the
+	   whole cell stays one click target (APG sortable table) */
+	padding: 0;
 	border-bottom: 1px solid var(--border-color);
 	white-space: nowrap;
 	cursor: pointer;
@@ -122,6 +150,17 @@ function navigate(row: TableRow) {
 }
 .frappe-ai-table-scroll thead th:hover {
 	background: var(--bg-gray);
+}
+.frappe-ai-table-sort {
+	display: block;
+	width: 100%;
+	padding: 6px 10px;
+	font: inherit;
+	color: inherit;
+	text-align: inherit;
+	background: none;
+	border: 0;
+	cursor: inherit;
 }
 .frappe-ai-table-scroll tbody td {
 	padding: 6px 10px;
@@ -137,6 +176,13 @@ function navigate(row: TableRow) {
 }
 .frappe-ai-table-scroll tbody tr:nth-child(even) {
 	background: var(--bg-light-gray);
+}
+/* the row already carries the design for "this opens a record"; the link is there for
+   the keyboard and the accessibility tree, and must not repaint its cell */
+.frappe-ai-table-link,
+.frappe-ai-table-link:hover {
+	color: inherit;
+	text-decoration: none;
 }
 .frappe-ai-table-clickable {
 	cursor: pointer;
