@@ -7,9 +7,17 @@ from urllib.parse import urlparse
 import frappe
 import requests
 from frappe import _
+from frappe.rate_limiter import rate_limit
 
 # below the agent's own 32 000-char cap because the relay also serialises the message into RQ
 _DEFAULT_MESSAGE_MAX_CHARS = 10_000
+
+# one relay job per user, named so a second tab, the other frontend or a direct call can be refused
+_STREAM_JOB_PREFIX = "frappe_ai:stream:"
+# ponytail: a worker killed outright leaves its claim until this expires; every other ending releases it
+_STREAM_CLAIM_MARGIN_SECONDS = 60
+# a refused start is cheap; an accepted one holds the long worker for the agent's budget plus 30 s
+_STARTS_PER_MINUTE = 30
 
 
 def _agent_url() -> str:
@@ -108,6 +116,20 @@ def cancel_stream(session_id: str) -> dict:
 		expires_in_sec=_CANCEL_KEY_TTL_SECONDS,
 	)
 	return {"ok": True}
+
+
+def _claim_key(user: str) -> bytes:
+	return frappe.cache().make_key(_STREAM_JOB_PREFIX + user)
+
+
+def _claim_the_answer(user: str, ttl: int) -> bool:
+	"""True if this user had no answer running: the claim is one redis SET NX, so two tabs cannot both win it."""
+	# the job reaches RQ only after this request commits, so RQ cannot be asked whether the slot is free
+	return bool(frappe.cache().set(_claim_key(user), b"1", ex=ttl, nx=True))
+
+
+def _release_the_answer(user: str) -> None:
+	frappe.cache().delete(_claim_key(user))
 
 
 def _is_stream_cancelled(session_id: str) -> bool:
@@ -219,6 +241,7 @@ def _sanitize_page_context(raw) -> dict:
 
 
 @frappe.whitelist(methods=["POST"])
+@rate_limit(limit=_STARTS_PER_MINUTE, seconds=60)
 def start_stream(message: str, session_id: str | None = None, page_context=None) -> dict:
 	"""Enqueue the agent relay and return {"session_id"}; subscribe to frappe_ai:chunk:<session_id> first."""
 	if not message or not message.strip():
@@ -236,37 +259,52 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 	if not settings.enabled:
 		frappe.throw(_("AI Assistant is not enabled"))
 
-	if not session_id:
-		session_id = str(uuid.uuid4())
-
-	agent_url = _agent_url()
-	if not agent_url:
-		frappe.throw(_("AI agent URL is not configured. Set frappe_ai_agent_url in site_config."))
-	_validate_agent_url(agent_url)
-
-	# a Stop that landed after the previous answer's last line would otherwise cancel this one
-	frappe.cache.delete_value(_cancel_key(session_id))
-
 	timeout_seconds = settings.agent_timeout()
-	# RQ keeps a job's arguments for days and shows them to System Managers, so the job gets a key to the sid instead
-	sid_key = frappe.generate_hash(length=32)
-	frappe.cache.set_value(_SID_KEY_PREFIX + sid_key, frappe.session.sid, expires_in_sec=timeout_seconds + 30)
+	# before any side effect: a refused start must not clear the running answer's cancel flag below
+	job_id = _STREAM_JOB_PREFIX + user
+	if not _claim_the_answer(user, timeout_seconds + _STREAM_CLAIM_MARGIN_SECONDS):
+		frappe.throw(
+			_("A response is already in progress. Wait for it to finish or stop it, then try again.")
+		)
 
-	frappe.enqueue(
-		"frappe_ai.api.chat._stream_to_agent",
-		queue="long",
-		# Worker timeout is agent timeout + buffer so the worker can emit the error event.
-		timeout=timeout_seconds + 30,
-		# Enqueue after the HTTP transaction commits so the worker sees all side effects.
-		enqueue_after_commit=True,
-		message=message,
-		session_id=session_id,
-		user=user,
-		sid_key=sid_key,
-		agent_url=agent_url,
-		timeout_seconds=timeout_seconds,
-		page_context=_sanitize_page_context(page_context),
-	)
+	# nothing below reaches the worker that would release the claim, so a failure here gives it back
+	try:
+		if not session_id:
+			session_id = str(uuid.uuid4())
+
+		agent_url = _agent_url()
+		if not agent_url:
+			frappe.throw(_("AI agent URL is not configured. Set frappe_ai_agent_url in site_config."))
+		_validate_agent_url(agent_url)
+
+		# a Stop that landed after the previous answer's last line would otherwise cancel this one
+		frappe.cache.delete_value(_cancel_key(session_id))
+
+		# RQ keeps a job's arguments for days and shows them to System Managers, so the job gets a key to the sid
+		sid_key = frappe.generate_hash(length=32)
+		frappe.cache.set_value(
+			_SID_KEY_PREFIX + sid_key, frappe.session.sid, expires_in_sec=timeout_seconds + 30
+		)
+
+		frappe.enqueue(
+			"frappe_ai.api.chat._stream_to_agent",
+			queue="long",
+			job_id=job_id,
+			# Worker timeout is agent timeout + buffer so the worker can emit the error event.
+			timeout=timeout_seconds + 30,
+			# Enqueue after the HTTP transaction commits so the worker sees all side effects.
+			enqueue_after_commit=True,
+			message=message,
+			session_id=session_id,
+			user=user,
+			sid_key=sid_key,
+			agent_url=agent_url,
+			timeout_seconds=timeout_seconds,
+			page_context=_sanitize_page_context(page_context),
+		)
+	except Exception:
+		_release_the_answer(user)
+		raise
 
 	return {"session_id": session_id}
 
@@ -440,3 +478,5 @@ def _stream_to_agent(
 		chunk_count,
 		done_source,
 	)
+
+	_release_the_answer(user)

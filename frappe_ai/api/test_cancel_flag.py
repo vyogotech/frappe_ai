@@ -10,6 +10,8 @@ from frappe_ai.api import chat
 
 class TestCancelFlag(unittest.TestCase):
 	def setUp(self):
+		# the previous turn's claim on this user's one answer ends with that turn (S13)
+		chat._release_the_answer(frappe.session.user)
 		self._conf = {
 			k: frappe.local.conf.get(k) for k in ("frappe_ai_agent_url", "frappe_ai_agent_url_unsafe_ok")
 		}

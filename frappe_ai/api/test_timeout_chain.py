@@ -21,6 +21,8 @@ def _set_timeout(value) -> None:
 
 class TestTimeoutChain(unittest.TestCase):
 	def setUp(self):
+		# the previous turn's claim on this user's one answer ends with that turn (S13)
+		chat._release_the_answer(frappe.session.user)
 		self._conf = {k: frappe.local.conf.get(k) for k in CONF}
 		frappe.local.conf.update(CONF)
 		settings = frappe.get_single(SETTINGS)

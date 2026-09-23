@@ -88,6 +88,8 @@ class TestSanitizePageContext(unittest.TestCase):
 
 class TestValidateAgentUrl(unittest.TestCase):
 	def setUp(self):
+		# the previous turn's claim on this user's one answer ends with that turn (S13)
+		chat._release_the_answer(frappe.session.user)
 		self._original_escape = frappe.local.conf.get("frappe_ai_agent_url_unsafe_ok")
 		frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = 0
 
@@ -174,6 +176,8 @@ class TestValidateAgentUrl(unittest.TestCase):
 
 class TestAgentUrl(unittest.TestCase):
 	def setUp(self):
+		# the previous turn's claim on this user's one answer ends with that turn (S13)
+		chat._release_the_answer(frappe.session.user)
 		self._original = frappe.local.conf.get("frappe_ai_agent_url")
 
 	def tearDown(self):
@@ -206,6 +210,8 @@ class TestAgentUrl(unittest.TestCase):
 
 class TestStartStream(unittest.TestCase):
 	def setUp(self):
+		# the previous turn's claim on this user's one answer ends with that turn (S13)
+		chat._release_the_answer(frappe.session.user)
 		# Establish a known-good baseline for the singleton + site_config.
 		self._original_url = frappe.local.conf.get("frappe_ai_agent_url")
 		frappe.local.conf["frappe_ai_agent_url"] = "http://localhost:8484"
@@ -290,6 +296,8 @@ class TestCancelStream(unittest.TestCase):
 	"""The client can signal a cancel to the worker."""
 
 	def setUp(self):
+		# the previous turn's claim on this user's one answer ends with that turn (S13)
+		chat._release_the_answer(frappe.session.user)
 		self._sid = "test-cancel-session-id"
 		# Ensure clean state.
 		frappe.cache().delete_value(f"frappe_ai:cancel:{self._sid}")

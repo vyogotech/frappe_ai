@@ -40,7 +40,7 @@ class TestTheJobHoldsNoSid(unittest.TestCase):
 		job = {
 			k: v
 			for k, v in enqueue.call_args.kwargs.items()
-			if k not in ("queue", "timeout", "enqueue_after_commit")
+			if k not in ("queue", "timeout", "enqueue_after_commit", "job_id", "deduplicate")
 		}
 		# RQ keeps these arguments for days and shows them to System Managers, and a failed job's traceback keeps them
 		self.assertNotIn(sid, json.dumps(job, default=str))
