@@ -29,6 +29,7 @@ const settings: Ref<FrappeAISettings> = ref({ ...DEFAULT_SETTINGS });
 const loaded = ref(false);
 /** Seconds the relay gives the agent; the sidebar sizes its own limit from it, so it is not a sidebar setting. */
 const timeout = ref(DEFAULT_TIMEOUT_SECONDS);
+const loadError = ref(false);
 
 export function useSettings() {
 	async function loadSettings(): Promise<void> {
@@ -50,8 +51,10 @@ export function useSettings() {
 				};
 				timeout.value = msg.timeout ?? DEFAULT_TIMEOUT_SECONDS;
 			}
+			loadError.value = false;
 		} catch {
-			// fall back to defaults
+			// not the same as Enabled being off: the callers mount anyway and say the read failed
+			loadError.value = true;
 		} finally {
 			loaded.value = true;
 		}
@@ -61,6 +64,7 @@ export function useSettings() {
 		settings: readonly(settings),
 		loaded: readonly(loaded),
 		timeout: readonly(timeout),
+		loadError: readonly(loadError),
 		loadSettings,
 	};
 }

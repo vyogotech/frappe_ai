@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
 import { useChat } from "../composables/useChat";
+import { useSettings } from "../composables/useSettings";
 import ChatHeader from "./ChatHeader.vue";
 import ChatMessages from "./ChatMessages.vue";
 import ChatInput from "./ChatInput.vue";
@@ -20,11 +21,16 @@ const {
 	cancelMessage,
 	clearMessages,
 	loadRecentConversation,
+	showError,
 } = useChat();
 
+const { loadError } = useSettings();
+
 // Hydrate from server-side history on first mount so a page reload doesn't
-// erase the user's last chat. Failures are swallowed in the composable.
+// erase the user's last chat.
 onMounted(() => {
+	// the sidebar is mounted with the defaults when the settings did not load (boot-decision.ts), so say so here
+	if (loadError.value) showError("Connection failed");
 	loadRecentConversation();
 });
 

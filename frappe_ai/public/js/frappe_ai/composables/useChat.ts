@@ -296,8 +296,7 @@ export function useChat() {
 
 	async function loadRecentConversation(): Promise<void> {
 		// Hydrate the sidebar on mount so a page reload doesn't throw away the
-		// user's last chat. Best-effort: any failure leaves the bubble list
-		// empty so the user can simply start a new conversation.
+		// user's last chat.
 		try {
 			const result = await new Promise<RecentMessagesResponse>((resolve, reject) => {
 				frappe.call<RecentMessagesResponse>({
@@ -323,7 +322,8 @@ export function useChat() {
 					timestamp: m.timestamp ? new Date(m.timestamp) : null,
 				}));
 		} catch {
-			// Swallow — restoring history is a nice-to-have, not a blocker.
+			// an empty thread would read as "you have no chats", and the user would think theirs was lost
+			_addErrorMessage("Failed to load chat");
 		}
 	}
 
@@ -377,5 +377,6 @@ export function useChat() {
 		cancelMessage,
 		clearMessages,
 		loadRecentConversation,
+		showError: _addErrorMessage,
 	};
 }
