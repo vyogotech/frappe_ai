@@ -514,14 +514,13 @@ def _stream_to_agent(
 		done_received = True
 		done_source = "timeout"
 	except requests.exceptions.RequestException as e:
-		logger.error(
-			"stream.failed session=%s after=%dms chunks=%d err=%s",
-			session_id,
-			int((time.monotonic() - stream_start) * 1000),
-			chunk_count,
-			e,
+		# the one row an operator reads: the stream.done line below already carries session, duration and chunks
+		frappe.log_error(
+			title="AI Agent Stream Failed",
+			message=frappe.get_traceback(),
+			reference_doctype="AI Chat Session",
+			reference_name=session_id,
 		)
-		frappe.log_error(title="AI Agent Stream Failed", message=frappe.get_traceback())
 		frappe.publish_realtime(
 			event_name,
 			{"type": "error", "message": _failure_message(e, streaming)},
@@ -532,7 +531,12 @@ def _stream_to_agent(
 		done_source = "error"
 	except Exception:  # noqa: BLE001 - whatever failed, the browser is waiting on an end-of-stream only this job sends
 		# Logged here, not re-raised: Frappe's job log records every frame's variables, and this frame holds the question
-		frappe.log_error(title="AI Agent Stream Failed", message=frappe.get_traceback())
+		frappe.log_error(
+			title="AI Agent Stream Failed",
+			message=frappe.get_traceback(),
+			reference_doctype="AI Chat Session",
+			reference_name=session_id,
+		)
 		frappe.publish_realtime(
 			event_name,
 			{"type": "error", "message": _FAILED},

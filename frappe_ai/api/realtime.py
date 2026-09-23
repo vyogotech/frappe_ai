@@ -35,4 +35,6 @@ def broadcast_message_added(doc: Any, method: str | None = None) -> None:
 		frappe.log_error(
 			title="frappe_ai broadcast_message_added failed",
 			message=frappe.get_traceback(),
+			reference_doctype="AI Chat Session",
+			reference_name=getattr(doc, "session", None),
 		)
