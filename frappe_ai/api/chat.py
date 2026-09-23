@@ -256,10 +256,21 @@ def _sanitize_page_context(raw) -> dict:
 	return out
 
 
+def _default_currency() -> str:
+	"""The currency the caller's amounts are in when the page names none: their company's, else the site's, else ""."""
+	currency = ""
+	if "erpnext" in frappe.get_installed_apps():
+		import erpnext
+
+		# the user's default company's, which on a multi-company site is not the site-wide default below
+		currency = erpnext.get_default_currency()
+	return currency or frappe.db.get_default("currency") or ""
+
+
 @frappe.whitelist(methods=["POST"])
 @rate_limit(limit=_STARTS_PER_MINUTE, seconds=60)
 def start_stream(message: str, session_id: str | None = None, page_context=None) -> dict:
-	"""Enqueue the agent relay and return {"session_id"}; subscribe to frappe_ai:chunk:<session_id> first."""
+	"""Enqueue the relay, return {"session_id", "currency"} (the currency the agent was told to answer in, or "")."""
 	if not message or not message.strip():
 		frappe.throw(_("Message is required"))
 
@@ -298,6 +309,14 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 			_SID_KEY_PREFIX + sid_key, frappe.session.sid, expires_in_sec=timeout_seconds + 30
 		)
 
+		# the page names a currency only when the open document has one; for every other page the
+		# agent would otherwise fall back to its own default, which is INR whatever the company uses
+		page_context = _sanitize_page_context(page_context)
+		if not page_context.get("currency"):
+			currency = _default_currency()
+			if currency:
+				page_context["currency"] = currency
+
 		frappe.enqueue(
 			"frappe_ai.api.chat._stream_to_agent",
 			queue="long",
@@ -312,14 +331,14 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 			sid_key=sid_key,
 			agent_url=agent_url,
 			timeout_seconds=timeout_seconds,
-			page_context=_sanitize_page_context(page_context),
+			page_context=page_context,
 		)
 	# broad on purpose: it re-raises, so nothing is swallowed, and any narrower list would strand the claim
 	except Exception:
 		_release_the_answer(user)
 		raise
 
-	return {"session_id": session_id}
+	return {"session_id": session_id, "currency": page_context.get("currency", "")}
 
 
 _SID_KEY_PREFIX = "frappe_ai:sid:"

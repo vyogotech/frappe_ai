@@ -3,6 +3,7 @@
 import { ref, readonly } from "vue";
 import type { AssistantMessage, Message } from "../types/messages";
 import { getPageContext } from "../utils/context";
+import { setAgentCurrency } from "../utils/formatters";
 import { useSettings } from "./useSettings";
 
 interface Chunk {
@@ -24,6 +25,7 @@ interface Chunk {
 
 interface StreamResult {
 	session_id: string;
+	currency: string;
 }
 
 // the buffer chat.py gives the worker over the agent's budget (timeout + 30), so the relay's own error
@@ -224,6 +226,8 @@ export function useChat() {
 						// forwards this dict into the agent's `context` payload.
 						page_context: getPageContext(),
 					},
+					// the currency the server told the agent to answer in; the blocks it sends carry none
+					callback: (r) => setAgentCurrency(r.message?.currency ?? ""),
 					error: (err: unknown) => settle("reject", _toError(err)),
 				});
 

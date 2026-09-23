@@ -68,23 +68,9 @@ describe("getPageContext", () => {
 		expect(getPageContext().currency).toBe("USD");
 	});
 
-	it("falls back to sysdefaults currency when cur_frm has none", () => {
-		setFrappe({ boot: { sysdefaults: { currency: "EUR" } } });
-		setCurFrm({ doc: { doctype: "SI", name: "X" } });
-		expect(getPageContext().currency).toBe("EUR");
-	});
-
-	it("falls back to frappe.defaults.get_default('currency') as last resort", () => {
-		setFrappe({
-			boot: {},
-			defaults: { get_default: (key: string) => (key === "currency" ? "GBP" : null) },
-		});
-		setCurFrm(undefined);
-		expect(getPageContext().currency).toBe("GBP");
-	});
-
 	it("uppercases the currency code", () => {
-		setFrappe({ boot: { sysdefaults: { currency: "inr" } } });
+		setFrappe({});
+		setCurFrm({ doc: { doctype: "SI", name: "X", currency: "inr" } });
 		expect(getPageContext().currency).toBe("INR");
 	});
 

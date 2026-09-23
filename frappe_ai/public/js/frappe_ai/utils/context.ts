@@ -32,15 +32,9 @@ export function getPageContext(): PageContext {
 			ctx.doctype = cur_list.doctype;
 		}
 
-		// the document's own currency first; frappe.defaults is for older Frappe without boot.sysdefaults
-		let currency = "";
-		if (typeof cur_frm !== "undefined" && cur_frm?.doc?.currency) {
-			currency = cur_frm.doc.currency;
-		} else if (frappe?.boot?.sysdefaults?.currency) {
-			currency = frappe.boot.sysdefaults.currency;
-		} else if (frappe?.defaults?.get_default) {
-			currency = frappe.defaults.get_default("currency") || "";
-		}
+		// the open document's own currency only: frappe.boot.sysdefaults holds the site-wide default, not the
+		// user's company's, and sending it here would hide the company's from the server, which fills this in
+		const currency = typeof cur_frm !== "undefined" ? cur_frm?.doc?.currency : undefined;
 		if (typeof currency === "string") {
 			ctx.currency = currency.toUpperCase();
 		}

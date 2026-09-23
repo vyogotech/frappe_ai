@@ -28,7 +28,8 @@ build-backend = "flit_core.buildapi"
 [tool.pyrefly]
 # `frappe` is provided by the bench at runtime, not installed in the local venv.
 # Treat it as Any only when the import cannot be resolved.
-ignore-missing-imports = ["frappe", "frappe.*"]
+# erpnext is the same: present on a site that has it, never in this venv (see api/chat.py, _default_currency).
+ignore-missing-imports = ["frappe", "frappe.*", "erpnext", "erpnext.*"]
 
 [tool.ruff]
 line-length = 110

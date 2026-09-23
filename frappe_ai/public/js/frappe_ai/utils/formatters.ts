@@ -4,9 +4,17 @@ type FormatOptions = {
 	currency?: string;
 };
 
+let agentCurrency = "";
+
+/** The currency the server told the agent to answer in; the blocks it sends back carry none of their own. */
+export function setAgentCurrency(code: string): void {
+	agentCurrency = code;
+}
+
 /** The currency to format in; the INR fallback matches the agent prompt's, so the prose and the table cells agree. */
 function resolveCurrency(supplied?: string): string {
 	if (supplied) return supplied;
+	if (agentCurrency) return agentCurrency;
 	try {
 		if (typeof frappe !== "undefined") {
 			const sys = frappe?.boot?.sysdefaults?.currency;
