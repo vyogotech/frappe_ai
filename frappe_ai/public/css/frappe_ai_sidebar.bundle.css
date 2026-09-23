@@ -28,12 +28,19 @@
 	--ai-accent: #475569;
 	--ai-accent-fg: #ffffff;
 	--ai-bubble-assistant-bg: var(--bg-light-gray, var(--control-bg));
+
+	/* The KPI trend paints on --bg-color, which flips with the theme, so no single
+	   value clears WCAG 4.5:1 on both; each theme carries its own. */
+	--ai-trend-up: #1e874b;
+	--ai-trend-down: #e22e1c;
 }
 
 [data-theme="dark"] #frappe-ai-sidebar-root {
 	--ai-accent: #94a3b8;
 	--ai-accent-fg: #0f172a;
 	--ai-bubble-assistant-bg: #2a2a2a;
+	--ai-trend-up: #27ae60;
+	--ai-trend-down: #e74c3c;
 }
 
 #frappe-ai-sidebar-root[hidden] {
@@ -323,18 +330,18 @@
 }
 
 .frappe-ai-error--info {
-	background: var(--blue-highlight, #f0f5ff);
-	border-color: var(--indicator-blue, #3498db);
-	color: var(--blue-dark, #2176ae);
+	background: #f0f5ff;
+	border-color: #1f76af;
+	color: #1f76af;
 }
 
 .frappe-ai-error-message {
 	font-weight: 500;
 }
+/* No opacity here either: the suggestion has to keep the message's 4.5:1. */
 .frappe-ai-error-suggestion {
 	font-size: 12px;
 	margin-top: 4px;
-	opacity: 0.8;
 }
 
 /* Markdown content */
@@ -737,20 +744,19 @@
 }
 
 .frappe-ai-trend--up {
-	color: var(--indicator-green, #27ae60);
+	color: var(--ai-trend-up);
 }
 .frappe-ai-trend--down {
-	color: var(--indicator-red, #e74c3c);
+	color: var(--ai-trend-down);
 }
 .frappe-ai-trend--flat {
 	color: var(--text-muted);
 }
 
+/* No opacity on the value: it composites towards the background and costs the
+   trend colours the 4.5:1 they are chosen for. */
 .frappe-ai-trend-arrow {
 	font-weight: 700;
-}
-.frappe-ai-trend-value {
-	opacity: 0.9;
 }
 
 /* ──────────────────────────────────────────
@@ -796,17 +802,20 @@
 	flex-shrink: 0;
 }
 
+/* Literal, not var(--indicator-*, …): those names are gone from v16, so the fallback is
+   what paints, and a desk that defined them again would repaint one half of a pair that
+   was measured as a pair — the dot against the row, the chip ink against the chip. */
 .frappe-ai-status-dot--green {
-	background: var(--indicator-green, #27ae60);
+	background: #1d8047;
 }
 .frappe-ai-status-dot--red {
-	background: var(--indicator-red, #e74c3c);
+	background: #d72c1b;
 }
 .frappe-ai-status-dot--yellow {
-	background: var(--indicator-yellow, #f39c12);
+	background: #a2670c;
 }
 .frappe-ai-status-dot--blue {
-	background: var(--indicator-blue, #3498db);
+	background: #1f76af;
 }
 .frappe-ai-status-dot--gray {
 	background: var(--text-muted);
@@ -829,20 +838,20 @@
 }
 
 .frappe-ai-status-badge--green {
-	background: var(--green-highlight, #e6f9ee);
-	color: var(--indicator-green, #27ae60);
+	background: #e6f9ee;
+	color: #1d8047;
 }
 .frappe-ai-status-badge--red {
-	background: var(--red-highlight, #fff2f2);
-	color: var(--indicator-red, #e74c3c);
+	background: #fff2f2;
+	color: #d72c1b;
 }
 .frappe-ai-status-badge--yellow {
-	background: var(--yellow-highlight, #fffbf0);
-	color: var(--yellow-dark, #d68910);
+	background: #fffbf0;
+	color: #a2670c;
 }
 .frappe-ai-status-badge--blue {
-	background: var(--blue-highlight, #f0f5ff);
-	color: var(--indicator-blue, #3498db);
+	background: #f0f5ff;
+	color: #1f76af;
 }
 .frappe-ai-status-badge--gray {
 	background: var(--bg-light-gray, #f0f0f0);
