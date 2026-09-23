@@ -95,24 +95,16 @@ interface FrappeGlobal {
 	assets?: FrappeAssets;
 	/** Navigate the desk to a route — accepts segments like ("Form", doctype, name). */
 	set_route: (...path: string[]) => void;
+	/** The document out of `locals`: null or undefined when it is not loaded. Optional: a test environment has no model layer. */
+	get_doc?: (doctype: string, name: string) => FrappeDoc | null | undefined;
 	/** The Promise is for async: true; callback and error are invoked either way. */
 	call: <TResponse = unknown>(
 		args: FrappeCallArgs<TResponse>,
 	) => Promise<{ message?: TResponse }>;
 }
 
-interface FrappeFormDoc {
-	doctype?: string;
-	name?: string;
+interface FrappeDoc {
 	currency?: string;
-}
-
-interface FrappeForm {
-	doc?: FrappeFormDoc;
-}
-
-interface FrappeList {
-	doctype?: string;
 }
 
 // frappe's libs.bundle.js sets window.$ (public/js/jquery-bootstrap.js) and desk.html loads it before any app bundle;
@@ -128,8 +120,6 @@ interface Window {
 
 // declared as always present, which tsc cannot check; keep the runtime typeof frappe guards anyway
 declare const frappe: FrappeGlobal;
-declare const cur_frm: FrappeForm | undefined;
-declare const cur_list: FrappeList | undefined;
 
 // frappe's translate.js sets window.__ = frappe._; `replace` fills indexed {0}, {1} only, and a named {key}
 // renders as "undefined". Never call it from a template expression: Vue compiles that to _ctx.__, which this

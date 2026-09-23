@@ -21,22 +21,24 @@ export function getPageContext(): PageContext {
 		}
 
 		const route = frappe?.router?.current_route;
-		if (Array.isArray(route)) {
-			ctx.route = route.join("/");
+		if (!Array.isArray(route)) {
+			return ctx;
 		}
+		ctx.route = route.join("/");
 
-		if (typeof cur_frm !== "undefined" && cur_frm?.doc) {
-			ctx.doctype = cur_frm.doc.doctype || "";
-			ctx.docname = cur_frm.doc.name || "";
-		} else if (typeof cur_list !== "undefined" && cur_list?.doctype) {
-			ctx.doctype = cur_list.doctype;
-		}
-
-		// the open document's own currency only: frappe.boot.sysdefaults holds the site-wide default, not the
-		// user's company's, and sending it here would hide the company's from the server, which fills this in
-		const currency = typeof cur_frm !== "undefined" ? cur_frm?.doc?.currency : undefined;
-		if (typeof currency === "string") {
-			ctx.currency = currency.toUpperCase();
+		// the route, never cur_frm or cur_list: frappe assigns cur_frm in one place (form.js:407) and clears
+		// it only when a Page route shows, so on a list it still names the last form the user opened
+		if (route[0] === "Form" && route[1]) {
+			ctx.doctype = route[1];
+			ctx.docname = route.slice(2).join("/");
+			// the open document's own currency only: frappe.boot.sysdefaults holds the site-wide default, not the
+			// user's company's, and sending it here would hide the company's from the server, which fills this in
+			const currency = frappe.get_doc?.(ctx.doctype, ctx.docname)?.currency;
+			if (typeof currency === "string") {
+				ctx.currency = currency.toUpperCase();
+			}
+		} else if (route[0] === "List" && route[1]) {
+			ctx.doctype = route[1];
 		}
 	} catch {
 		// Silently fail in dev mode without frappe
