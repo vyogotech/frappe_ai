@@ -13,6 +13,8 @@ import type { ECharts } from "echarts/core";
 
 const props = defineProps<{ block: ChartBlock }>();
 
+const noData = __("No data available");
+
 const canvas = ref<HTMLDivElement>();
 
 const hasData = computed(() => {
@@ -53,7 +55,7 @@ onBeforeUnmount(() => {
 <template>
 	<div class="frappe-ai-chart">
 		<div v-if="block.title" class="frappe-ai-chart-title">{{ block.title }}</div>
-		<div v-if="!hasData" class="frappe-ai-chart-empty">No data available</div>
+		<div v-if="!hasData" class="frappe-ai-chart-empty">{{ noData }}</div>
 		<div v-else ref="canvas" class="frappe-ai-chart-canvas"></div>
 	</div>
 </template>

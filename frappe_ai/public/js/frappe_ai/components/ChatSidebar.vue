@@ -28,6 +28,8 @@ const {
 
 const { loadError } = readBootSettings();
 
+const appName = __("Frappe AI");
+
 const panel = ref<HTMLElement>();
 const input = ref<InstanceType<typeof ChatInput>>();
 let opener: HTMLElement | null = null;
@@ -60,7 +62,7 @@ function onClosed() {
 // erase the user's last chat.
 onMounted(() => {
 	// the sidebar is mounted with the defaults when the boot carried no settings (boot-decision.ts), so say so here
-	if (loadError) showError("Connection failed");
+	if (loadError) showError(__("Connection failed"));
 	loadRecentConversation();
 	document.addEventListener("frappe-ai-opened", onOpened);
 	document.addEventListener("frappe-ai-closed", onClosed);
@@ -95,7 +97,7 @@ const liveStatus = computed(() => {
 	if (last?.role === "error") {
 		return [last.error.message, last.error.suggestion].filter(Boolean).join(" ");
 	}
-	if (isLoading.value) return "Thinking...";
+	if (isLoading.value) return __("Thinking...");
 	// `parts` is set only on a message this tab streamed, so restoring the last chat on mount
 	// does not read yesterday's answer out
 	if (last?.role === "assistant" && !last.pending && last.parts) return last.content;
@@ -108,7 +110,7 @@ const liveStatus = computed(() => {
 	<aside
 		ref="panel"
 		class="frappe-ai-sidebar"
-		aria-label="Frappe AI"
+		:aria-label="appName"
 		:style="{ width: sidebarWidth + 'px' }"
 		@keydown.esc="handleClose"
 	>

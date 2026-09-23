@@ -51,10 +51,21 @@ const starterPrompts = computed<string[]>(() => {
 	// `void` keeps the lint/tsc clean about the unused read.
 	void routeTick.value;
 	const ctx = getPageContext();
-	const onForm = ctx.doctype && ctx.docname;
-	const first = onForm ? `Summarise this ${ctx.doctype}` : "What can you do?";
-	return [first, "Show open invoices over 30 days", "List my top 5 customers by revenue"];
+	const first =
+		ctx.doctype && ctx.docname
+			? __("Summarise this {0}", [ctx.doctype])
+			: __("What can you do?");
+	return [
+		first,
+		__("Show open invoices over 30 days"),
+		__("List my top 5 customers by revenue"),
+	];
 });
+
+const emptyTitle = __("How can I help?");
+const emptySubtitle = __(
+	"Ask me anything about your ERPNext data, or let me help you with tasks.",
+);
 
 function pickPrompt(text: string) {
 	emit("send", text);
@@ -82,10 +93,8 @@ watch(
 				<!-- eslint-disable-next-line vue/no-v-html -->
 				<span v-html="frappeIcon('bot-message-square', 'md')" />
 			</div>
-			<h2 class="frappe-ai-empty-title">How can I help?</h2>
-			<p class="frappe-ai-empty-subtitle">
-				Ask me anything about your ERPNext data, or let me help you with tasks.
-			</p>
+			<h2 class="frappe-ai-empty-title">{{ emptyTitle }}</h2>
+			<p class="frappe-ai-empty-subtitle">{{ emptySubtitle }}</p>
 			<div class="frappe-ai-starter-prompts">
 				<button
 					v-for="prompt in starterPrompts"

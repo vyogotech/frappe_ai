@@ -15,7 +15,7 @@ export default defineConfig([
 	{
 		files: ["frappe_ai/public/js/**/*.{ts,vue}"],
 		languageOptions: {
-			globals: { ...globals.browser, frappe: "readonly" },
+			globals: { ...globals.browser, frappe: "readonly", __: "readonly" },
 			parserOptions: { parser: ts.parser },
 		},
 		// the three that are findings rather than layout: raise them out of eslint-plugin-vue's warn default

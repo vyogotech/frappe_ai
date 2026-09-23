@@ -46,8 +46,8 @@ md.renderer.rules.image = (tokens, idx, options, env, self) => {
 		return defaultImage(tokens, idx, options, env, self);
 	const alt = esc(self.renderInlineAsText(tokens[idx].children || [], options, env));
 	if (!url || (url.protocol !== "https:" && url.protocol !== "http:"))
-		return `<span class="frappe-ai-noimage">${alt || "Image unavailable"}</span>`;
-	return `<a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${alt || "Image"}</a> (image on ${esc(url.host)})`;
+		return `<span class="frappe-ai-noimage">${alt || __("Image unavailable")}</span>`;
+	return `<a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${alt || __("Image")}</a> ${__("(image on {0})", [esc(url.host)])}`;
 };
 
 export function renderMarkdown(text: string): string {

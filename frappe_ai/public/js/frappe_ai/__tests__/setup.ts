@@ -16,3 +16,7 @@ g.frappe = {
 };
 g.cur_frm = undefined;
 g.cur_list = undefined;
+
+// frappe._ with no catalogue loaded: the source string, with the indexed {0}, {1} the app uses filled in
+g.__ = (txt: string, replace?: (string | number)[]) =>
+	replace ? txt.replace(/\{(\d+)\}/g, (m, i) => `${replace[+i] ?? m}`) : txt;

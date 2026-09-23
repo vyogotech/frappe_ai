@@ -130,3 +130,8 @@ interface Window {
 declare const frappe: FrappeGlobal;
 declare const cur_frm: FrappeForm | undefined;
 declare const cur_list: FrappeList | undefined;
+
+// frappe's translate.js sets window.__ = frappe._; `replace` fills indexed {0}, {1} only, and a named {key}
+// renders as "undefined". Never call it from a template expression: Vue compiles that to _ctx.__, which this
+// app's plain createApp leaves undefined.
+declare function __(txt: string, replace?: (string | number)[]): string;

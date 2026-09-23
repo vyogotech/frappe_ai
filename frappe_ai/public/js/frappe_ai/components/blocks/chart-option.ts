@@ -184,6 +184,8 @@ export function buildChartOption(block: ChartBlock, t: ChartTheme) {
 		const year = data.labels[0]?.slice(0, 4) || new Date().getFullYear().toString();
 		const calMin = calValues.length ? Math.min(...calValues) : 0;
 		const calMax = calValues.length ? Math.max(...calValues) : 1;
+		const calName = data.datasets[0]?.name || __("values");
+		const calPoints = calData.map(([label, value]) => `${label}: ${value}`).join(", ");
 
 		return {
 			...base,
@@ -192,9 +194,9 @@ export function buildChartOption(block: ChartBlock, t: ChartTheme) {
 			aria: {
 				enabled: true,
 				label: {
-					description: `Calendar of ${data.datasets[0]?.name || "values"} by date. ${calData
-						.map(([label, value]) => `${label}: ${value}`)
-						.join(", ")}`,
+					// hoisted so the __() below fits one line: frappe extracts with a regex compiled
+					// without DOTALL, so a newline inside the argument list hides the call
+					description: __("Calendar of {0} by date. {1}", [calName, calPoints]),
 				},
 			},
 			tooltip: { ...tooltipBase, position: "top" },

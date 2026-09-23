@@ -20,10 +20,10 @@
 					class="frappe-ai-tool-allow"
 					@click="emit('allow', confirmId)"
 				>
-					Allow
+					{{ allowLabel }}
 				</button>
 				<button type="button" class="frappe-ai-tool-deny" @click="emit('deny', confirmId)">
-					Deny
+					{{ denyLabel }}
 				</button>
 			</span>
 		</div>
@@ -31,7 +31,7 @@
 			v-else
 			:class="['frappe-ai-tool-header', expanded ? 'frappe-ai-tool-header--open' : '']"
 			:aria-expanded="expanded"
-			:aria-label="`Tool call: ${toolCall.name}`"
+			:aria-label="headerLabel"
 			type="button"
 			@click="expanded = !expanded"
 		>
@@ -52,7 +52,7 @@
 		</button>
 		<div v-if="expanded">
 			<div class="frappe-ai-tool-section">
-				<p class="frappe-ai-tool-label">{{ confirming ? "Input" : "Arguments" }}</p>
+				<p class="frappe-ai-tool-label">{{ sectionLabel }}</p>
 				<pre class="frappe-ai-tool-pre">{{ formattedArgs }}</pre>
 			</div>
 		</div>
@@ -79,10 +79,17 @@ const confirming = computed(
 // where TypeScript's `!` is a syntax error and the whole desk bundle fails to build
 const confirmId = computed(() => props.toolCall.confirm?.id ?? "");
 
+const allowLabel = __("Allow");
+const denyLabel = __("Deny");
+
+const headerLabel = computed(() => __("Tool call: {0}", [props.toolCall.name]));
+
+const sectionLabel = computed(() => (confirming.value ? __("Input") : __("Arguments")));
+
 const confirmLabel = computed(() =>
 	props.toolCall.status === "waiting"
-		? `Allow ${props.toolCall.name}?`
-		: `Denied ${props.toolCall.name}`,
+		? __("Allow {0}?", [props.toolCall.name])
+		: __("Denied {0}", [props.toolCall.name]),
 );
 
 const formattedArgs = computed(() => {

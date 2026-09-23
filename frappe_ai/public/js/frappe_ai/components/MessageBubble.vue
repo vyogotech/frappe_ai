@@ -22,10 +22,12 @@ const timeStr = computed(() =>
 // which side of the panel a bubble sits on, and what colour it is, say this to a sighted
 // user and to nobody else; an error bubble is nobody's utterance, so it stays unattributed
 const speaker = computed(() => {
-	if (props.message.role === "user") return "You said:";
-	if (props.message.role === "assistant") return "Frappe AI said:";
+	if (props.message.role === "user") return __("You said:");
+	if (props.message.role === "assistant") return __("Frappe AI said:");
 	return "";
 });
+
+const renderFailed = __("Could not render response");
 
 const isPendingEmpty = computed(
 	() =>
@@ -49,7 +51,7 @@ const isPendingEmpty = computed(
          normal render path. -->
 		<div v-else-if="message.role === 'assistant'" class="frappe-ai-bubble-content">
 			<div v-if="renderError" class="frappe-ai-error frappe-ai-error--info">
-				<div class="frappe-ai-error-message">Could not render response</div>
+				<div class="frappe-ai-error-message">{{ renderFailed }}</div>
 			</div>
 			<template v-else-if="isPendingEmpty">
 				<!-- the panel's role=status region says "Thinking..." instead (ChatSidebar.vue) -->

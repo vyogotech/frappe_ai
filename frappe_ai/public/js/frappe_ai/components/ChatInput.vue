@@ -7,8 +7,8 @@
 					v-model="text"
 					class="frappe-ai-textarea"
 					rows="1"
-					placeholder="Ask anything..."
-					aria-label="Chat input"
+					:placeholder="askAnything"
+					:aria-label="chatInput"
 					@keydown="handleKeydown"
 					@input="autoResize"
 				/>
@@ -24,8 +24,8 @@
 							: '',
 				]"
 				:disabled="sendDisabled"
-				:title="showStop ? 'Stop generating' : 'Send message'"
-				:aria-label="showStop ? 'Stop generating' : 'Send message'"
+				:title="buttonLabel"
+				:aria-label="buttonLabel"
 				@click="onButtonClick"
 			>
 				<span v-if="showStop" class="frappe-ai-stop-icon" aria-hidden="true"></span>
@@ -60,6 +60,9 @@ const text = ref("");
 const inputEl = ref<HTMLTextAreaElement>();
 const buttonEl = ref<HTMLButtonElement>();
 
+const askAnything = __("Ask anything...");
+const chatInput = __("Chat input");
+
 // NOTE-005: keep the textarea's unsent content across hard reloads.
 // `useDraft` debounces writes and scopes by user.
 const draft = useDraft();
@@ -71,6 +74,7 @@ watch(text, (v) => {
 });
 
 const showStop = computed(() => props.busy && props.canCancel);
+const buttonLabel = computed(() => (showStop.value ? __("Stop generating") : __("Send message")));
 
 const sendDisabled = computed(() => {
 	if (showStop.value) return false;

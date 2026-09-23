@@ -38,6 +38,8 @@ function sortState(key: string): "ascending" | "descending" | undefined {
 
 const firstKey = computed(() => props.block.columns[0]?.key);
 
+const noData = __("No data available");
+
 /** The desk address of a row's document, so the cell can be a real link. */
 function formLink(row: TableRow): string {
 	if (!row.route || typeof frappe === "undefined") return "";
@@ -54,7 +56,7 @@ function navigate(row: TableRow) {
 <template>
 	<div class="frappe-ai-table">
 		<div v-if="block.title" class="frappe-ai-table-title">{{ block.title }}</div>
-		<div v-if="block.rows.length === 0" class="frappe-ai-table-empty">No data available</div>
+		<div v-if="block.rows.length === 0" class="frappe-ai-table-empty">{{ noData }}</div>
 		<div v-else class="frappe-ai-table-scroll">
 			<table>
 				<thead>

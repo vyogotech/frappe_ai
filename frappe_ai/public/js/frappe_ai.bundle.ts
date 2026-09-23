@@ -71,7 +71,7 @@ function injectNavbarButton(keyboardShortcut: string): void {
 			`<button id="frappe-ai-nav-btn" type="button"
                class="btn-reset nav-link text-muted"
                style="cursor:pointer;background:transparent;border:none;display:flex;align-items:center;justify-content:center;padding:0 6px"
-               title="Frappe AI (${keyboardShortcut})">${frappeIcon("message-square-text", "md")}</button>`,
+               title="${__("Frappe AI ({0})", [keyboardShortcut])}">${frappeIcon("message-square-text", "md")}</button>`,
 		);
 	}
 
@@ -79,9 +79,9 @@ function injectNavbarButton(keyboardShortcut: string): void {
 		// mirrors Frappe's "Getting Started" entry; text-ink-gray-7 current-color keeps the icon gray, not the anchor's colour
 		return makeButton(
 			`<a id="frappe-ai-nav-btn" class="onboarding-sidebar frappe-ai-nav-link px-2"
-          title="Frappe AI (${keyboardShortcut})">
+          title="${__("Frappe AI ({0})", [keyboardShortcut])}">
           ${frappeIcon("message-square-text", "sm", "text-ink-gray-7 current-color")}
-          <span class="sidebar-item-label">Frappe AI</span>
+          <span class="sidebar-item-label">${__("Frappe AI")}</span>
       </a>`,
 		);
 	}
@@ -182,7 +182,7 @@ function mountSidebar(sidebarWidth: number, keyboardShortcut: string): void {
 	frappe.ui.keys.add_shortcut({
 		shortcut: keyboardShortcut.toLowerCase(),
 		action: toggleSidebar,
-		description: "Toggle Frappe AI sidebar",
+		description: __("Toggle Frappe AI sidebar"),
 		ignore_inputs: false,
 	});
 }
@@ -200,7 +200,7 @@ function injectDisabledHint(): void {
 		tpl.innerHTML = `
       <a id="frappe-ai-disabled-hint"
          href="/app/ai-assistant-settings"
-         title="Frappe AI is disabled — open settings to re-enable"
+         title="${__("Frappe AI is disabled — open settings to re-enable")}"
          style="display:flex;align-items:center;color:var(--ink-gray-5,#888);padding:0 6px;text-decoration:none"
          class="nav-link text-muted">
         ${frappeIcon("message-square-text", "md")}

@@ -67,7 +67,7 @@ function _toError(err: unknown): Error {
 		}
 		if (typeof e.exc_type === "string" && e.exc_type) return new Error(e.exc_type);
 	}
-	return new Error("Failed to get response");
+	return new Error(__("Failed to get response"));
 }
 
 export function useChat() {
@@ -135,7 +135,7 @@ export function useChat() {
 					if (timerId !== undefined) clearTimeout(timerId);
 					timerId = setTimeout(() => {
 						_serverCancelInFlight(); // the worker would otherwise go on calling tools for an answer nobody waits for
-						settle("reject", new Error("Response timed out. Please try again."));
+						settle("reject", new Error(__("Response timed out. Please try again.")));
 					}, silenceMs);
 				};
 
@@ -205,7 +205,7 @@ export function useChat() {
 						});
 						settle("resolve");
 					} else if (chunk.type === "error") {
-						settle("reject", new Error(chunk.message ?? "Agent error"));
+						settle("reject", new Error(chunk.message ?? __("Agent error")));
 					}
 				});
 
@@ -214,7 +214,7 @@ export function useChat() {
 				armSilenceTimer();
 			});
 		} catch (err) {
-			const msg = err instanceof Error ? err.message : "Failed to get response";
+			const msg = err instanceof Error ? err.message : __("Failed to get response");
 			// Remove the empty assistant placeholder and add a typed error message.
 			messages.value = messages.value.filter((m) => m.id !== assistantId);
 			_addErrorMessage(msg);
@@ -377,7 +377,7 @@ export function useChat() {
 				}));
 		} catch {
 			// an empty thread would read as "you have no chats", and the user would think theirs was lost
-			_addErrorMessage("Failed to load chat");
+			_addErrorMessage(__("Failed to load chat"));
 		}
 	}
 
