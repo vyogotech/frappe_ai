@@ -3,10 +3,15 @@ name: CI
 on:
   push:
     branches: ['**']
+  pull_request:
+
+# Nothing here writes to the repository; each job asks for the read it needs.
+permissions: {}
 
 concurrency:
-  # Cancel older runs of the same branch when a newer commit arrives.
-  group: ci-${{ github.ref }}
+  # Cancel older runs of the same branch when a newer commit arrives. head_ref first: a pushed branch
+  # that also has a PR open fires both triggers, and only the branch name is the same in both.
+  group: ci-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -18,27 +23,29 @@ jobs:
     name: Lint & type-check
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           # Frappe v16 (16.18+) requires Python 3.14.
           python-version: '3.14'
 
       - name: Set up Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           # Frappe v16 frontend declares engines.node >= 24.
           node-version: '24'
           cache: 'npm'
 
       - name: Install uv
-        # v8 doesn't ship a major-version tag yet (only v8.0.0 / v8.1.0),
-        # and v7 is the latest rolling major tag. Both target Node 24.
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           enable-cache: true
 
@@ -102,6 +109,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: lint
+    permissions:
+      contents: read
 
     services:
       mariadb:
@@ -127,14 +136,21 @@ jobs:
           - 11000:6379
 
     steps:
+      # The directory name becomes the app name: bench derives it from the
+      # basename of the path it clones (bench 5.29.1 app.py:113).
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          path: frappe_ai
+          persist-credentials: false
+
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           # Frappe v16 (16.18+) requires Python 3.14.
           python-version: '3.14'
 
       - name: Set up Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           # Frappe v16 frontend declares engines.node >= 24.
           node-version: '24'
@@ -179,27 +195,10 @@ jobs:
 
       - name: Install this app via `bench get-app` (production install path)
         working-directory: frappe-bench
-        env:
-          # Pass GITHUB_TOKEN so `git clone` works even if the repo is
-          # private. The token has read access to the current repository
-          # automatically.
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Pass ref_name and repository through env vars so a maliciously
-          # named branch (e.g. `;rm -rf /`) cannot break out of the
-          # `bench get-app` command. With on.push.branches: ['**'] the
-          # trigger fires on any pushed branch including PRs from forks
-          # via the same actor — direct interpolation into a `run:` block
-          # would let the branch name execute as shell.
-          BRANCH: ${{ github.ref_name }}
-          REPO: ${{ github.repository }}
         run: |
           git config --global user.email "ci@example.com"
           git config --global user.name "CI"
-          git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
-          bench get-app \
-            --branch "$BRANCH" \
-            --skip-assets \
-            "https://github.com/$REPO.git"
+          bench get-app --skip-assets "$GITHUB_WORKSPACE/frappe_ai"
 
       - name: Create test site
         working-directory: frappe-bench
