@@ -24,10 +24,8 @@ function open() {
 }
 
 describe("App backdrop", () => {
-	// Everything App renders is a child of #frappe-ai-sidebar-root (frappe_ai.bundle.ts:111-138),
-	// and at <=768px that element is transformed, so a position:fixed child is sized against the
-	// panel rather than the viewport (CSS Transforms 2, transform rendering model). A backdrop
-	// rendered there covers the panel it is meant to sit behind and swallows its clicks.
+	// a backdrop rendered here is sized against the transformed root (css:885-902), not the
+	// viewport, so it covers the panel it should sit behind and swallows its clicks
 	it("renders nothing beside the panel that could overlay it", async () => {
 		const wrapper = open();
 		await wrapper.vm.$nextTick();
