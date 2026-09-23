@@ -16,7 +16,9 @@ from frappe_ai.api.chat import (
 	_cancel_key,
 	_check_agent_url,
 	_claim_the_answer,
+	_logger,
 	_release_the_answer,
+	_request_id,
 )
 
 # the call the user is being asked about, keyed by the id the browser was given
@@ -96,12 +98,14 @@ def respond(confirmation_id: str, decision: str) -> dict:
 	arguments = record.get("arguments") if isinstance(record.get("arguments"), dict) else {}
 	doctype = str(arguments.get("doctype") or "")
 	name = str(arguments.get("name") or "")
-	logger = frappe.logger("frappe_ai", allow_site=True)
+	logger = _logger()
+	request_id = _request_id()
 
 	if decision == "deny":
 		frappe.cache.delete_value(key)
 		logger.info(
-			"confirm.denied user=%s session=%s tool=%s doctype=%s name=%s id=%s",
+			"confirm.denied rid=%s user=%s session=%s tool=%s doctype=%s name=%s id=%s",
+			request_id,
 			user,
 			session_id,
 			tool,
@@ -157,6 +161,7 @@ def respond(confirmation_id: str, decision: str) -> dict:
 			agent_url=agent_url,
 			timeout_seconds=timeout_seconds,
 			confirmation={"tool": tool, "arguments": arguments, "token_key": token_key},
+			request_id=request_id,
 		)
 	# broad on purpose: it re-raises, so nothing is swallowed, and any narrower list would strand the claim
 	except Exception:
@@ -164,7 +169,8 @@ def respond(confirmation_id: str, decision: str) -> dict:
 		raise
 
 	logger.info(
-		"confirm.allowed user=%s session=%s tool=%s doctype=%s name=%s id=%s",
+		"confirm.allowed rid=%s user=%s session=%s tool=%s doctype=%s name=%s id=%s",
+		request_id,
 		user,
 		session_id,
 		tool,

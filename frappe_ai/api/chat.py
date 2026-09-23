@@ -2,12 +2,14 @@ import datetime as _dt
 import functools
 import ipaddress
 import json
+import logging
 import socket
 import uuid
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import frappe
+import frappe.monitor
 import requests
 from frappe import _
 from frappe.rate_limiter import rate_limit
@@ -29,6 +31,22 @@ _HISTORY_TURNS = 20
 _HISTORY_BLOCK_CHARS = 4000
 # how much of its first question names a chat in the sidebar
 _TITLE_CHARS = 60
+
+
+def _logger() -> logging.Logger:
+	"""This module's logger, at INFO: frappe's own default is ERROR off a dev server (frappe/utils/logger.py:12)."""
+	logger = frappe.logger("frappe_ai", allow_site=True)
+	logger.setLevel(logging.INFO)
+	return logger
+
+
+def _request_id() -> str:
+	"""One id per request (ADR-008): the one it arrived with, or one minted here and kept for the rest of it."""
+	# frappe.flags is the request's own scratch space; without the memo two lines of one request
+	# carry two ids wherever frappe.conf.monitor is off and get_trace_id() is None
+	if not frappe.flags.ai_request_id:
+		frappe.flags.ai_request_id = frappe.monitor.get_trace_id() or str(uuid.uuid4())
+	return frappe.flags.ai_request_id
 
 
 def _agent_url() -> str:
@@ -116,9 +134,7 @@ def _check_agent_url(url: str) -> None:
 		_validate_agent_url(url)
 	except AgentUnreachable:
 		# no job runs for this question, so its log line is the only record the outage leaves
-		frappe.logger("frappe_ai", allow_site=True).warning(
-			"agent host does not resolve: %s", urlparse(url).hostname
-		)
+		_logger().warning("agent host does not resolve: %s rid=%s", urlparse(url).hostname, _request_id())
 		frappe.clear_last_message()
 		frappe.throw(_(_UNREACHABLE))
 	except frappe.ValidationError:
@@ -236,7 +252,7 @@ def _system_tzinfo(name: str) -> _dt.tzinfo:
 		return ZoneInfo(name)
 	except (ZoneInfoNotFoundError, ValueError):
 		# silently assuming UTC moves every chat timestamp by the site's offset, with nothing to read it from
-		frappe.logger("frappe_ai", allow_site=True).warning(
+		_logger().warning(
 			"chat timestamps fall back to UTC: System Settings time zone %r is not in this host's tz database",
 			name,
 		)
@@ -388,7 +404,7 @@ def _save_message(session_id: str, role: str, content: str, tool_result_json: st
 		return ""
 
 
-def _save_the_answer(session_id: str, saved: dict) -> None:
+def _save_the_answer(session_id: str, saved: dict, request_id: str = "") -> None:
 	"""Write the turn's answer row; a chat deleted while it was answered has nowhere left to put one."""
 	if not frappe.db.exists("AI Chat Session", session_id):
 		return
@@ -402,7 +418,8 @@ def _save_the_answer(session_id: str, saved: dict) -> None:
 	except Exception:  # noqa: BLE001 - the answer is on screen; what is left to protect is the claim
 		frappe.log_error(
 			title="AI Chat Message Not Saved",
-			message=frappe.get_traceback(),
+			# a job's Error Log row carries frappe's own uuid for the job, never the request's (ADR-008)
+			message=f"rid={request_id}\n{frappe.get_traceback()}",
 			reference_doctype="AI Chat Session",
 			reference_name=session_id,
 		)
@@ -426,7 +443,7 @@ def _open_session(session_id: str, title: str, context_json: str) -> None:
 @frappe.whitelist(methods=["POST"])
 @rate_limit(limit=_STARTS_PER_MINUTE, seconds=60)
 def start_stream(message: str, session_id: str | None = None, page_context=None) -> dict:
-	"""Enqueue the relay, return {"session_id", "currency"} (the currency the agent was told to answer in, or "")."""
+	"""Enqueue the relay; returns session_id, the currency the agent was told to answer in, and the request id."""
 	if not message or not message.strip():
 		frappe.throw(_("Message is required"))
 
@@ -448,6 +465,7 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 
 	# nothing below reaches the worker that would release the claim, so a failure here gives it back
 	try:
+		request_id = _request_id()
 		if not session_id:
 			session_id = str(uuid.uuid4())
 
@@ -492,13 +510,18 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 			timeout_seconds=timeout_seconds,
 			page_context=page_context,
 			question_row=question_row,
+			request_id=request_id,
 		)
 	# broad on purpose: it re-raises, so nothing is swallowed, and any narrower list would strand the claim
 	except Exception:
 		_release_the_answer(user)
 		raise
 
-	return {"session_id": session_id, "currency": page_context.get("currency", "")}
+	return {
+		"session_id": session_id,
+		"currency": page_context.get("currency", ""),
+		"request_id": request_id,
+	}
 
 
 _TOKEN_HANDOFF_PREFIX = "frappe_ai:confirm_handoff:"
@@ -546,6 +569,7 @@ def _stream_to_agent(
 	page_context: dict | None = None,
 	confirmation: dict | None = None,
 	question_row: str = "",
+	request_id: str = "",
 ) -> None:
 	"""Relay the agent's chunks to user; never whitelist it: it trusts user, and a `confirmation` carries no message."""
 	import time
@@ -553,7 +577,12 @@ def _stream_to_agent(
 	# at module level this would close the import cycle: confirm.py is built on this module
 	from frappe_ai.api.confirm import record_pending
 
-	logger = frappe.logger("frappe_ai", allow_site=True)
+	# ADR-008: whoever handles a request without an id mints one, and frappe.monitor mints a fresh
+	# uuid for a job and adopts nothing, so the request's id goes on that record beside the job's own
+	frappe.flags.ai_request_id = request_id
+	request_id = _request_id()
+	frappe.monitor.add_data_to_monitor(trace_id=request_id)
+	logger = _logger()
 	context: dict = {"user_id": user}
 	if page_context:
 		# Merge the sanitised page context (route/doctype/docname/currency) into
@@ -586,7 +615,8 @@ def _stream_to_agent(
 	streaming = False  # the agent accepted the request, so a later failure is an answer that broke off
 
 	logger.info(
-		"stream.start session=%s user=%s agent=%s timeout=%ds context_keys=%s msg_len=%d",
+		"stream.start rid=%s session=%s user=%s agent=%s timeout=%ds context_keys=%s msg_len=%d",
+		request_id,
 		session_id,
 		user,
 		agent_url,
@@ -603,6 +633,8 @@ def _stream_to_agent(
 			headers={
 				"Content-Type": "application/json",
 				"Accept": "text/event-stream",
+				# each hop sends the header its receiver already parses (ADR-008); the agent reads this one
+				"X-Request-ID": request_id,
 			},
 			# a down agent fails the connect in seconds, not the whole reply budget
 			timeout=(5, timeout_seconds),
@@ -614,7 +646,8 @@ def _stream_to_agent(
 			for line in response.iter_lines(decode_unicode=True):
 				if _is_stream_cancelled(session_id):
 					logger.info(
-						"stream.cancelled session=%s after=%dms chunks=%d",
+						"stream.cancelled rid=%s session=%s after=%dms chunks=%d",
+						request_id,
 						session_id,
 						int((time.monotonic() - stream_start) * 1000),
 						chunk_count,
@@ -644,7 +677,7 @@ def _stream_to_agent(
 					done_source = "agent"
 					# before the frame the browser settles on: a row inserted after it reaches the
 					# tab as msg_added with an id it cannot match, and the answer renders twice
-					_save_the_answer(session_id, saved)
+					_save_the_answer(session_id, saved, request_id)
 				elif chunk.get("type") == "tool_confirm":
 					# recorded before it is published: this record, not the chunk the browser holds, is
 					# what a click is answered from, so a forged click can only name an id
@@ -659,7 +692,8 @@ def _stream_to_agent(
 
 	except requests.exceptions.Timeout:
 		logger.warning(
-			"stream.timeout session=%s after=%dms chunks=%d",
+			"stream.timeout rid=%s session=%s after=%dms chunks=%d",
+			request_id,
 			session_id,
 			int((time.monotonic() - stream_start) * 1000),
 			chunk_count,
@@ -676,7 +710,7 @@ def _stream_to_agent(
 		# the one row an operator reads: the stream.done line below already carries session, duration and chunks
 		frappe.log_error(
 			title="AI Agent Stream Failed",
-			message=frappe.get_traceback(),
+			message=f"rid={request_id}\n{frappe.get_traceback()}",
 			reference_doctype="AI Chat Session",
 			reference_name=session_id,
 		)
@@ -692,7 +726,7 @@ def _stream_to_agent(
 		# Logged here, not re-raised: Frappe's job log records every frame's variables, and this frame holds the question
 		frappe.log_error(
 			title="AI Agent Stream Failed",
-			message=frappe.get_traceback(),
+			message=f"rid={request_id}\n{frappe.get_traceback()}",
 			reference_doctype="AI Chat Session",
 			reference_name=session_id,
 		)
@@ -714,7 +748,8 @@ def _stream_to_agent(
 		)
 
 	logger.info(
-		"stream.done session=%s user=%s duration_ms=%d chunks=%d done_source=%s",
+		"stream.done rid=%s session=%s user=%s duration_ms=%d chunks=%d done_source=%s",
+		request_id,
 		session_id,
 		user,
 		int((time.monotonic() - stream_start) * 1000),

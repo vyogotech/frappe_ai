@@ -4,7 +4,7 @@ import frappe
 import requests
 from frappe import _
 
-from frappe_ai.api.chat import _validate_agent_url
+from frappe_ai.api.chat import _request_id, _validate_agent_url
 
 
 def _agent_url() -> str:
@@ -31,7 +31,9 @@ def test_connection():
 			# settings page caller renders the message verbatim.
 			return {"success": False, "message": str(e)}
 
-		health_response = requests.get(f"{agent_url}/health", timeout=10)
+		# the other call this app makes to the agent, under the same header (ADR-008)
+		headers = {"X-Request-ID": _request_id()}
+		health_response = requests.get(f"{agent_url}/health", headers=headers, timeout=10)
 
 		if health_response.status_code == 200:
 			return {
@@ -56,5 +58,8 @@ def test_connection():
 
 	# not Exception: a bug must not read as unreachable. ValueError: .json(), and getaddrinfo's UnicodeError
 	except (requests.RequestException, ValueError) as e:
-		frappe.log_error(title="AI Agent Connection Test Failed", message=frappe.get_traceback())
+		frappe.log_error(
+			title="AI Agent Connection Test Failed",
+			message=f"rid={_request_id()}\n{frappe.get_traceback()}",
+		)
 		return {"success": False, "message": _("Connection test failed: {0}").format(e)}
