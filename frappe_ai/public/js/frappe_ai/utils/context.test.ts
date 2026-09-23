@@ -13,6 +13,20 @@ function setCurList(value: unknown) {
 	g.cur_list = value;
 }
 
+/** The desk with one document open: the route names it, locals holds it, cur_frm points at it (form.js:407,415). */
+function openDocument(
+	doc: { doctype: string; name: string; currency?: string },
+	rest: object = {},
+) {
+	setFrappe({
+		...rest,
+		router: { current_route: ["Form", doc.doctype, doc.name] },
+		get_doc: (doctype: string, name: string) =>
+			doctype === doc.doctype && name === doc.name ? doc : null,
+	});
+	setCurFrm({ doctype: doc.doctype, docname: doc.name, doc });
+}
+
 describe("getPageContext", () => {
 	let originalFrappe: unknown;
 	let originalCurFrm: unknown;
@@ -47,34 +61,34 @@ describe("getPageContext", () => {
 		expect(getPageContext().route).toBe("");
 	});
 
-	it("reads doctype + docname from cur_frm", () => {
-		setFrappe({});
-		setCurFrm({ doc: { doctype: "Sales Invoice", name: "SINV-001" } });
+	it("reads doctype + docname from the open document", () => {
+		openDocument({ doctype: "Sales Invoice", name: "SINV-001" });
 		const ctx = getPageContext();
 		expect(ctx.doctype).toBe("Sales Invoice");
 		expect(ctx.docname).toBe("SINV-001");
 	});
 
-	it("falls back to cur_list.doctype when no form is open", () => {
-		setFrappe({});
+	it("falls back to the list's doctype when no document is open", () => {
+		setFrappe({ router: { current_route: ["List", "Item", "List"] } });
 		setCurFrm(undefined);
 		setCurList({ doctype: "Item" });
 		expect(getPageContext().doctype).toBe("Item");
 	});
 
-	it("prefers cur_frm currency when present", () => {
-		setFrappe({ boot: { sysdefaults: { currency: "INR" } } });
-		setCurFrm({ doc: { doctype: "SI", name: "X", currency: "USD" } });
+	it("prefers the open document's currency over the site default", () => {
+		openDocument(
+			{ doctype: "SI", name: "X", currency: "USD" },
+			{ boot: { sysdefaults: { currency: "INR" } } },
+		);
 		expect(getPageContext().currency).toBe("USD");
 	});
 
 	it("uppercases the currency code", () => {
-		setFrappe({});
-		setCurFrm({ doc: { doctype: "SI", name: "X", currency: "inr" } });
+		openDocument({ doctype: "SI", name: "X", currency: "inr" });
 		expect(getPageContext().currency).toBe("INR");
 	});
 
-	it("treats malformed cur_frm gracefully", () => {
+	it("treats a malformed desk state gracefully", () => {
 		setFrappe({});
 		setCurFrm({ doc: null });
 		expect(getPageContext().doctype).toBe("");
