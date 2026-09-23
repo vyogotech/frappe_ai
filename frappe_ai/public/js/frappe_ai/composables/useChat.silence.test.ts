@@ -7,16 +7,14 @@ interface Listener {
 	handler: (data: unknown) => void;
 }
 
-/** useChat over a stubbed frappe whose AI Assistant Settings answers with this timeout. */
+/** useChat over a stubbed frappe whose desk boot carries this timeout. */
 async function setup(timeoutSeconds: number) {
 	const listeners: Listener[] = [];
 	const methods: string[] = [];
 	g.frappe = {
+		boot: { frappe_ai: { enabled: true, timeout: timeoutSeconds } },
 		call: vi.fn((opts: Record<string, unknown>) => {
 			methods.push(opts.method as string);
-			if (opts.method === "frappe_ai.api.get_settings") {
-				return Promise.resolve({ message: { enabled: true, timeout: timeoutSeconds } });
-			}
 			return Promise.resolve({ message: { session_id: "s-1" } });
 		}),
 		realtime: {
@@ -26,9 +24,7 @@ async function setup(timeoutSeconds: number) {
 			off: vi.fn(),
 		},
 	};
-	vi.resetModules(); // both composables are module-level singletons
-	const { useSettings } = await import("./useSettings");
-	await useSettings().loadSettings();
+	vi.resetModules(); // useChat is a module-level singleton
 	const { useChat } = await import("./useChat");
 	return { chat: useChat(), listeners, methods };
 }

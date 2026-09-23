@@ -31,8 +31,17 @@ interface FrappeBootSysDefaults {
 	currency?: string;
 }
 
+/** What frappe_ai's extend_bootinfo hook puts on the boot; every key is optional, an older boot has none. */
+interface FrappeAIBoot {
+	enabled?: boolean;
+	sidebar_width?: number;
+	keyboard_shortcut?: string;
+	timeout?: number;
+}
+
 interface FrappeBoot {
 	sysdefaults?: FrappeBootSysDefaults;
+	frappe_ai?: FrappeAIBoot;
 }
 
 interface FrappeDefaults {
@@ -95,7 +104,11 @@ interface FrappeList {
 	doctype?: string;
 }
 
-// $ is left undeclared on purpose: v16.16+ scopes jQuery out of app bundles, so any $(...) must fail tsc
+// frappe's libs.bundle.js sets window.$ (public/js/jquery-bootstrap.js) and desk.html loads it before any app bundle;
+// only the one member we use is declared, so a wider jQuery call is a type error
+declare const $: (target: Document) => {
+	on: (event: "app_ready", handler: () => void) => void;
+};
 
 // declared as always present, which tsc cannot check; keep the runtime typeof frappe guards anyway
 declare const frappe: FrappeGlobal;

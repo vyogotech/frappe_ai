@@ -14,6 +14,9 @@ app_include_css = ["frappe_ai_sidebar.bundle.css"]
 # .ts, not .js: esbuild keys assets.json by the source entry point, so a .js name 404s (frappe/esbuild/esbuild.js)
 app_include_js = ["frappe_ai.bundle.ts"]
 
+# the sidebar reads its settings off the desk boot, so a desk load carries no settings call of its own
+extend_bootinfo = "frappe_ai.ai_assistant.doctype.ai_assistant_settings.ai_assistant_settings.boot_settings"
+
 # other tabs on the same session append these messages instead of polling
 doc_events = {
 	"AI Chat Message": {

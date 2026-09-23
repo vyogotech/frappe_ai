@@ -6,11 +6,17 @@ from unittest.mock import patch
 
 import frappe
 
-from frappe_ai import api
+from frappe_ai.ai_assistant.doctype.ai_assistant_settings.ai_assistant_settings import boot_settings
 from frappe_ai.api import chat
 
 CONF = {"frappe_ai_agent_url": "http://localhost:8484", "frappe_ai_agent_url_unsafe_ok": 1}
 SETTINGS = "AI Assistant Settings"
+
+
+def _boot_timeout() -> int:
+	bootinfo = frappe._dict()
+	boot_settings(bootinfo=bootinfo)
+	return bootinfo["frappe_ai"]["timeout"]
 
 
 def _set_timeout(value) -> None:
@@ -47,14 +53,14 @@ class TestTimeoutChain(unittest.TestCase):
 		chat.start_stream(message="hello")
 		self.assertEqual(enqueue.call_args.kwargs["timeout_seconds"], 300)
 		self.assertEqual(enqueue.call_args.kwargs["timeout"], 330)
-		self.assertEqual(api.get_settings()["timeout"], 300)
+		self.assertEqual(_boot_timeout(), 300)
 
 	@patch("frappe.enqueue")
 	def test_a_timeout_left_unset_is_the_fields_own_default(self, enqueue):
 		_set_timeout(0)
 		chat.start_stream(message="hello")
 		self.assertEqual(enqueue.call_args.kwargs["timeout_seconds"], 120)
-		self.assertEqual(api.get_settings()["timeout"], 120)
+		self.assertEqual(_boot_timeout(), 120)
 
 	def test_the_relay_job_carries_no_budget_of_its_own(self):
 		default = inspect.signature(chat._stream_to_agent).parameters["timeout_seconds"].default

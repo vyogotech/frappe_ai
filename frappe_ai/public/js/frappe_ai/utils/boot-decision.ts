@@ -7,12 +7,12 @@ const PRIVILEGED_ROLES = new Set(["System Manager", "Administrator"]);
 export interface BootDecisionInput {
 	enabled: boolean;
 	roles: string[];
-	/** The settings call failed, so `enabled` is unknown rather than false. */
+	/** The desk boot carried no settings, so `enabled` is unknown rather than false. */
 	loadError?: boolean;
 }
 
 export function decideBoot(input: BootDecisionInput): BootDecision {
-	// a read that failed is not an administrator's switch: mount with the defaults rather than report it off
+	// settings that never arrived are not an administrator's switch: mount with the defaults rather than report it off
 	if (input.enabled || input.loadError) return "mount-sidebar";
 	const hasPrivilegedRole = (input.roles || []).some((r) => PRIVILEGED_ROLES.has(r));
 	return hasPrivilegedRole ? "show-disabled-hint" : "hidden";

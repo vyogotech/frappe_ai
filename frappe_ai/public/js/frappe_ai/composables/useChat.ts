@@ -4,7 +4,7 @@ import { ref, readonly } from "vue";
 import type { AssistantMessage, Message, ToolCall } from "../types/messages";
 import { getPageContext } from "../utils/context";
 import { setAgentCurrency } from "../utils/formatters";
-import { useSettings } from "./useSettings";
+import { readBootSettings } from "../utils/boot-settings";
 
 interface Chunk {
 	type:
@@ -106,7 +106,7 @@ export function useChat() {
 		// every ending (done, error chunk, call error, timeout, cancel) goes through settle(), or two error bubbles appear
 		let settled = false;
 		let timerId: ReturnType<typeof setTimeout> | undefined;
-		const silenceMs = useSettings().timeout.value * 1000 + SILENCE_MARGIN_MS;
+		const silenceMs = readBootSettings().timeout * 1000 + SILENCE_MARGIN_MS;
 
 		try {
 			const sessionId = _conversationId ?? crypto.randomUUID();

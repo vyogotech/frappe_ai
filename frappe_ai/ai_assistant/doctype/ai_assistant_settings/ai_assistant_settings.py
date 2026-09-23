@@ -22,9 +22,13 @@ class AIAssistantSettings(Document):
 		conf_url = frappe.local.conf.get("frappe_ai_agent_url", "")
 		self.agent_url = conf_url.rstrip("/") if conf_url else ""
 
+	def field_or_default(self, fieldname: str):
+		"""The stored value, or the field's own default while it is unset — so no default is written twice."""
+		return self.get(fieldname) or self.meta.get_field(fieldname).default
+
 	def agent_timeout(self) -> int:
 		"""Seconds the relay gives the agent: this setting, or the field's own default while it is unset."""
-		return int(self.timeout or self.meta.get_field("timeout").default)
+		return int(self.field_or_default("timeout"))
 
 	def validate(self):
 		if self.timeout is not None and (self.timeout < 1 or self.timeout > 300):
@@ -58,3 +62,15 @@ def _validate_shortcut(shortcut: str) -> None:
 				shortcut
 			)
 		)
+
+
+def boot_settings(bootinfo) -> None:
+	"""extend_bootinfo hook: put the sidebar's settings on the desk boot, so it needs no call of its own."""
+	settings = frappe.get_single("AI Assistant Settings")
+	bootinfo["frappe_ai"] = {
+		"enabled": bool(settings.enabled),
+		# the sidebar sizes its own limit from this, so it never gives up while the relay is still reading
+		"timeout": settings.agent_timeout(),
+		"sidebar_width": int(settings.field_or_default("sidebar_width")),
+		"keyboard_shortcut": settings.field_or_default("keyboard_shortcut"),
+	}

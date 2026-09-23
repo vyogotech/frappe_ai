@@ -1,7 +1,7 @@
 import { createApp, type App as VueApp } from "vue";
 import App from "./frappe_ai/App.vue";
-import { useSettings } from "./frappe_ai/composables/useSettings";
 import { decideBoot } from "./frappe_ai/utils/boot-decision";
+import { readBootSettings } from "./frappe_ai/utils/boot-settings";
 import { frappeIcon } from "./frappe_ai/utils/frappe-icon";
 import { createSidebarVisibilityController } from "./frappe_ai/utils/sidebar-visibility";
 
@@ -154,26 +154,6 @@ function toggleSidebar(): void {
 	document.dispatchEvent(new CustomEvent("frappe-ai-toggle"));
 }
 
-// polled: app_ready is a jQuery event, and v16.16+ scopes jQuery out of app bundles (window.$ is undefined);
-// frappe.boot, not frappe.app, which only the desk controller sets and is not reliable across dev and prod
-function onFrappeReady(handler: () => void): void {
-	const tick = (attempts: number) => {
-		if (
-			typeof frappe !== "undefined" &&
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			(frappe as any).boot &&
-			// Body has been hydrated past the bare loading skeleton.
-			document.body.children.length > 1
-		) {
-			handler();
-			return;
-		}
-		if (attempts > 900) return; // 90s cap — desk that doesn't reach boot+body in 90s is broken
-		setTimeout(() => tick(attempts + 1), 100);
-	};
-	tick(0);
-}
-
 /** Inject a small "AI is disabled — open settings" link in the navbar. */
 function injectDisabledHint(): void {
 	function build(): HTMLElement {
@@ -207,21 +187,22 @@ function injectDisabledHint(): void {
 	});
 }
 
-onFrappeReady(async () => {
-	const { settings, loadError, loadSettings } = useSettings();
-	await loadSettings();
+// app_ready is frappe's own "the desk is up" event (desk.js), the one ERPNext mounts from;
+// this bundle is a plain <script> in desk.html, so the handler is registered well before the desk triggers it
+$(document).on("app_ready", () => {
+	const settings = readBootSettings();
 
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const roles = ((frappe as any).user_roles as string[]) || [];
 	const decision = decideBoot({
-		enabled: settings.value.enabled,
+		enabled: settings.enabled,
 		roles,
-		loadError: loadError.value,
+		loadError: settings.loadError,
 	});
 	if (decision === "hidden") return;
 	if (decision === "show-disabled-hint") {
 		injectDisabledHint();
 		return;
 	}
-	mountSidebar(settings.value.sidebarWidth, settings.value.keyboardShortcut);
+	mountSidebar(settings.sidebarWidth, settings.keyboardShortcut);
 });
