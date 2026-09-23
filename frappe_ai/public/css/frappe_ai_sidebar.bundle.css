@@ -471,13 +471,14 @@
 	flex-shrink: 0;
 }
 
+/* Literal, like .frappe-ai-status-dot--*: a desk that defined --indicator-green would move it. */
 .frappe-ai-tool-status--done {
-	background: var(--indicator-green, #27ae60);
+	background: #1d8047;
 }
 
 /* Waiting on the user's Allow or Deny (ADR-006). */
 .frappe-ai-tool-status--waiting {
-	background: var(--indicator-orange, #f39c12);
+	background: #a2670c;
 	animation: frappe-ai-blink 1s ease-in-out infinite;
 }
 

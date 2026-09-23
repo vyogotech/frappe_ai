@@ -61,6 +61,15 @@ const opacity = (selector: string) => Number(decl(selector, "opacity") ?? 1);
 const HUES = ["green", "red", "yellow", "blue"] as const;
 const THEMES = Object.keys(THEME) as Theme[];
 
+// the tool header paints the same --bg-light-gray the status item does. At rest: the waiting dot
+// blinks to 0.3 alpha, where nothing at all clears 3:1 (pure black reaches 2.09 on the light
+// header, pure white 2.70 on the dark one), and that animation is the owner's to change.
+const DOTS = [
+	...HUES.map((hue) => `.frappe-ai-status-dot--${hue}`),
+	".frappe-ai-tool-status--done",
+	".frappe-ai-tool-status--waiting",
+];
+
 describe.each(THEMES)("the sidebar's status colours, %s theme", (theme) => {
 	const { bg, row, muted } = THEME[theme];
 
@@ -69,9 +78,8 @@ describe.each(THEMES)("the sidebar's status colours, %s theme", (theme) => {
 		expect(ratio(decl(sel, "color")!, decl(sel, "background")!)).toBeGreaterThanOrEqual(4.5);
 	});
 
-	it.each(HUES)("shows the %s dot at 3:1 against its row (SC 1.4.11)", (hue) => {
-		const dot = decl(`.frappe-ai-status-dot--${hue}`, "background")!;
-		expect(ratio(dot, row)).toBeGreaterThanOrEqual(3);
+	it.each(DOTS)("shows %s at 3:1 against its surface (SC 1.4.11)", (selector) => {
+		expect(ratio(decl(selector, "background")!, row)).toBeGreaterThanOrEqual(3);
 	});
 
 	it("keeps the gray chip and dot, which follow the desk's tokens", () => {
