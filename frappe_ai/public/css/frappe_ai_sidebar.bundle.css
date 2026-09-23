@@ -51,8 +51,9 @@
 	overflow: hidden;
 }
 
-/* Text for assistive technology only. The desk's Bootstrap 4 ships .sr-only, but
-   Bootstrap 5 renamed it, and a renamed class here would put the text on screen. */
+/* Text for assistive technology only. Local, not the desk's Bootstrap .sr-only: nothing
+   pins the framework version this app is installed into, and if that class ever moves the
+   failure is "You said:" appearing on screen. */
 .frappe-ai-sr-only {
 	position: absolute;
 	width: 1px;
@@ -929,12 +930,9 @@
 	transform: translateX(100%);
 }
 
-/* ──────────────────────────────────────────
-   Reduced motion
-   ────────────────────────────────────────── */
-/* Last in the file on purpose: several of the rules above have the same specificity,
-   so only source order lets this one win without !important. Near-zero rather than
-   `none` so a transitionend or animationend listener still fires. */
+/* Reduced motion. Last in the file on purpose: #frappe-ai-sidebar-root ties on specificity
+   with the mobile rule above, so only source order lets this win without !important.
+   Near-zero rather than `none` so a transitionend or animationend listener still fires. */
 @media (prefers-reduced-motion: reduce) {
 	#frappe-ai-sidebar-root,
 	#frappe-ai-sidebar-root * {
