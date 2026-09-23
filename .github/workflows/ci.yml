@@ -34,7 +34,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
-          # Frappe v16 (16.18+) requires Python 3.14.
+          # Every frappe v16 release, from v16.0.0, declares requires-python >=3.14,<3.15.
           python-version: '3.14'
 
       - name: Set up Node
@@ -50,34 +50,26 @@ jobs:
           enable-cache: true
 
       - name: Install Python deps (runtime + dev group)
-        run: uv sync --group dev
+        run: uv sync --locked --group dev
 
       - name: Install Node deps
         run: npm ci
 
-      - name: ruff check
-        run: uvx ruff check
+      # The Makefile is the one definition of these checks, so CI and a developer cannot drift apart.
+      - name: make lint
+        run: make lint
 
-      - name: ruff format --check
-        run: uvx ruff format --check
+      - name: make typecheck
+        run: make typecheck
 
-      - name: pyrefly check
-        run: uvx pyrefly check
+      - name: make boundaries
+        run: make boundaries
 
-      - name: eslint
-        run: npm run lint
-
-      - name: prettier --check
-        run: npm run format:check
-
-      - name: TypeScript type-check
-        run: npm run typecheck
-
-      - name: Vitest (frontend unit tests)
-        run: npm test
+      - name: make test-js
+        run: make test-js
 
       - name: markdownlint
-        run: npx --yes markdownlint-cli README.md QUICKSTART.md INSTALLATION.md APP_STRUCTURE.md
+        run: npx --yes markdownlint-cli@0.49.1 README.md QUICKSTART.md INSTALLATION.md APP_STRUCTURE.md CONTRIBUTING.md SECURITY.md
 
       - name: Strict JSON validity
         run: |
@@ -114,7 +106,8 @@ jobs:
 
     services:
       mariadb:
-        image: mariadb:10.6
+        # 10.6 left community support on 2026-07-06; 11.8 LTS is what frappe's own CI runs.
+        image: mariadb:11.8
         env:
           MARIADB_ROOT_PASSWORD: travis
         ports:
@@ -126,12 +119,12 @@ jobs:
           --health-retries 10
 
       redis-cache:
-        image: redis:alpine
+        image: redis:8-alpine
         ports:
           - 13000:6379
 
       redis-queue:
-        image: redis:alpine
+        image: redis:8-alpine
         ports:
           - 11000:6379
 
@@ -146,7 +139,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
-          # Frappe v16 (16.18+) requires Python 3.14.
+          # Every frappe v16 release, from v16.0.0, declares requires-python >=3.14,<3.15.
           python-version: '3.14'
 
       - name: Set up Node
@@ -175,7 +168,7 @@ jobs:
             FLUSH PRIVILEGES;"
 
       - name: Install frappe-bench
-        run: pip install frappe-bench
+        run: pip install frappe-bench==5.31.0
 
       - name: bench init (Frappe v16)
         run: |
