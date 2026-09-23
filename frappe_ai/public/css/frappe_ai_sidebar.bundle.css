@@ -902,23 +902,6 @@
 }
 
 /* ──────────────────────────────────────────
-   Background overlay (App.vue — mobile)
-   ────────────────────────────────────────── */
-.frappe-ai-overlay {
-	display: none;
-}
-
-@media (max-width: 768px) {
-	.frappe-ai-overlay {
-		display: block;
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.35);
-		z-index: 1029;
-	}
-}
-
-/* ──────────────────────────────────────────
    Vue transitions
    ────────────────────────────────────────── */
 .frappe-ai-slide-enter-active,
@@ -929,14 +912,4 @@
 .frappe-ai-slide-enter-from,
 .frappe-ai-slide-leave-to {
 	transform: translateX(100%);
-}
-
-.frappe-ai-fade-enter-active,
-.frappe-ai-fade-leave-active {
-	transition: opacity 0.25s ease;
-}
-
-.frappe-ai-fade-enter-from,
-.frappe-ai-fade-leave-to {
-	opacity: 0;
 }

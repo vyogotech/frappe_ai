@@ -43,12 +43,4 @@ onUnmounted(() => {
 			@close="handleClose"
 		/>
 	</Transition>
-	<Transition name="frappe-ai-fade">
-		<div
-			v-show="visible"
-			class="frappe-ai-overlay"
-			aria-hidden="true"
-			@click="handleClose"
-		></div>
-	</Transition>
 </template>
