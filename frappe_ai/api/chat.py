@@ -171,8 +171,6 @@ def get_recent_messages(limit: int = 50) -> dict:
 		None when the caller has no chat and timestamp is ISO 8601 UTC.
 	"""
 	user = frappe.session.user
-	if user == "Guest":
-		return {"session_id": None, "messages": []}
 
 	sessions = frappe.get_all(
 		"AI Chat Session",
@@ -270,8 +268,6 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 		frappe.throw(_("Message too long (max {0} characters).").format(max_chars))
 
 	user = frappe.session.user
-	if user == "Guest":
-		frappe.throw(_("Authentication required"), frappe.AuthenticationError)
 
 	settings = frappe.get_single("AI Assistant Settings")
 	if not settings.enabled:
@@ -318,6 +314,7 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 			timeout_seconds=timeout_seconds,
 			page_context=_sanitize_page_context(page_context),
 		)
+	# broad on purpose: it re-raises, so nothing is swallowed, and any narrower list would strand the claim
 	except Exception:
 		_release_the_answer(user)
 		raise

@@ -2,7 +2,6 @@
 
 import frappe
 import requests
-from frappe import _
 
 from frappe_ai.api.chat import _validate_agent_url
 
@@ -19,9 +18,6 @@ def test_connection():
 
 	if not settings.enabled:
 		return {"success": False, "message": "AI Assistant is not enabled"}
-
-	if frappe.session.user == "Guest":
-		frappe.throw(_("Authentication required"), frappe.AuthenticationError)
 
 	try:
 		agent_url = _agent_url()
