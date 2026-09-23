@@ -19,6 +19,14 @@ const timeStr = computed(() =>
 		: "",
 );
 
+// which side of the panel a bubble sits on, and what colour it is, say this to a sighted
+// user and to nobody else; an error bubble is nobody's utterance, so it stays unattributed
+const speaker = computed(() => {
+	if (props.message.role === "user") return "You said:";
+	if (props.message.role === "assistant") return "Frappe AI said:";
+	return "";
+});
+
 const isPendingEmpty = computed(
 	() =>
 		props.message.role === "assistant" &&
@@ -30,6 +38,7 @@ const isPendingEmpty = computed(
 
 <template>
 	<div :class="`frappe-ai-bubble frappe-ai-bubble--${message.role}`">
+		<span v-if="speaker" class="frappe-ai-sr-only">{{ speaker }}</span>
 		<!-- User message -->
 		<div v-if="message.role === 'user'" class="frappe-ai-bubble-content">
 			{{ message.content }}

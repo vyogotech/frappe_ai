@@ -105,9 +105,10 @@ const liveStatus = computed(() => {
 
 <template>
 	<!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -- not a widget: the panel only catches an Escape bubbling up from the control that has focus (APG dialog) -->
-	<div
+	<aside
 		ref="panel"
 		class="frappe-ai-sidebar"
+		aria-label="Frappe AI"
 		:style="{ width: sidebarWidth + 'px' }"
 		@keydown.esc="handleClose"
 	>
@@ -121,5 +122,5 @@ const liveStatus = computed(() => {
 			@stop="handleStop"
 		/>
 		<div class="sr-only" role="status">{{ liveStatus }}</div>
-	</div>
+	</aside>
 </template>
