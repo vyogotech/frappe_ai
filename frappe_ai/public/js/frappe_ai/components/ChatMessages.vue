@@ -22,18 +22,23 @@ const onRouteChange = () => {
 	routeTick.value++;
 };
 
+// the chat is hydrated while the panel is still hidden, where scrollHeight is 0 and the watcher's scroll is a no-op
+const onSidebarOpened = () => scrollToNewest();
+
 onMounted(() => {
 	// frappe.router.on("change", ...) is the v16 Desk hook for SPA navigation.
 	// Guard against frappe being undefined (server-rendered/test env).
 	if (typeof frappe !== "undefined" && frappe?.router?.on) {
 		frappe.router.on("change", onRouteChange);
 	}
+	document.addEventListener("frappe-ai-opened", onSidebarOpened);
 });
 
 onUnmounted(() => {
 	if (typeof frappe !== "undefined" && frappe?.router?.off) {
 		frappe.router.off("change", onRouteChange);
 	}
+	document.removeEventListener("frappe-ai-opened", onSidebarOpened);
 });
 
 // Three starter prompts shown on the empty state. The first is route-aware:
@@ -53,16 +58,18 @@ function pickPrompt(text: string) {
 	emit("send", text);
 }
 
+function scrollToNewest() {
+	nextTick(() => {
+		if (container.value) {
+			container.value.scrollTop = container.value.scrollHeight;
+		}
+	});
+}
+
 // length and the last content only: a deep watch walks the whole array on every chunk
 watch(
 	[() => props.messages.length, () => props.messages[props.messages.length - 1]?.content],
-	() => {
-		nextTick(() => {
-			if (container.value) {
-				container.value.scrollTop = container.value.scrollHeight;
-			}
-		});
-	},
+	scrollToNewest,
 );
 </script>
 

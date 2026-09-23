@@ -164,7 +164,7 @@ def _is_stream_cancelled(session_id: str) -> bool:
 
 @frappe.whitelist()
 def get_recent_messages(limit: int = 50) -> dict:
-	"""Return the caller's last modified chat and the first limit (1 to 200) of its messages, oldest first.
+	"""Return the caller's last modified chat and the newest limit (1 to 200) of its messages, oldest first.
 
 	Returns:
 		{"session_id": str | None, "messages": [{"id", "role", "content", "timestamp"}]}, where session_id is
@@ -192,9 +192,11 @@ def get_recent_messages(limit: int = 50) -> dict:
 		"AI Chat Message",
 		filters={"session": session_id},
 		fields=["name", "role", "content", "creation"],
-		order_by="creation asc",
+		order_by="creation desc",
 		limit=safe_limit,
 	)
+	# newest `limit` rows, then back into reading order; ascending would page from the chat's first message
+	rows.reverse()
 	messages = [
 		{
 			"id": r["name"],
