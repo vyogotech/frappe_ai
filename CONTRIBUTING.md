@@ -93,7 +93,7 @@ Versions are tracked in `frappe_ai/__init__.py`. Bench reads them for the assets
 - **Polling instead of realtime**: the old code briefly used `setInterval` to fetch chunks. The current `frappe.realtime` relay is push-only and much cheaper.
 - **`frappe_ai_agent_url` stored on the doctype**: it's in `site_config.json`, read-only on the form. Lets ops rotate endpoints without granting DocType write to anyone.
 - **OAuth client + Bearer tokens**: superseded by sid-cookie forwarding. If you're tempted to add OAuth, talk to me first — it solves a problem we no longer have.
-- **Eager `import echarts`**: large, only some users render charts. Lazy-loaded via `defineAsyncComponent` in `blocks/index.ts`. Don't undo this.
+- **Eager `import echarts`**: large, only some users render charts. It lives in a `*.bundle.ts` entry point of its own, which `ChartBlock.vue` loads the first time a chart block renders. Don't undo this, and don't reach for `defineAsyncComponent` instead: Frappe's esbuild emits no chunk for a dynamic `import()`.
 
 ## Questions
 

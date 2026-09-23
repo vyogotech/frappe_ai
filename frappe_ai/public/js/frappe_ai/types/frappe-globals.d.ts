@@ -63,6 +63,13 @@ interface FrappeRealtime {
 	off: (event: string, handler?: (data: unknown) => void) => void;
 }
 
+interface FrappeAssets {
+	/** A bundle's hashed URL from sites/assets/assets.json, or the path unchanged when it has none. */
+	bundled_asset: (path: string) => string;
+	/** Appends one <script> or <link> per path and resolves when it has run — or failed to load. */
+	load_asset: (path: string, url: string) => Promise<void>;
+}
+
 interface FrappeUIKeys {
 	add_shortcut: (opts: {
 		shortcut: string;
@@ -84,6 +91,8 @@ interface FrappeGlobal {
 	defaults?: FrappeDefaults;
 	realtime: FrappeRealtime;
 	ui: FrappeUI;
+	/** Optional: a test environment has no desk asset manager. */
+	assets?: FrappeAssets;
 	/** Navigate the desk to a route — accepts segments like ("Form", doctype, name). */
 	set_route: (...path: string[]) => void;
 	/** The Promise is for async: true; callback and error are invoked either way. */
@@ -111,6 +120,11 @@ interface FrappeList {
 declare const $: (target: Document) => {
 	on: (event: "app_ready", handler: () => void) => void;
 };
+
+interface Window {
+	/** Set by frappe_ai_chart.bundle.ts; undefined until ChartBlock has loaded that bundle. */
+	frappe_ai_echarts?: typeof import("../components/blocks/chart-echarts");
+}
 
 // declared as always present, which tsc cannot check; keep the runtime typeof frappe guards anyway
 declare const frappe: FrappeGlobal;

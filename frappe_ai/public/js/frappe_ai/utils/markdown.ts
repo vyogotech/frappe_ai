@@ -35,7 +35,8 @@ function resolveSrc(src: string): URL | null {
 	}
 }
 
-const esc = md.utils.escapeHtml;
+/** markdown-it's own escaper: `&`, `<`, `>` and `"` as entities. */
+export const esc = md.utils.escapeHtml;
 
 md.renderer.rules.image = (tokens, idx, options, env, self) => {
 	const url = resolveSrc(tokens[idx].attrGet("src") || "");

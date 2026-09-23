@@ -35,4 +35,4 @@ use([
 	CalendarComponent,
 ]);
 
-export { init } from "echarts/core";
+export { init, throttle } from "echarts/core";

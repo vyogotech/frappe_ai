@@ -1,7 +1,10 @@
 /** The echarts option for a chart block: the desk's theme tokens in, one option object out. */
 
-import { format } from "echarts/core";
 import { formatValue } from "../../utils/formatters";
+// echarts writes a function formatter's string into the tooltip with innerHTML and the labels come from
+// the model. markdown-it is already in this bundle, and its escaper is the one the rest of the app renders
+// model text with; echarts' own format.encodeHTML would pull the chart library back in here.
+import { esc } from "../../utils/markdown";
 import type { ChartBlock } from "../../types/blocks";
 
 export interface ChartTheme {
@@ -84,7 +87,7 @@ export function buildChartOption(block: ChartBlock, t: ChartTheme) {
 					...tooltipBase,
 					trigger: "item",
 					formatter: (p: { name: string; value: number }) =>
-						`${format.encodeHTML(p.name)}: ${formatValue(p.value, currency ? "currency" : "number", { currency })}`,
+						`${esc(p.name)}: ${formatValue(p.value, currency ? "currency" : "number", { currency })}`,
 				},
 				legend: {
 					orient: "horizontal",
