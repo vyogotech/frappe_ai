@@ -1,8 +1,11 @@
+import datetime as _dt
+import functools
 import ipaddress
 import json
 import socket
 import uuid
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import frappe
 import requests
@@ -209,10 +212,22 @@ def get_recent_messages(limit: int = 50) -> dict:
 	return {"session_id": session_id, "messages": messages}
 
 
+@functools.lru_cache(maxsize=4)
+def _system_tzinfo(name: str) -> _dt.tzinfo:
+	"""System Settings' time zone, or UTC and one log line where this host's tz database has no entry for it."""
+	try:
+		return ZoneInfo(name)
+	except (ZoneInfoNotFoundError, ValueError):
+		# silently assuming UTC moves every chat timestamp by the site's offset, with nothing to read it from
+		frappe.logger("frappe_ai", allow_site=True).warning(
+			"chat timestamps fall back to UTC: System Settings time zone %r is not in this host's tz database",
+			name,
+		)
+		return _dt.timezone.utc
+
+
 def _to_iso_utc(value) -> str | None:
 	"""ISO 8601 UTC with a Z: a naive Frappe time is in System Settings' zone, and JS reads it as local."""
-	import datetime as _dt
-
 	from frappe.utils import get_datetime, get_system_timezone
 
 	if value is None:
@@ -224,13 +239,7 @@ def _to_iso_utc(value) -> str | None:
 
 	if dt.tzinfo is None:
 		# Naive Frappe datetime: localise to the system timezone first.
-		from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-
-		try:
-			dt = dt.replace(tzinfo=ZoneInfo(get_system_timezone()))
-		except (ZoneInfoNotFoundError, ValueError):
-			# a System Settings time_zone this host's tz database has no entry for; anything else is a bug
-			dt = dt.replace(tzinfo=_dt.timezone.utc)
+		dt = dt.replace(tzinfo=_system_tzinfo(get_system_timezone()))
 
 	utc_dt = dt.astimezone(_dt.timezone.utc)
 	# Replace "+00:00" with "Z" for the canonical UTC suffix the FE expects.
