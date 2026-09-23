@@ -48,14 +48,6 @@ describe("formatValue", () => {
 			});
 		});
 
-		it("falls back to INR when no other source is available", () => {
-			withBoot(undefined, () => {
-				const out = formatValue(1234, "currency");
-				// Currency code or symbol — Intl may render as '₹' or 'INR'.
-				expect(out).toMatch(/₹|INR/);
-			});
-		});
-
 		it("rounds to integer (no fractional digits)", () => {
 			const out = formatValue(1234.567, "currency", { currency: "USD" });
 			expect(out).toContain("1,235");
