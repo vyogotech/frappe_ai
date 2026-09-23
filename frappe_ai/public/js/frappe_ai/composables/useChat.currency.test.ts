@@ -45,7 +45,7 @@ describe("useChat currency", () => {
 		expect(formatValue(1234, "currency")).toMatch(/\$/);
 	});
 
-	it("leaves the fallback alone when the server could not name a currency", async () => {
+	it("leaves the site default in place when the server could not name a currency", async () => {
 		const { chat, listeners, formatValue } = await setup("");
 		const promise = chat.sendMessage("what did we sell last month?");
 		listeners[listeners.length - 1]({ type: "done", tools_called: [] });

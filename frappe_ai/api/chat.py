@@ -318,8 +318,8 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 			_SID_KEY_PREFIX + sid_key, frappe.session.sid, expires_in_sec=timeout_seconds + 30
 		)
 
-		# the page names a currency only when the open document has one; for every other page the
-		# agent would otherwise fall back to its own default, which is INR whatever the company uses
+		# the page names a currency only when the open document has one; for every other page this
+		# is the answer's only chance at one, because the agent names none it was not given
 		page_context = _sanitize_page_context(page_context)
 		if not page_context.get("currency"):
 			currency = _default_currency()

@@ -11,7 +11,7 @@ export function setAgentCurrency(code: string): void {
 	agentCurrency = code;
 }
 
-/** The currency to format in; the INR fallback matches the agent prompt's, so the prose and the table cells agree. */
+/** The block's own currency, else the one the server gave the agent, else the site default, else "" — never a guess. */
 function resolveCurrency(supplied?: string): string {
 	if (supplied) return supplied;
 	if (agentCurrency) return agentCurrency;
@@ -25,9 +25,9 @@ function resolveCurrency(supplied?: string): string {
 			}
 		}
 	} catch {
-		// ignore — fall through to default
+		// ignore — nothing names a currency
 	}
-	return "INR";
+	return "";
 }
 
 export function formatValue(value: unknown, format?: string, options: FormatOptions = {}): string {
@@ -37,10 +37,9 @@ export function formatValue(value: unknown, format?: string, options: FormatOpti
 
 	switch (format) {
 		case "currency": {
-			const currencyCode = resolveCurrency(options.currency);
+			const currency = resolveCurrency(options.currency);
 			return new Intl.NumberFormat("en-IN", {
-				style: "currency",
-				currency: currencyCode,
+				...(currency ? { style: "currency" as const, currency } : {}),
 				minimumFractionDigits: 0,
 				maximumFractionDigits: 0,
 			}).format(Number(value));
