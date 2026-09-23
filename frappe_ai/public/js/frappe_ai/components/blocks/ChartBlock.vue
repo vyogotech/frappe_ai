@@ -222,6 +222,16 @@ const chartOption = computed(() => {
 
 		return {
 			...base,
+			// the calendar coordinate system parses each date into a timestamp, and echarts'
+			// generated description reads that back, so it would say "1767186000000, 4"
+			aria: {
+				enabled: true,
+				label: {
+					description: `Calendar of ${data.datasets[0]?.name || "values"} by date. ${calData
+						.map(([label, value]) => `${label}: ${value}`)
+						.join(", ")}`,
+				},
+			},
 			tooltip: { ...tooltipBase, position: "top" },
 			visualMap: {
 				min: calMin,

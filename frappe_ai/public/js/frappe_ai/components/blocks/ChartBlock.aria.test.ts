@@ -47,6 +47,24 @@ describe("ChartBlock text alternative", () => {
 		expect(label).toMatch(/Q2\D*20\b/);
 	});
 
+	it("reads a calendar's dates back as dates, not as epoch milliseconds", () => {
+		const el = render({
+			type: "chart",
+			chart_type: "calendar",
+			title: "Invoices raised",
+			data: {
+				labels: ["2026-01-01", "2026-01-02"],
+				datasets: [{ name: "Invoices", values: [4, 9] }],
+			},
+		});
+
+		expect(el.getAttribute("role")).toBe("img");
+		const label = el.getAttribute("aria-label") ?? "";
+		expect(label).toMatch(/2026-01-01\D*4\b/);
+		expect(label).toMatch(/2026-01-02\D*9\b/);
+		expect(label).not.toMatch(/\d{10,}/);
+	});
+
 	it("reads out pie slices, which carry no on-chart text of their own", () => {
 		const el = render({
 			type: "chart",
