@@ -14,10 +14,9 @@ class AIChatSession(Document):
 	def before_insert(self):
 		# a caller-supplied user would put this chat in someone else's sidebar
 		self.user = frappe.session.user
-		if not self.started_at:
-			self.started_at = frappe.utils.now_datetime()
 		if not self.last_activity:
-			self.last_activity = self.started_at
+			# the chat list orders on this, so a session without one would sort last from the moment it opens
+			self.last_activity = frappe.utils.now_datetime()
 
 	def validate(self):
 		# `self.get_doc_before_save()` returns None on insert and the persisted

@@ -6,7 +6,7 @@ from frappe.tests import IntegrationTestCase
 
 
 class TestAIChatMessage(IntegrationTestCase):
-	"""AI Chat Message keeps its tenant_id column: saas_platform's permission query filters on it."""
+	"""AI Chat Message lists for a non-admin without a SQL error."""
 
 	def setUp(self):
 		email = "tenant_test_user@example.com"
@@ -28,9 +28,3 @@ class TestAIChatMessage(IntegrationTestCase):
 		frappe.set_user(self.user)
 		# Should not raise — was MySQLdb.OperationalError before BUG-018 fix.
 		frappe.get_list("AI Chat Message", limit=1)
-
-	def test_doctype_has_tenant_id_column(self):
-		self.assertTrue(
-			frappe.db.has_column("AI Chat Message", "tenant_id"),
-			"AI Chat Message must have a tenant_id column for tenant-isolation queries to work",
-		)

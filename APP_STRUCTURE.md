@@ -86,8 +86,10 @@ The user's `sid` cookie is forwarded to the agent (`requests.post(..., cookies={
 | DocType | Type | Key fields |
 | --- | --- | --- |
 | AI Assistant Settings | Single | `enabled`, `timeout`, `sidebar_width`, `keyboard_shortcut`, `agent_url` (read-only mirror of `site_config`) |
-| AI Chat Session | Standard | `user`, `title`, `started_at`, `last_activity`, `context_json` |
+| AI Chat Session | Standard | `user`, `title`, `last_activity`, `context_json` |
 | AI Chat Message | Standard | `session`, `role`, `content`, `tool_name`, `tool_args_json`, `tool_result_json`, `created_at` |
+
+Neither chat DocType carries a tenant column: the site is the tenancy boundary (see **One agent per site** in `INSTALLATION.md`). A session's start time is Frappe's own `creation`; `last_activity` and `created_at` are kept because the other frontend selects them by name and orders on them.
 
 The Settings singleton is created by `install.py:after_install` / `after_migrate`. `after_migrate` additionally re-imports the bundled `Frappe AI` workspace JSON via `frappe.modules.import_file.import_file_by_path(force=True)` so workspace content blob updates reach existing installs (Frappe's normal fixture sync leaves an installed workspace's `content` field untouched). `before_save` always refreshes the `agent_url` display field from `site_config.json` so the form shows the live value.
 

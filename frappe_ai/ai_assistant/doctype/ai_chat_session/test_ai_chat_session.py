@@ -6,7 +6,7 @@ from frappe.tests import IntegrationTestCase
 
 
 class TestAIChatSession(IntegrationTestCase):
-	"""AI Chat Session keeps its tenant_id column: saas_platform's permission query filters on it."""
+	"""AI Chat Session lists for a non-admin, and locks user and context_json after insert."""
 
 	def setUp(self):
 		# Ensure a known non-admin user exists.
@@ -29,13 +29,6 @@ class TestAIChatSession(IntegrationTestCase):
 		frappe.set_user(self.user)
 		# Should not raise — was MySQLdb.OperationalError before BUG-018 fix.
 		frappe.get_list("AI Chat Session", limit=1)
-
-	def test_doctype_has_tenant_id_column(self):
-		# The saas_platform tenant filter requires this column to exist on the table.
-		self.assertTrue(
-			frappe.db.has_column("AI Chat Session", "tenant_id"),
-			"AI Chat Session must have a tenant_id column for tenant-isolation queries to work",
-		)
 
 	def test_user_field_locked_after_insert(self):
 		# BUG-010: pre-fix, System Manager could reassign a session's user via

@@ -49,6 +49,12 @@ Edit `sites/your-site.local/site_config.json`:
 
 The AI Assistant Settings form shows this value in a read-only **Agent URL** field; the `before_save` hook refreshes it from `site_config` on every save.
 
+### One agent per site
+
+Give every site its own agent and its own MCP server. An agent process holds one `FRAPPE_URL` and writes chat history back to that one site, so pointing two sites at the same agent sends both sites' history to whichever site that agent was configured with. A bench with three sites needs three agents, three MCP servers and three different `frappe_ai_agent_url` values.
+
+The site is therefore the only boundary between one customer's chats and another's. This app stores no tenant identifier on a chat session or message, and it isolates nothing within a site beyond Frappe's own per-user permissions. If a deployment ever has to separate tenants inside one site, that belongs to the platform app that owns the tenant concept, which can add its own `tenant_id` Custom Field and permission query to these DocTypes without a change here.
+
 ## Step 4: Enable and tune
 
 Open `/app/ai-assistant-settings` and configure:
