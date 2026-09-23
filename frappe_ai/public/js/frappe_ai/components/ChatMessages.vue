@@ -18,6 +18,17 @@ const emit = defineEmits<{
 
 const container = ref<HTMLElement>();
 
+// SC 2.1.1: a scrolling list has no keyboard path of its own, so it takes a tab stop exactly while it
+// scrolls — unconditional would put one in the desk's tab order at every size, with nothing to scroll to.
+const scrolls = ref(false);
+const messagesLabel = __("Chat messages");
+let resizes: ResizeObserver | undefined;
+
+function measure() {
+	const el = container.value;
+	scrolls.value = !!el && el.scrollHeight > el.clientHeight;
+}
+
 // getPageContext() is not reactive, so this tick is what re-evaluates starterPrompts after a route change
 const routeTick = ref(0);
 const onRouteChange = () => {
@@ -34,6 +45,12 @@ onMounted(() => {
 		frappe.router.on("change", onRouteChange);
 	}
 	document.addEventListener("frappe-ai-opened", onSidebarOpened);
+	// zoom, a window resize and the composer growing all change the list's height without changing the
+	// messages; observe() calls back once, which is the first measurement. Undefined in jsdom, like frappe.
+	if (typeof ResizeObserver !== "undefined" && container.value) {
+		resizes = new ResizeObserver(measure);
+		resizes.observe(container.value);
+	}
 });
 
 onUnmounted(() => {
@@ -41,6 +58,7 @@ onUnmounted(() => {
 		frappe.router.off("change", onRouteChange);
 	}
 	document.removeEventListener("frappe-ai-opened", onSidebarOpened);
+	resizes?.disconnect();
 });
 
 // Three starter prompts shown on the empty state. The first is route-aware:
@@ -76,6 +94,8 @@ function scrollToNewest() {
 		if (container.value) {
 			container.value.scrollTop = container.value.scrollHeight;
 		}
+		// messages change the content's height, not the box's, so the observer stays quiet here
+		measure();
 	});
 }
 
@@ -87,7 +107,13 @@ watch(
 </script>
 
 <template>
-	<div ref="container" class="frappe-ai-messages">
+	<!-- a <section> maps to region only once it is named (HTML-AAM), so the landmark comes and goes with the stop -->
+	<section
+		ref="container"
+		class="frappe-ai-messages"
+		:tabindex="scrolls ? 0 : undefined"
+		:aria-label="scrolls ? messagesLabel : undefined"
+	>
 		<div v-if="messages.length === 0" class="frappe-ai-empty-state">
 			<div class="frappe-ai-empty-icon">
 				<!-- eslint-disable-next-line vue/no-v-html -->
@@ -117,5 +143,5 @@ watch(
 			/>
 			<MessageBubble v-else :message="msg" />
 		</template>
-	</div>
+	</section>
 </template>
