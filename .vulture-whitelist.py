@@ -1,3 +1,4 @@
+# ruff: noqa: F821 -- this file is a list of names for vulture, not code that runs.
 # Names a framework reads by contract, which vulture cannot see a caller for.
 # frappe's app loader reads app_version off hooks.py: frappe/__init__.py get_hooks().
 app_version
