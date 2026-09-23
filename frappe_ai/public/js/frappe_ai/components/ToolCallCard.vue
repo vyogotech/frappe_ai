@@ -4,7 +4,6 @@
 			<button
 				class="frappe-ai-tool-toggle"
 				:aria-expanded="expanded"
-				:aria-label="`${confirmLabel} ${expanded ? 'collapse' : 'expand'} details`"
 				type="button"
 				@click="expanded = !expanded"
 			>
@@ -32,7 +31,7 @@
 			v-else
 			:class="['frappe-ai-tool-header', expanded ? 'frappe-ai-tool-header--open' : '']"
 			:aria-expanded="expanded"
-			:aria-label="`Tool call: ${toolCall.name}, ${expanded ? 'collapse' : 'expand'} details`"
+			:aria-label="`Tool call: ${toolCall.name}`"
 			type="button"
 			@click="expanded = !expanded"
 		>
@@ -63,7 +62,7 @@
 						resultExpanded ? 'frappe-ai-tool-expand-btn--open' : '',
 					]"
 					:aria-expanded="resultExpanded"
-					:aria-label="`${resultExpanded ? 'Hide' : 'Show'} tool result`"
+					aria-label="Tool result"
 					type="button"
 					@click.stop="resultExpanded = !resultExpanded"
 				>

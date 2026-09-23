@@ -6,7 +6,7 @@ export default defineConfig({
 	test: {
 		environment: "jsdom",
 		globals: false,
-		include: ["frappe_ai/public/js/frappe_ai/**/*.test.{ts,vue}"],
+		include: ["frappe_ai/public/js/**/*.test.{ts,vue}"],
 		setupFiles: ["frappe_ai/public/js/frappe_ai/__tests__/setup.ts"],
 	},
 });

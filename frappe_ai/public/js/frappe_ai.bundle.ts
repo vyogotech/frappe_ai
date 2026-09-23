@@ -9,6 +9,16 @@ const SIDEBAR_ID = "frappe-ai-sidebar-root";
 
 let vueApp: VueApp | null = null;
 
+// App.vue owns whether the panel is open; the navbar button only mirrors it, and tryInject()
+// rebuilds that button on every route change, so the state has to outlive the element
+let sidebarOpen = false;
+
+function syncNavExpanded(): void {
+	document
+		.getElementById("frappe-ai-nav-btn")
+		?.setAttribute("aria-expanded", String(sidebarOpen));
+}
+
 function injectNavbarButton(keyboardShortcut: string): void {
 	/** Build a DOM element from an HTML string and wire its click handler. */
 	function makeButton(html: string): HTMLElement {
@@ -16,6 +26,19 @@ function injectNavbarButton(keyboardShortcut: string): void {
 		tpl.innerHTML = html.trim();
 		const btn = tpl.content.firstElementChild as HTMLElement;
 		btn.addEventListener("click", toggleSidebar);
+		btn.setAttribute("aria-controls", SIDEBAR_ID);
+		btn.setAttribute("aria-expanded", String(sidebarOpen));
+		// an <a> with no href is neither a button nor tabbable, so give it both halves
+		if (btn.tagName === "A") {
+			btn.setAttribute("role", "button");
+			btn.tabIndex = 0;
+			btn.addEventListener("keydown", (e) => {
+				if (e.key === "Enter" || e.key === " ") {
+					e.preventDefault();
+					toggleSidebar();
+				}
+			});
+		}
 		return btn;
 	}
 
@@ -126,11 +149,15 @@ function mountSidebar(sidebarWidth: number, keyboardShortcut: string): void {
 	// measure again on open and after the next paint, since at mount the chrome may not have its themed height yet
 	const visibility = createSidebarVisibilityController(el);
 	document.addEventListener("frappe-ai-opened", () => {
+		sidebarOpen = true;
+		syncNavExpanded();
 		visibility.onOpen();
 		syncHostChromeHeight();
 		requestAnimationFrame(syncHostChromeHeight);
 	});
 	document.addEventListener("frappe-ai-closed", () => {
+		sidebarOpen = false;
+		syncNavExpanded();
 		visibility.onClose();
 	});
 
