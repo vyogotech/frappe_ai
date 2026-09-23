@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import { useChat } from "../composables/useChat";
 import { readBootSettings } from "../utils/boot-settings";
 import ChatHeader from "./ChatHeader.vue";
@@ -28,12 +28,47 @@ const {
 
 const { loadError } = readBootSettings();
 
+const panel = ref<HTMLElement>();
+const input = ref<InstanceType<typeof ChatInput>>();
+let opener: HTMLElement | null = null;
+let isOpen = false;
+
+// The panel is the last child of body (frappe_ai.bundle.ts), so without this a keyboard
+// user would tab through the whole desk to reach it, and find no way back.
+function onOpened() {
+	isOpen = true;
+	opener = document.activeElement as HTMLElement | null;
+	// the panel is still display:none this tick; re-check, or a close before the flush would
+	// pull focus back into a hidden composer
+	nextTick(() => {
+		if (isOpen) input.value?.focus();
+	});
+}
+
+function onClosed() {
+	isOpen = false;
+	const el = opener;
+	opener = null;
+	if (!el) return;
+	// v-show drops focus to body; anywhere else means the user has moved on, so leave them there
+	const active = document.activeElement;
+	if (active && active !== document.body && !panel.value?.contains(active)) return;
+	el.focus();
+}
+
 // Hydrate from server-side history on first mount so a page reload doesn't
 // erase the user's last chat.
 onMounted(() => {
 	// the sidebar is mounted with the defaults when the boot carried no settings (boot-decision.ts), so say so here
 	if (loadError) showError("Connection failed");
 	loadRecentConversation();
+	document.addEventListener("frappe-ai-opened", onOpened);
+	document.addEventListener("frappe-ai-closed", onClosed);
+});
+
+onUnmounted(() => {
+	document.removeEventListener("frappe-ai-opened", onOpened);
+	document.removeEventListener("frappe-ai-closed", onClosed);
 });
 
 function handleSend(content: string) {
@@ -69,10 +104,17 @@ const liveStatus = computed(() => {
 </script>
 
 <template>
-	<div class="frappe-ai-sidebar" :style="{ width: sidebarWidth + 'px' }">
+	<!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -- not a widget: the panel only catches an Escape bubbling up from the control that has focus (APG dialog) -->
+	<div
+		ref="panel"
+		class="frappe-ai-sidebar"
+		:style="{ width: sidebarWidth + 'px' }"
+		@keydown.esc="handleClose"
+	>
 		<ChatHeader @clear="handleClear" @close="handleClose" />
 		<ChatMessages :messages="messages" @send="handleSend" @allow="allow" @deny="deny" />
 		<ChatInput
+			ref="input"
 			:busy="isLoading"
 			:can-cancel="canCancel"
 			@send="handleSend"

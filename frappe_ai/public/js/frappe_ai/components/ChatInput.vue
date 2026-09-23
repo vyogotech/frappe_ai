@@ -14,6 +14,7 @@
 				/>
 			</div>
 			<button
+				ref="buttonEl"
 				:class="[
 					'frappe-ai-send-btn',
 					showStop
@@ -57,6 +58,7 @@ const emit = defineEmits<{
 
 const text = ref("");
 const inputEl = ref<HTMLTextAreaElement>();
+const buttonEl = ref<HTMLButtonElement>();
 
 // NOTE-005: keep the textarea's unsent content across hard reloads.
 // `useDraft` debounces writes and scopes by user.
@@ -84,6 +86,15 @@ function onButtonClick() {
 	if (props.busy) return;
 	send();
 }
+
+// A turn ending disables the button that Stop had put under the keyboard user, and a
+// disabled element cannot hold focus. Move first, or focus falls to BODY (SC 2.4.3).
+// `watch` flushes before the render, so the button is still focusable here.
+watch(sendDisabled, (disabled) => {
+	if (disabled && document.activeElement === buttonEl.value) inputEl.value?.focus();
+});
+
+defineExpose({ focus: () => inputEl.value?.focus() });
 
 function send() {
 	const content = text.value.trim();
