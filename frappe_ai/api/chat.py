@@ -46,13 +46,17 @@ def _message_max_chars() -> int:
 		return _DEFAULT_MESSAGE_MAX_CHARS
 
 
+class AgentUnreachable(frappe.ValidationError):
+	"""The agent's host does not resolve: the peer is down, not this site's configuration wrong."""
+
+
 def _validate_agent_url(url: str) -> None:
 	"""Throw unless url is safe to receive the user's sid, which the worker sends to it as a cookie.
 
 	Raises:
-		frappe.ValidationError: not http(s), no host or one that does not resolve, a cloud metadata or
-			link-local address, http to a public address, or a non-public address without
-			frappe_ai_agent_url_unsafe_ok in site_config.
+		AgentUnreachable: the host is a name that does not resolve right now.
+		frappe.ValidationError: not http(s), no host, a cloud metadata or link-local address, http to a
+			public address, or a non-public address without frappe_ai_agent_url_unsafe_ok in site_config.
 	"""
 	parsed = urlparse(url)
 	if parsed.scheme not in ("http", "https"):
@@ -78,7 +82,7 @@ def _validate_agent_url(url: str) -> None:
 			port = parsed.port or (443 if parsed.scheme == "https" else 80)
 			infos = socket.getaddrinfo(host, port)
 		except socket.gaierror:
-			frappe.throw(_("AI agent URL host '{0}' does not resolve.").format(host))
+			frappe.throw(_("AI agent URL host '{0}' does not resolve.").format(host), exc=AgentUnreachable)
 		else:
 			for info in infos:
 				try:
@@ -105,11 +109,18 @@ def _validate_agent_url(url: str) -> None:
 
 
 def _check_agent_url(url: str) -> None:
-	"""Throw unless url is set and safe; only a System Manager is told which address or setting is wrong."""
+	"""Throw unless url is set and safe; an unresolvable host reads as unreachable, not as a wrong setting."""
 	try:
 		if not url:
 			frappe.throw(_("AI agent URL is not configured. Set frappe_ai_agent_url in site_config."))
 		_validate_agent_url(url)
+	except AgentUnreachable:
+		# no job runs for this question, so its log line is the only record the outage leaves
+		frappe.logger("frappe_ai", allow_site=True).warning(
+			"agent host does not resolve: %s", urlparse(url).hostname
+		)
+		frappe.clear_last_message()
+		frappe.throw(_(_UNREACHABLE))
 	except frappe.ValidationError:
 		if "System Manager" in frappe.get_roles():
 			raise
