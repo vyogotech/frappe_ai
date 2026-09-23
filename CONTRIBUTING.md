@@ -10,7 +10,7 @@ You need Python 3.14, Node 24, and either a bench at hand or Docker.
 # clone + install dev deps
 git clone https://github.com/vyogotech/frappe_ai && cd frappe_ai
 uv sync --locked --group dev
-npm ci
+yarn install --frozen-lockfile   # yarn, as bench does; there is no package-lock.json
 ```
 
 Quick sanity check before touching anything:

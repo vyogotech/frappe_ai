@@ -17,6 +17,7 @@
   "dependencies": {
     "echarts": "^5.6.0",
     "markdown-it": "^14.1.0",
+    "vue": "^3.5.13",
     "vue-echarts": "^7.0.3"
   },
   "devDependencies": {
@@ -33,7 +34,6 @@
     "prettier": "^3.9.8",
     "typescript": "~5.6",
     "typescript-eslint": "^8.70.1",
-    "vitest": "^2.1.9",
-    "vue": "^3.5.13"
+    "vitest": "^2.1.9"
   }
 }

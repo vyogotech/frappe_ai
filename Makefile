@@ -16,7 +16,7 @@ help:
 	@echo "  typecheck  - pyrefly (Python) + tsc --noEmit (TS)"
 	@echo "  boundaries - import-linter contracts from .importlinter"
 	@echo "  test-js    - vitest run"
-	@echo "  audit      - Full scanner suite: ruff, bandit, pip-audit, npm audit, trivy, gitleaks"
+	@echo "  audit      - Full scanner suite: ruff, bandit, pip-audit, yarn audit, trivy, gitleaks"
 	@echo "  audit-clean - Remove $(AUDIT_DIR)/"
 
 lint:
@@ -61,9 +61,9 @@ audit:
 	else \
 		echo "  SKIP: pip-audit not installed (pipx install pip-audit)"; \
 	fi
-	@echo "==> npm audit (JS deps)"
+	@echo "==> yarn audit (JS deps)"
 	@if [ -f package.json ]; then \
-		npm audit --json > $(AUDIT_DIR)/npm-audit.json 2>/dev/null || true; \
+		yarn audit --json > $(AUDIT_DIR)/yarn-audit.json 2>/dev/null || true; \
 	fi
 	@echo "==> trivy fs (vuln + misconfig)"
 	@if command -v trivy >/dev/null 2>&1; then \

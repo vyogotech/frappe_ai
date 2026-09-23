@@ -42,7 +42,7 @@ jobs:
         with:
           # Frappe v16 frontend declares engines.node >= 24.
           node-version: '24'
-          cache: 'npm'
+          cache: 'yarn'
 
       - name: Install uv
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
@@ -53,7 +53,9 @@ jobs:
         run: uv sync --locked --group dev
 
       - name: Install Node deps
-        run: npm ci
+        # yarn, not npm: bench installs an app's JS with `yarn install --check-files`
+        # (bench 5.29.1 app.py:960), so yarn.lock is the lockfile production actually uses.
+        run: yarn install --frozen-lockfile
 
       # The Makefile is the one definition of these checks, so CI and a developer cannot drift apart.
       - name: make lint
