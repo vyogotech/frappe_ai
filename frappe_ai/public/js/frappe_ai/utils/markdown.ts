@@ -45,9 +45,11 @@ md.renderer.rules.image = (tokens, idx, options, env, self) => {
 	if (url && url.origin === window.location.origin)
 		return defaultImage(tokens, idx, options, env, self);
 	const alt = esc(self.renderInlineAsText(tokens[idx].children || [], options, env));
+	// the Translator role writes what __() returns, so it is escaped here like any other untrusted
+	// text; the host goes in before the escape so that it is escaped once, not twice
 	if (!url || (url.protocol !== "https:" && url.protocol !== "http:"))
-		return `<span class="frappe-ai-noimage">${alt || __("Image unavailable")}</span>`;
-	return `<a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${alt || __("Image")}</a> ${__("(image on {0})", [esc(url.host)])}`;
+		return `<span class="frappe-ai-noimage">${alt || esc(__("Image unavailable"))}</span>`;
+	return `<a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${alt || esc(__("Image"))}</a> ${esc(__("(image on {0})", [url.host]))}`;
 };
 
 export function renderMarkdown(text: string): string {

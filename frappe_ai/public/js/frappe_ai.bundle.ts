@@ -45,6 +45,9 @@ function injectNavbarButton(keyboardShortcut: string): void {
 		const tpl = document.createElement("template");
 		tpl.innerHTML = html.trim();
 		const btn = tpl.content.firstElementChild as HTMLElement;
+		// a property, never interpolated into the markup below: the Translator role writes this
+		// text, and a quotation mark in it would close the attribute and open one of its own
+		btn.title = __("Frappe AI ({0})", [keyboardShortcut]);
 		btn.addEventListener("click", toggleSidebar);
 		btn.setAttribute("aria-controls", SIDEBAR_ID);
 		btn.setAttribute("aria-expanded", String(sidebarOpen));
@@ -70,20 +73,21 @@ function injectNavbarButton(keyboardShortcut: string): void {
 		return makeButton(
 			`<button id="frappe-ai-nav-btn" type="button"
                class="btn-reset nav-link text-muted"
-               style="cursor:pointer;background:transparent;border:none;display:flex;align-items:center;justify-content:center;padding:0 6px"
-               title="${__("Frappe AI ({0})", [keyboardShortcut])}">${frappeIcon("message-square-text", "md")}</button>`,
+               style="cursor:pointer;background:transparent;border:none;display:flex;align-items:center;justify-content:center;padding:0 6px">${frappeIcon("message-square-text", "md")}</button>`,
 		);
 	}
 
 	function buildSidebarBtn(): HTMLElement {
 		// mirrors Frappe's "Getting Started" entry; text-ink-gray-7 current-color keeps the icon gray, not the anchor's colour
-		return makeButton(
-			`<a id="frappe-ai-nav-btn" class="onboarding-sidebar frappe-ai-nav-link px-2"
-          title="${__("Frappe AI ({0})", [keyboardShortcut])}">
+		const btn = makeButton(
+			`<a id="frappe-ai-nav-btn" class="onboarding-sidebar frappe-ai-nav-link px-2">
           ${frappeIcon("message-square-text", "sm", "text-ink-gray-7 current-color")}
-          <span class="sidebar-item-label">${__("Frappe AI")}</span>
+          <span class="sidebar-item-label"></span>
       </a>`,
 		);
+		// textContent, not the markup above, for the same reason as the title
+		(btn.querySelector(".sidebar-item-label") as HTMLElement).textContent = __("Frappe AI");
+		return btn;
 	}
 
 	// a visible .desktop-avatar only: v16 leaves the previous route's navbar in the DOM at 0x0 after a route change
@@ -200,12 +204,14 @@ function injectDisabledHint(): void {
 		tpl.innerHTML = `
       <a id="frappe-ai-disabled-hint"
          href="/app/ai-assistant-settings"
-         title="${__("Frappe AI is disabled — open settings to re-enable")}"
          style="display:flex;align-items:center;color:var(--ink-gray-5,#888);padding:0 6px;text-decoration:none"
          class="nav-link text-muted">
         ${frappeIcon("message-square-text", "md")}
       </a>`.trim();
-		return tpl.content.firstElementChild as HTMLElement;
+		const hint = tpl.content.firstElementChild as HTMLElement;
+		// the Translator role writes this text: a property, never interpolated into the markup above
+		hint.title = __("Frappe AI is disabled — open settings to re-enable");
+		return hint;
 	}
 
 	function tryInject(): boolean {
