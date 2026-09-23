@@ -19,6 +19,26 @@ function syncNavExpanded(): void {
 		?.setAttribute("aria-expanded", String(sidebarOpen));
 }
 
+/** Run `place` until it reports its element is in position, watching the body only while it is not. */
+function keepPlaced(place: () => boolean): void {
+	// the observer catches the boot repaint and the route event the SPA navigations it misses; it stops at the
+	// first success, or every later DOM change in the desk — every streamed token included — pays for a
+	// querySelectorAll and the forced layout of an offsetParent read
+	const observer = new MutationObserver(() => settle());
+
+	function settle(): void {
+		if (place()) observer.disconnect();
+		else observer.observe(document.body, { childList: true, subtree: true });
+	}
+
+	settle();
+	frappe.router?.on?.("change", () => {
+		settle();
+		// the double rAF covers chrome painted a couple of frames after the route event
+		requestAnimationFrame(() => requestAnimationFrame(settle));
+	});
+}
+
 function injectNavbarButton(keyboardShortcut: string): void {
 	/** Build a DOM element from an HTML string and wire its click handler. */
 	function makeButton(html: string): HTMLElement {
@@ -67,7 +87,7 @@ function injectNavbarButton(keyboardShortcut: string): void {
 	}
 
 	// a visible .desktop-avatar only: v16 leaves the previous route's navbar in the DOM at 0x0 after a route change
-	function tryInject(): void {
+	function tryInject(): boolean {
 		const existing = document.getElementById("frappe-ai-nav-btn");
 		const topAvatar = Array.from(
 			document.querySelectorAll<HTMLElement>(".desktop-avatar"),
@@ -79,37 +99,29 @@ function injectNavbarButton(keyboardShortcut: string): void {
 				existing.parentNode === topAvatar.parentNode &&
 				existing.nextSibling === topAvatar
 			) {
-				return;
+				return true;
 			}
 			existing?.remove();
 			topAvatar.parentNode.insertBefore(buildTopBtn(), topAvatar);
-			return;
+			return true;
 		}
 
 		const sidebarUser = document.querySelector(".dropdown-navbar-user");
-		if (!sidebarUser?.parentNode) return;
+		if (!sidebarUser?.parentNode) return false;
 
 		if (
 			existing &&
 			existing.parentNode === sidebarUser.parentNode &&
 			existing.nextSibling === sidebarUser
 		) {
-			return;
+			return true;
 		}
 		existing?.remove();
 		sidebarUser.parentNode.insertBefore(buildSidebarBtn(), sidebarUser);
+		return true;
 	}
 
-	tryInject();
-
-	// both: the observer catches the boot repaint, the route event the SPA navigations the observer misses;
-	// the double rAF covers chrome painted a couple of frames after the route event
-	const observer = new MutationObserver(tryInject);
-	observer.observe(document.body, { childList: true, subtree: true });
-	frappe.router?.on?.("change", () => {
-		tryInject();
-		requestAnimationFrame(() => requestAnimationFrame(tryInject));
-	});
+	keepPlaced(tryInject);
 }
 
 /** Publish the bar's measured height: Frappe's --page-head-height is the unthemed default, not what a theme paints. */
@@ -196,22 +208,17 @@ function injectDisabledHint(): void {
 		return tpl.content.firstElementChild as HTMLElement;
 	}
 
-	function tryInject(): void {
-		if (document.getElementById("frappe-ai-disabled-hint")) return;
+	function tryInject(): boolean {
+		if (document.getElementById("frappe-ai-disabled-hint")) return true;
 		const topAvatar = Array.from(
 			document.querySelectorAll<HTMLElement>(".desktop-avatar"),
 		).find((el) => el.offsetParent !== null);
-		if (!topAvatar?.parentNode) return;
+		if (!topAvatar?.parentNode) return false;
 		topAvatar.parentNode.insertBefore(build(), topAvatar);
+		return true;
 	}
 
-	tryInject();
-	const observer = new MutationObserver(tryInject);
-	observer.observe(document.body, { childList: true, subtree: true });
-	frappe.router?.on?.("change", () => {
-		tryInject();
-		requestAnimationFrame(() => requestAnimationFrame(tryInject));
-	});
+	keepPlaced(tryInject);
 }
 
 // app_ready is frappe's own "the desk is up" event (desk.js), the one ERPNext mounts from;
