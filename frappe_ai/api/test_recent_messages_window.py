@@ -3,20 +3,13 @@
 
 """get_recent_messages returns the newest page of a chat longer than `limit`, not its first page."""
 
-import unittest
-
 import frappe
+from frappe.tests import IntegrationTestCase
 
 from frappe_ai.api import chat
 
 
-class TestRecentMessagesWindow(unittest.TestCase):
-	def tearDown(self):
-		for s in frappe.get_all("AI Chat Session", filters={"user": frappe.session.user}, pluck="name"):
-			frappe.delete_doc("AI Chat Session", s, ignore_permissions=True, force=True)
-		for m in frappe.get_all("AI Chat Message", pluck="name"):
-			frappe.delete_doc("AI Chat Message", m, ignore_permissions=True, force=True)
-
+class TestRecentMessagesWindow(IntegrationTestCase):
 	def _chat_of(self, count: int) -> str:
 		"""A session with `count` messages, stamped a minute apart so their order does not ride on clock resolution."""
 		session = frappe.get_doc(
@@ -26,6 +19,10 @@ class TestRecentMessagesWindow(unittest.TestCase):
 				"user": frappe.session.user,
 			}
 		).insert(ignore_permissions=True)
+		# on_trash takes the chat's messages with it, so this clears what this test inserted and nothing else
+		self.addCleanup(
+			frappe.delete_doc, "AI Chat Session", session.name, ignore_permissions=True, force=True
+		)
 		for i in range(count):
 			msg = frappe.get_doc(
 				{

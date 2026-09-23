@@ -3,17 +3,18 @@
 
 """Tests for the Settings page's Test Connection (api.health.test_connection), with requests.get mocked."""
 
-import unittest
 from unittest.mock import MagicMock, patch
 
 import frappe
 import requests
+from frappe.tests import IntegrationTestCase
 
 from frappe_ai.api import health
 
 
-class TestHealthEndpoint(unittest.TestCase):
+class TestHealthEndpoint(IntegrationTestCase):
 	def setUp(self):
+		super().setUp()
 		self._original_url = frappe.local.conf.get("frappe_ai_agent_url")
 		frappe.local.conf["frappe_ai_agent_url"] = "http://localhost:8484"
 		# the SSRF guard rejects loopback without the hatch, and it runs even though requests.get is mocked

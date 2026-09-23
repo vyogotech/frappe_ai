@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 import frappe
+from frappe.tests import IntegrationTestCase
 
 from frappe_ai.api import chat
 
@@ -208,8 +209,9 @@ class TestAgentUrl(unittest.TestCase):
 # ──────────────────────────────────────────────────────────────────────────
 
 
-class TestStartStream(unittest.TestCase):
+class TestStartStream(IntegrationTestCase):
 	def setUp(self):
+		super().setUp()
 		# the previous turn's claim on this user's one answer ends with that turn (S13)
 		chat._release_the_answer(frappe.session.user)
 		# Establish a known-good baseline for the singleton + site_config.
@@ -340,85 +342,67 @@ class TestCancelStream(unittest.TestCase):
 # ──────────────────────────────────────────────────────────────────────────
 
 
-class TestGetRecentMessages(unittest.TestCase):
+RECENT_MESSAGES_USER = "recent_messages_user@example.com"
+
+
+class TestGetRecentMessages(IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
-		cls._user = frappe.session.user
+		super().setUpClass()
+		if not frappe.db.exists("User", RECENT_MESSAGES_USER):
+			user = {
+				"doctype": "User",
+				"email": RECENT_MESSAGES_USER,
+				"first_name": "Recent",
+				"send_welcome_email": 0,
+			}
+			frappe.get_doc(user | {"roles": [{"role": "All"}]}).insert(ignore_permissions=True)
 
-	def tearDown(self):
-		# Clean up any AI Chat Session / Message rows the test created.
-		for s in frappe.get_all("AI Chat Session", filters={"user": frappe.session.user}, pluck="name"):
-			frappe.delete_doc("AI Chat Session", s, ignore_permissions=True, force=True)
-		# Cascade for orphan messages just in case.
-		for m in frappe.get_all("AI Chat Message", pluck="name"):
-			frappe.delete_doc("AI Chat Message", m, ignore_permissions=True, force=True)
+	def setUp(self):
+		super().setUp()
+		# its own user: test_empty_when_no_session must not depend on whose chats the site already holds
+		frappe.set_user(RECENT_MESSAGES_USER)
+		self.addCleanup(frappe.set_user, "Administrator")
+
+	def _session(self, name: str) -> str:
+		doc = frappe.get_doc(
+			{"doctype": "AI Chat Session", "name": name, "user": frappe.session.user}
+		).insert(ignore_permissions=True)
+		# on_trash takes the chat's messages with it, so this clears what this test inserted and nothing else
+		self.addCleanup(frappe.delete_doc, "AI Chat Session", doc.name, ignore_permissions=True, force=True)
+		return doc.name
+
+	def _message(self, session: str, content: str, role: str = "user") -> None:
+		frappe.get_doc(
+			{"doctype": "AI Chat Message", "session": session, "role": role, "content": content}
+		).insert(ignore_permissions=True)
 
 	def test_empty_when_no_session(self):
 		out = chat.get_recent_messages()
 		self.assertEqual(out, {"session_id": None, "messages": []})
 
 	def test_returns_messages_for_most_recent_session(self):
-		session = frappe.get_doc(
-			{
-				"doctype": "AI Chat Session",
-				"name": "test-session-1",
-				"user": frappe.session.user,
-			}
-		).insert(ignore_permissions=True)
+		session = self._session("test-session-1")
 		for i, role in enumerate(["user", "assistant"]):
-			frappe.get_doc(
-				{
-					"doctype": "AI Chat Message",
-					"session": session.name,
-					"role": role,
-					"content": f"msg-{i}",
-				}
-			).insert(ignore_permissions=True)
+			self._message(session, f"msg-{i}", role)
 		out = chat.get_recent_messages()
-		self.assertEqual(out["session_id"], session.name)
+		self.assertEqual(out["session_id"], session)
 		self.assertEqual(len(out["messages"]), 2)
 		self.assertEqual(out["messages"][0]["role"], "user")
 		self.assertEqual(out["messages"][0]["content"], "msg-0")
 
 	def test_timestamps_are_iso8601_with_explicit_utc_suffix(self):
 		# JS parses Frappe's naive datetime string as local time, so the API must send ISO 8601 with a "Z"
-		session = frappe.get_doc(
-			{
-				"doctype": "AI Chat Session",
-				"name": "test-session-ts",
-				"user": frappe.session.user,
-			}
-		).insert(ignore_permissions=True)
-		frappe.get_doc(
-			{
-				"doctype": "AI Chat Message",
-				"session": session.name,
-				"role": "user",
-				"content": "ts probe",
-			}
-		).insert(ignore_permissions=True)
+		self._message(self._session("test-session-ts"), "ts probe")
 		out = chat.get_recent_messages()
 		ts = out["messages"][0]["timestamp"]
 		self.assertIsNotNone(ts)
 		self.assertRegex(ts, r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$")
 
 	def test_limit_clamped_to_safe_range(self):
-		session = frappe.get_doc(
-			{
-				"doctype": "AI Chat Session",
-				"name": "test-session-limit",
-				"user": frappe.session.user,
-			}
-		).insert(ignore_permissions=True)
+		session = self._session("test-session-limit")
 		for i in range(5):
-			frappe.get_doc(
-				{
-					"doctype": "AI Chat Message",
-					"session": session.name,
-					"role": "user",
-					"content": f"msg-{i}",
-				}
-			).insert(ignore_permissions=True)
+			self._message(session, f"msg-{i}")
 		# limit=0 → clamped to 1
 		out = chat.get_recent_messages(limit=0)
 		self.assertEqual(len(out["messages"]), 1)
@@ -427,22 +411,8 @@ class TestGetRecentMessages(unittest.TestCase):
 		self.assertLessEqual(len(out["messages"]), 200)
 
 	def test_string_limit_coerced_by_frappe_typing(self):
+		self._message(self._session("test-session-str-limit"), "ok")
 		# v16's @whitelist type validation coerces the query-string "100" to int before the endpoint runs
-		session = frappe.get_doc(
-			{
-				"doctype": "AI Chat Session",
-				"name": "test-session-str-limit",
-				"user": frappe.session.user,
-			}
-		).insert(ignore_permissions=True)
-		frappe.get_doc(
-			{
-				"doctype": "AI Chat Message",
-				"session": session.name,
-				"role": "user",
-				"content": "ok",
-			}
-		).insert(ignore_permissions=True)
 		out = chat.get_recent_messages(limit="100")  # type: ignore[arg-type]
 		self.assertEqual(len(out["messages"]), 1)
 
