@@ -89,15 +89,15 @@ All endpoints live under `frappe_ai.api.*`. Authentication is the standard Frapp
 | `frappe_ai.api.chat.start_stream` | Enqueue a background worker that relays agent SSE chunks via `frappe.realtime`. Returns `{session_id, currency}`. |
 | `frappe_ai.api.chat.cancel_stream` | Flag the caller's own relay for a session to stop between chunks. |
 | `frappe_ai.api.chat.get_recent_messages` | Hydrate the sidebar from the user's most recent `AI Chat Session`. Returns `{session_id, messages}`. |
-| `frappe_ai.api.confirm.respond` | Record the user's Allow or Deny for a write the agent asked to make. |
-| `frappe_ai.api.confirm.redeem` | Exchange an allowed confirmation for the one-time token the agent spends on the write. |
+| `frappe_ai.api.confirm.respond` | Record the user's Allow or Deny for a write the agent asked to make. An Allow mints the one-time token. |
+| `frappe_ai.api.confirm.redeem` | Spend that token on one write, for the user and the call it was minted for. |
 | `frappe_ai.api.health.test_connection` | Settings page health check. System Managers only. |
 
 Two realtime channels carry everything the sidebar receives:
 
 | Event | Published by | Carries |
 | --- | --- | --- |
-| `frappe_ai:chunk:<session_id>` | the relay worker, `frappe_ai.api.chat` | one agent SSE chunk each, then a `{type: "done"}` marker |
+| `frappe_ai:chunk:<session_id>` | the relay worker, `frappe_ai.api.chat` | one agent SSE chunk each, then a `{type: "done"}` marker — or, if the relay failed or timed out, a `{type: "error", message}` as the last event instead |
 | `frappe_ai:msg_added` | `frappe_ai.api.realtime.broadcast_message_added`, on every `AI Chat Message` insert | the new message, so a second tab on the same chat appends it without polling |
 
 The browser subscribes to `frappe_ai:chunk:<session_id>` via `frappe.realtime.on` before calling `start_stream`. It generates the session id itself, so it can subscribe before it asks.

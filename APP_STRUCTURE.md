@@ -82,8 +82,8 @@ The user's `sid` cookie is forwarded to the agent (`requests.post(..., cookies={
 | `frappe_ai.api.chat` | `cancel_stream(session_id)` | yes | Flags the caller's own relay to stop between chunks |
 | `frappe_ai.api.chat` | `get_recent_messages(limit=50)` | yes | Hydrates sidebar from `AI Chat Session` / `AI Chat Message` |
 | `frappe_ai.api.chat` | `_stream_to_agent(...)` | no | Background worker, called via `frappe.enqueue` only |
-| `frappe_ai.api.confirm` | `respond(confirmation_id, decision)` | yes | Records Allow or Deny for a write the agent asked to make |
-| `frappe_ai.api.confirm` | `redeem(token, tool, doctype, name)` | yes | Exchanges an allowed confirmation for its one-time token |
+| `frappe_ai.api.confirm` | `respond(confirmation_id, decision)` | yes | Records Allow or Deny; an Allow mints the one-time token |
+| `frappe_ai.api.confirm` | `redeem(token, tool, doctype, name)` | yes | Spends that token on one write, for the user and call it was minted for |
 | `frappe_ai.api.health` | `test_connection()` | yes | Settings page health check; hits `<agent_url>/health`. System Managers only |
 | `frappe_ai.api.realtime` | `broadcast_message_added(doc, method)` | no | `after_insert` hook on `AI Chat Message`; publishes `frappe_ai:msg_added` |
 
