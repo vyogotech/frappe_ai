@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "description": "Runtime deps for the frappe_ai bundle (resolved by Frappe's esbuild).",
+  "packageManager": "yarn@1.22.22",
   "engines": {
     "node": ">=24"
   },

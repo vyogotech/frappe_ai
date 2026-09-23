@@ -37,6 +37,12 @@ jobs:
           # Every frappe v16 release, from v16.0.0, declares requires-python >=3.14,<3.15.
           python-version: '3.14'
 
+      # setup-node reads the yarn cache before any later step runs, so yarn has to exist first.
+      # corepack ships with node and installs the version package.json names, which keeps this
+      # working on any runner rather than only on images that happen to preinstall yarn.
+      - name: Enable corepack
+        run: corepack enable
+
       - name: Set up Node
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
