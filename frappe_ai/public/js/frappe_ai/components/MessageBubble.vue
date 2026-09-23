@@ -43,7 +43,8 @@ const isPendingEmpty = computed(
 				<div class="frappe-ai-error-message">Could not render response</div>
 			</div>
 			<template v-else-if="isPendingEmpty">
-				<div class="frappe-ai-bubble-status">
+				<!-- the panel's role=status region says "Thinking..." instead (ChatSidebar.vue) -->
+				<div class="frappe-ai-bubble-status" aria-hidden="true">
 					<span class="frappe-ai-bubble-status-dot"></span>
 					<span class="frappe-ai-bubble-status-dot"></span>
 					<span class="frappe-ai-bubble-status-dot"></span>
