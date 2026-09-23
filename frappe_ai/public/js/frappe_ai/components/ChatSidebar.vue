@@ -18,6 +18,8 @@ const {
 	isLoading,
 	canCancel,
 	sendMessage,
+	allow,
+	deny,
 	cancelMessage,
 	clearMessages,
 	loadRecentConversation,
@@ -54,7 +56,7 @@ function handleClose() {
 <template>
 	<div class="frappe-ai-sidebar" :style="{ width: sidebarWidth + 'px' }">
 		<ChatHeader @clear="handleClear" @close="handleClose" />
-		<ChatMessages :messages="messages" @send="handleSend" />
+		<ChatMessages :messages="messages" @send="handleSend" @allow="allow" @deny="deny" />
 		<ChatInput
 			:busy="isLoading"
 			:can-cancel="canCancel"

@@ -18,6 +18,8 @@ _STREAM_JOB_PREFIX = "frappe_ai:stream:"
 _STREAM_CLAIM_MARGIN_SECONDS = 60
 # a refused start is cheap; an accepted one holds the long worker for the agent's budget plus 30 s
 _STARTS_PER_MINUTE = 30
+# one line, two callers: api/confirm.py refuses an allowed write with the same words start_stream refuses a question
+_ANSWER_IN_PROGRESS = "A response is already in progress. Wait for it to finish or stop it, then try again."
 
 
 def _agent_url() -> str:
@@ -288,9 +290,7 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 	# before any side effect: a refused start must not clear the running answer's cancel flag below
 	job_id = _STREAM_JOB_PREFIX + user
 	if not _claim_the_answer(user, timeout_seconds + _STREAM_CLAIM_MARGIN_SECONDS):
-		frappe.throw(
-			_("A response is already in progress. Wait for it to finish or stop it, then try again.")
-		)
+		frappe.throw(_(_ANSWER_IN_PROGRESS))
 
 	# nothing below reaches the worker that would release the claim, so a failure here gives it back
 	try:
@@ -341,6 +341,7 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 	return {"session_id": session_id, "currency": page_context.get("currency", "")}
 
 
+_TOKEN_HANDOFF_PREFIX = "frappe_ai:confirm_handoff:"
 _SID_KEY_PREFIX = "frappe_ai:sid:"
 
 # one line per way the relay can fail; the address, the status and the stack stay in the Error Log
@@ -366,9 +367,9 @@ def _failure_message(exc: Exception, streaming: bool) -> str:
 	return _STOPPED_PART_WAY if streaming else _UNREACHABLE
 
 
-def _take_sid(sid_key: str) -> str:
-	"""The sid start_stream left for this job; gone after the first read."""
-	key = _SID_KEY_PREFIX + sid_key
+def _take_sid(sid_key: str, prefix: str = _SID_KEY_PREFIX) -> str:
+	"""What the enqueuing request left for this job under `prefix`; gone after the first read."""
+	key = prefix + sid_key
 	try:
 		return frappe.cache.get_value(key, use_local_cache=False) or ""
 	finally:
@@ -383,9 +384,13 @@ def _stream_to_agent(
 	agent_url: str,
 	timeout_seconds: int,
 	page_context: dict | None = None,
+	confirmation: dict | None = None,
 ) -> None:
-	"""The RQ job relaying the agent's chunks to user over realtime; never whitelist it: it trusts user."""
+	"""Relay the agent's chunks to user; never whitelist it: it trusts user, and a `confirmation` carries no message."""
 	import time
+
+	# at module level this would close the import cycle: confirm.py is built on this module
+	from frappe_ai.api.confirm import record_pending
 
 	logger = frappe.logger("frappe_ai", allow_site=True)
 	context: dict = {"user_id": user}
@@ -395,13 +400,19 @@ def _stream_to_agent(
 		context.update(page_context)
 
 	payload = {
-		"message": message,
 		# Forward session_id so the agent groups all turns under the same
 		# AI Chat Session row, and so its FrappeHistoryClient can pull
 		# prior messages back into the LLM context for this session.
 		"session_id": session_id,
 		"context": context,
 	}
+	# the agent takes exactly one of the two: a confirmed turn runs a call the user already saw
+	if confirmation:
+		# the token itself is never a job argument, so it is read here and spent by the agent
+		call = dict(confirmation)
+		token = _take_sid(call.pop("token_key", ""), _TOKEN_HANDOFF_PREFIX)
+		confirmation = {**call, "token": token}
+	payload["confirmation" if confirmation else "message"] = confirmation or message
 
 	event_name = f"frappe_ai:chunk:{session_id}"
 	done_received = False
@@ -466,6 +477,10 @@ def _stream_to_agent(
 				if chunk.get("type") == "done":
 					done_received = True
 					done_source = "agent"
+				elif chunk.get("type") == "tool_confirm":
+					# recorded before it is published: this record, not the chunk the browser holds, is
+					# what a click is answered from, so a forged click can only name an id
+					record_pending(chunk, user, session_id)
 
 				frappe.publish_realtime(
 					event_name,

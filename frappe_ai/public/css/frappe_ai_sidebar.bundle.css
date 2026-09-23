@@ -460,6 +460,71 @@
 	background: var(--indicator-red, #e74c3c);
 }
 
+/* Waiting on the user's Allow or Deny (ADR-006). */
+.frappe-ai-tool-status--waiting {
+	background: var(--indicator-orange, #f39c12);
+	animation: frappe-ai-blink 1s ease-in-out infinite;
+}
+
+.frappe-ai-tool-status--cancelled {
+	background: var(--text-muted);
+}
+
+.frappe-ai-tool-header--confirm {
+	cursor: default;
+}
+
+.frappe-ai-tool-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 1;
+	min-width: 0;
+	border: none;
+	background: transparent;
+	padding: 0;
+	margin: 0;
+	font: inherit;
+	color: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.frappe-ai-tool-confirm-label {
+	color: var(--text-color);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.frappe-ai-tool-actions {
+	display: flex;
+	gap: 4px;
+	flex-shrink: 0;
+}
+
+.frappe-ai-tool-allow,
+.frappe-ai-tool-deny {
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	padding: 2px 8px;
+	font-size: 11px;
+	cursor: pointer;
+	background: var(--bg-color);
+	color: var(--text-color);
+}
+
+.frappe-ai-tool-deny {
+	border-color: transparent;
+	background: transparent;
+	color: var(--text-muted);
+}
+
+.frappe-ai-tool-allow:hover,
+.frappe-ai-tool-deny:hover {
+	background: var(--subtle-accent, #f0f4f8);
+}
+
 @keyframes frappe-ai-blink {
 	0%,
 	100% {

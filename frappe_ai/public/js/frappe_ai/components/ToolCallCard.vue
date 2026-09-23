@@ -1,6 +1,39 @@
 <template>
 	<div class="frappe-ai-tool-card">
+		<div v-if="confirming" class="frappe-ai-tool-header frappe-ai-tool-header--confirm">
+			<button
+				class="frappe-ai-tool-toggle"
+				:aria-expanded="expanded"
+				:aria-label="`${confirmLabel} ${expanded ? 'collapse' : 'expand'} details`"
+				type="button"
+				@click="expanded = !expanded"
+			>
+				<span
+					class="frappe-ai-tool-status"
+					:class="`frappe-ai-tool-status--${toolCall.status}`"
+					aria-hidden="true"
+				/>
+				<span class="frappe-ai-tool-confirm-label">{{ confirmLabel }}</span>
+			</button>
+			<span v-if="toolCall.status === 'waiting'" class="frappe-ai-tool-actions">
+				<button
+					type="button"
+					class="frappe-ai-tool-allow"
+					@click="emit('allow', toolCall.confirm!.id)"
+				>
+					Allow
+				</button>
+				<button
+					type="button"
+					class="frappe-ai-tool-deny"
+					@click="emit('deny', toolCall.confirm!.id)"
+				>
+					Deny
+				</button>
+			</span>
+		</div>
 		<button
+			v-else
 			:class="['frappe-ai-tool-header', expanded ? 'frappe-ai-tool-header--open' : '']"
 			:aria-expanded="expanded"
 			:aria-label="`Tool call: ${toolCall.name}, ${expanded ? 'collapse' : 'expand'} details`"
@@ -24,7 +57,7 @@
 		</button>
 		<div v-if="expanded">
 			<div class="frappe-ai-tool-section">
-				<p class="frappe-ai-tool-label">Arguments</p>
+				<p class="frappe-ai-tool-label">{{ confirming ? "Input" : "Arguments" }}</p>
 				<pre class="frappe-ai-tool-pre">{{ formattedArgs }}</pre>
 			</div>
 			<div v-if="toolCall.result !== null && toolCall.result !== undefined">
@@ -57,8 +90,22 @@ import { frappeIcon } from "../utils/frappe-icon";
 import type { ToolCall } from "../types/messages";
 
 const props = defineProps<{ toolCall: ToolCall }>();
+const emit = defineEmits<{ allow: [id: string]; deny: [id: string] }>();
 const expanded = ref(false);
 const resultExpanded = ref(false);
+
+// only a card the server minted an id for can be answered; every other card keeps its ordinary header
+const confirming = computed(
+	() =>
+		!!props.toolCall.confirm &&
+		(props.toolCall.status === "waiting" || props.toolCall.status === "cancelled"),
+);
+
+const confirmLabel = computed(() =>
+	props.toolCall.status === "waiting"
+		? `Allow ${props.toolCall.name}?`
+		: `Denied ${props.toolCall.name}`,
+);
 
 const formattedArgs = computed(() => {
 	if (!props.toolCall.arguments) return "{}";

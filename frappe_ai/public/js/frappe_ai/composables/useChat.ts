@@ -1,18 +1,20 @@
 /** Chat state; a reply streams from the server's relay (api.chat.start_stream) over frappe.realtime. */
 
 import { ref, readonly } from "vue";
-import type { AssistantMessage, Message } from "../types/messages";
+import type { AssistantMessage, Message, ToolCall } from "../types/messages";
 import { getPageContext } from "../utils/context";
 import { setAgentCurrency } from "../utils/formatters";
 import { useSettings } from "./useSettings";
 
 interface Chunk {
-	type: "content" | "content_block" | "tool_call" | "done" | "error" | "session";
+	type:
+		"content" | "content_block" | "tool_call" | "tool_confirm" | "done" | "error" | "session";
 	text?: string;
 	message?: string;
 	tools_called?: string[];
 	// For chunk.type === "session" the agent echoes back the canonical id it
-	// wants the client to use for subsequent turns in this conversation.
+	// wants the client to use for subsequent turns in this conversation; for
+	// chunk.type === "tool_confirm" it is the id of the paused write.
 	id?: string;
 	// For chunk.type === "content_block" the parsed block payload
 	// (table | chart | kpi | status | text) the FE will render via the block
@@ -80,16 +82,11 @@ export function useChat() {
 	// reused across turns, or the agent loses the conversation's history
 	let _conversationId: string | null = null;
 
-	async function sendMessage(content: string): Promise<void> {
-		if (!content.trim() || isLoading.value) return;
-
-		const userMessage: Message = {
-			id: crypto.randomUUID(),
-			role: "user",
-			content,
-			timestamp: new Date(),
-		};
-		messages.value.push(userMessage);
+	// `begin` runs only after the realtime listener exists: a chunk published before it is lost
+	/** Stream one turn into a new assistant bubble; `begin` asks the server to start it, `fail` reports a bad start. */
+	async function _runTurn(
+		begin: (sessionId: string, fail: (err: Error) => void) => void,
+	): Promise<void> {
 		isLoading.value = true;
 		lastError.value = null;
 
@@ -187,24 +184,24 @@ export function useChat() {
 							m.pending = false;
 						});
 					} else if (chunk.type === "tool_call" && chunk.name) {
-						// status "done": the relay sends no tool-result event, so "running" would spin forever;
-						// no placeholder left means an error removed it, so drop the card rather than append it out of order
-						const assistantIdx = messages.value.findIndex((m) => m.id === assistantId);
-						if (assistantIdx < 0) return;
-						const toolCallMessage: Message = {
-							id: crypto.randomUUID(),
-							role: "tool_call",
-							content: "",
-							toolCall: {
-								call_id: crypto.randomUUID(),
-								name: chunk.name,
-								arguments: chunk.arguments ?? {},
-								status: "done",
-								timestamp: new Date(),
-							},
+						// status "done": the relay sends no tool-result event, so "running" would spin forever
+						_insertToolCard(assistantId, {
+							call_id: crypto.randomUUID(),
+							name: chunk.name,
+							arguments: chunk.arguments ?? {},
+							status: "done",
 							timestamp: new Date(),
-						};
-						messages.value.splice(assistantIdx, 0, toolCallMessage);
+						});
+					} else if (chunk.type === "tool_confirm" && chunk.name && chunk.id) {
+						// the agent ran nothing: this card is the question, and allow()/deny() is the answer
+						_insertToolCard(assistantId, {
+							call_id: crypto.randomUUID(),
+							name: chunk.name,
+							arguments: chunk.arguments ?? {},
+							status: "waiting",
+							confirm: { id: chunk.id },
+							timestamp: new Date(),
+						});
 					} else if (chunk.type === "done") {
 						_updateMessage(assistantId, (m) => {
 							m.pending = false;
@@ -216,20 +213,7 @@ export function useChat() {
 					}
 				});
 
-				frappe.call<StreamResult>({
-					method: "frappe_ai.api.chat.start_stream",
-					args: {
-						message: content,
-						session_id: sessionId,
-						// Inject route/doctype/docname/currency so the agent prompt
-						// can ground answers in the user's current page. The relay
-						// forwards this dict into the agent's `context` payload.
-						page_context: getPageContext(),
-					},
-					// the currency the server told the agent to answer in; the blocks it sends carry none
-					callback: (r) => setAgentCurrency(r.message?.currency ?? ""),
-					error: (err: unknown) => settle("reject", _toError(err)),
-				});
+				begin(sessionId, (err: Error) => settle("reject", err));
 
 				armSilenceTimer();
 			});
@@ -244,6 +228,78 @@ export function useChat() {
 			canCancel.value = false;
 			_resolveStream = null;
 		}
+	}
+
+	async function sendMessage(content: string): Promise<void> {
+		if (!content.trim() || isLoading.value) return;
+
+		messages.value.push({
+			id: crypto.randomUUID(),
+			role: "user",
+			content,
+			timestamp: new Date(),
+		});
+
+		await _runTurn((sessionId, fail) => {
+			frappe.call<StreamResult>({
+				method: "frappe_ai.api.chat.start_stream",
+				args: {
+					message: content,
+					session_id: sessionId,
+					// Inject route/doctype/docname/currency so the agent prompt
+					// can ground answers in the user's current page. The relay
+					// forwards this dict into the agent's `context` payload.
+					page_context: getPageContext(),
+				},
+				// the currency the server told the agent to answer in; the blocks it sends carry none
+				callback: (r) => setAgentCurrency(r.message?.currency ?? ""),
+				error: (err: unknown) => fail(_toError(err)),
+			});
+		});
+	}
+
+	/** Run the write this card is waiting on: the server starts the turn, so the answer streams in as usual. */
+	async function allow(confirmationId: string): Promise<void> {
+		if (isLoading.value) return;
+		await _runTurn((_sessionId, fail) => {
+			frappe.call({
+				method: "frappe_ai.api.confirm.respond",
+				args: { confirmation_id: confirmationId, decision: "allow" },
+				// the buttons go once the answer is on its way; a throw leaves them, because nothing ran
+				callback: () => _setConfirmStatus(confirmationId, "done"),
+				error: (err: unknown) => fail(_toError(err)),
+			});
+		});
+	}
+
+	/** Drop the write this card is waiting on; nothing is sent to the agent and no turn follows. */
+	function deny(confirmationId: string): void {
+		frappe.call({
+			method: "frappe_ai.api.confirm.respond",
+			args: { confirmation_id: confirmationId, decision: "deny" },
+			callback: () => _setConfirmStatus(confirmationId, "cancelled"),
+			error: (err: unknown) => _addErrorMessage(_toError(err).message),
+		});
+	}
+
+	function _setConfirmStatus(confirmationId: string, status: ToolCall["status"]): void {
+		const target = messages.value.find(
+			(m) => m.role === "tool_call" && m.toolCall.confirm?.id === confirmationId,
+		);
+		if (target?.role === "tool_call") target.toolCall.status = status;
+	}
+
+	/** Put a tool card just above the streaming bubble; no bubble left means an error removed it. */
+	function _insertToolCard(assistantId: string, toolCall: ToolCall): void {
+		const assistantIdx = messages.value.findIndex((m) => m.id === assistantId);
+		if (assistantIdx < 0) return;
+		messages.value.splice(assistantIdx, 0, {
+			id: crypto.randomUUID(),
+			role: "tool_call",
+			content: "",
+			toolCall,
+			timestamp: new Date(),
+		});
 	}
 
 	function _serverCancelInFlight(): void {
@@ -378,6 +434,8 @@ export function useChat() {
 		canCancel: readonly(canCancel),
 		lastError: readonly(lastError),
 		sendMessage,
+		allow,
+		deny,
 		cancelMessage,
 		clearMessages,
 		loadRecentConversation,

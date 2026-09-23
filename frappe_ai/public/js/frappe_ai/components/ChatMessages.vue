@@ -12,6 +12,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
 	send: [content: string];
+	allow: [id: string];
+	deny: [id: string];
 }>();
 
 const container = ref<HTMLElement>();
@@ -101,6 +103,8 @@ watch(
 			<ToolCallCard
 				v-if="msg.role === 'tool_call' && msg.toolCall"
 				:tool-call="msg.toolCall"
+				@allow="emit('allow', $event)"
+				@deny="emit('deny', $event)"
 			/>
 			<MessageBubble v-else :message="msg" />
 		</template>
