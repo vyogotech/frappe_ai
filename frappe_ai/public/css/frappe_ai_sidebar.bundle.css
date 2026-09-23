@@ -464,16 +464,8 @@
 	flex-shrink: 0;
 }
 
-.frappe-ai-tool-status--running {
-	background: var(--indicator-yellow, #f39c12);
-	animation: frappe-ai-blink 1s ease-in-out infinite;
-}
-
 .frappe-ai-tool-status--done {
 	background: var(--indicator-green, #27ae60);
-}
-.frappe-ai-tool-status--error {
-	background: var(--indicator-red, #e74c3c);
 }
 
 /* Waiting on the user's Allow or Deny (ADR-006). */
@@ -591,8 +583,7 @@
 	font-weight: 600;
 }
 
-.frappe-ai-tool-pre,
-.frappe-ai-tool-result-pre {
+.frappe-ai-tool-pre {
 	font-family: var(--font-stack-monospace, monospace);
 	font-size: 11px;
 	background: var(--bg-light-gray, var(--control-bg));
@@ -605,31 +596,6 @@
 	max-height: 200px;
 	overflow-y: auto;
 	color: var(--text-color);
-}
-
-.frappe-ai-tool-expand-btn {
-	display: flex;
-	align-items: center;
-	gap: 4px;
-	border: none;
-	background: transparent;
-	cursor: pointer;
-	font-size: 12px;
-	color: var(--text-muted);
-	padding: 6px 10px;
-	border-top: 1px solid var(--border-color);
-	width: 100%;
-	text-align: left;
-	transition: background 0.15s;
-}
-
-.frappe-ai-tool-expand-btn:hover,
-.frappe-ai-tool-expand-btn--open {
-	background: var(--subtle-accent, #f0f4f8);
-}
-
-.frappe-ai-tool-expand-btn--open > span:first-child {
-	transform: rotate(90deg);
 }
 
 /* ──────────────────────────────────────────

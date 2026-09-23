@@ -5,7 +5,6 @@ import type { ToolCall } from "../types/messages";
 
 function makeCall(overrides: Partial<ToolCall> = {}): ToolCall {
 	return {
-		call_id: "c1",
 		name: "frappe.get_all",
 		arguments: { doctype: "User", limit: 10 },
 		status: "done",
@@ -36,19 +35,5 @@ describe("ToolCallCard", () => {
 		expect(pre.exists()).toBe(true);
 		expect(pre.text()).toContain('"doctype"');
 		expect(pre.text()).toContain('"User"');
-	});
-
-	it("renders the Result toggle only when a result is present", async () => {
-		const withResult = mount(ToolCallCard, {
-			props: { toolCall: makeCall({ result: "ok" }) },
-		});
-		await withResult.find("button.frappe-ai-tool-header").trigger("click");
-		expect(withResult.find(".frappe-ai-tool-expand-btn").exists()).toBe(true);
-
-		const noResult = mount(ToolCallCard, {
-			props: { toolCall: makeCall({ result: undefined }) },
-		});
-		await noResult.find("button.frappe-ai-tool-header").trigger("click");
-		expect(noResult.find(".frappe-ai-tool-expand-btn").exists()).toBe(false);
 	});
 });

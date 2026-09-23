@@ -74,7 +74,6 @@ export function useChat() {
 	const messages = ref<Message[]>([]);
 	const isLoading = ref(false);
 	const canCancel = ref(false);
-	const lastError = ref<string | null>(null);
 
 	// Holds a resolve callback so cancelMessage() can cleanly settle the stream promise.
 	let _resolveStream: (() => void) | null = null;
@@ -88,7 +87,6 @@ export function useChat() {
 		begin: (sessionId: string, fail: (err: Error) => void) => void,
 	): Promise<void> {
 		isLoading.value = true;
-		lastError.value = null;
 
 		const assistantId = crypto.randomUUID();
 		const assistantMessage: Message = {
@@ -186,7 +184,6 @@ export function useChat() {
 					} else if (chunk.type === "tool_call" && chunk.name) {
 						// status "done": the relay sends no tool-result event, so "running" would spin forever
 						_insertToolCard(assistantId, {
-							call_id: crypto.randomUUID(),
 							name: chunk.name,
 							arguments: chunk.arguments ?? {},
 							status: "done",
@@ -195,7 +192,6 @@ export function useChat() {
 					} else if (chunk.type === "tool_confirm" && chunk.name && chunk.id) {
 						// the agent ran nothing: this card is the question, and allow()/deny() is the answer
 						_insertToolCard(assistantId, {
-							call_id: crypto.randomUUID(),
 							name: chunk.name,
 							arguments: chunk.arguments ?? {},
 							status: "waiting",
@@ -219,7 +215,6 @@ export function useChat() {
 			});
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : "Failed to get response";
-			lastError.value = msg;
 			// Remove the empty assistant placeholder and add a typed error message.
 			messages.value = messages.value.filter((m) => m.id !== assistantId);
 			_addErrorMessage(msg);
@@ -322,7 +317,6 @@ export function useChat() {
 		if (_resolveStream) _resolveStream();
 		messages.value = [];
 		isLoading.value = false;
-		lastError.value = null;
 		// "New conversation" — drop the session id so the next message opens
 		// a fresh AI Chat Session row.
 		_conversationId = null;
@@ -418,7 +412,6 @@ export function useChat() {
 	});
 
 	function _addErrorMessage(message: string): void {
-		lastError.value = message;
 		messages.value.push({
 			id: crypto.randomUUID(),
 			role: "error",
@@ -432,7 +425,6 @@ export function useChat() {
 		messages,
 		isLoading: readonly(isLoading),
 		canCancel: readonly(canCancel),
-		lastError: readonly(lastError),
 		sendMessage,
 		allow,
 		deny,

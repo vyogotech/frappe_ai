@@ -5,15 +5,12 @@ import type { ContentBlock } from "./blocks";
 export type MessageRole = "user" | "assistant" | "tool_call" | "error";
 
 export interface ToolCall {
-	call_id: string;
 	name: string;
 	arguments: Record<string, unknown>;
 	/** The relay sends a tool call already "done"; "waiting" is a write paused for the user (ADR-006). */
-	status: "running" | "done" | "error" | "cancelled" | "waiting";
+	status: "done" | "cancelled" | "waiting";
 	/** Set on a paused write: the id an Allow or a Deny is posted back with, and all the browser holds of it. */
 	confirm?: { id: string };
-	result?: string;
-	success?: boolean;
 	timestamp?: Date;
 }
 

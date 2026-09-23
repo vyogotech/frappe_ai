@@ -43,7 +43,6 @@ describe("ChatMessages", () => {
 				role: "tool_call",
 				content: "",
 				toolCall: {
-					call_id: "x",
 					name: "frappe.get_all",
 					arguments: {},
 					status: "done",

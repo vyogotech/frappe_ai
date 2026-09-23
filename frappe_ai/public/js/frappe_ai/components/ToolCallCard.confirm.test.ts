@@ -7,7 +7,6 @@ import type { ToolCall } from "../types/messages";
 
 function pending(overrides: Partial<ToolCall> = {}): ToolCall {
 	return {
-		call_id: "c1",
 		name: "create_document",
 		arguments: { doctype: "ToDo", description: "pay the invoice" },
 		status: "waiting",

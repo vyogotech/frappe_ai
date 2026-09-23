@@ -29,18 +29,6 @@ describe("ToolCallCard accessible names", () => {
 		expect(header.attributes("aria-label")).toBe("Tool call: get_doc");
 	});
 
-	it("keeps the result toggle's name steady too", async () => {
-		const wrapper = card({ result: "42" });
-		await wrapper.get("button.frappe-ai-tool-header").trigger("click");
-		const toggle = wrapper.get("button.frappe-ai-tool-expand-btn");
-		expect(toggle.attributes("aria-expanded")).toBe("false");
-		expect(toggle.attributes("aria-label")).toBe("Tool result");
-
-		await toggle.trigger("click");
-		expect(toggle.attributes("aria-expanded")).toBe("true");
-		expect(toggle.attributes("aria-label")).toBe("Tool result");
-	});
-
 	it("lets the confirm header's own visible label be its name", async () => {
 		const wrapper = card({ status: "waiting", confirm: { id: "x1" } });
 		const header = wrapper.get("button.frappe-ai-tool-toggle");

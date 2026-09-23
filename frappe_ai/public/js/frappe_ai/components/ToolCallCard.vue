@@ -4,6 +4,7 @@
 			<button
 				class="frappe-ai-tool-toggle"
 				:aria-expanded="expanded"
+				:aria-label="`${confirmLabel} ${expanded ? 'collapse' : 'expand'} details`"
 				type="button"
 				@click="expanded = !expanded"
 			>
@@ -31,13 +32,13 @@
 			v-else
 			:class="['frappe-ai-tool-header', expanded ? 'frappe-ai-tool-header--open' : '']"
 			:aria-expanded="expanded"
-			:aria-label="`Tool call: ${toolCall.name}`"
+			:aria-label="`Tool call: ${toolCall.name}, ${expanded ? 'collapse' : 'expand'} details`"
 			type="button"
 			@click="expanded = !expanded"
 		>
 			<span
 				class="frappe-ai-tool-status"
-				:class="`frappe-ai-tool-status--${toolCall.status || 'running'}`"
+				:class="`frappe-ai-tool-status--${toolCall.status}`"
 				aria-hidden="true"
 			/>
 			<span class="frappe-ai-tool-name">{{ toolCall.name }}</span>
@@ -55,26 +56,6 @@
 				<p class="frappe-ai-tool-label">{{ confirming ? "Input" : "Arguments" }}</p>
 				<pre class="frappe-ai-tool-pre">{{ formattedArgs }}</pre>
 			</div>
-			<div v-if="toolCall.result !== null && toolCall.result !== undefined">
-				<button
-					:class="[
-						'frappe-ai-tool-expand-btn',
-						resultExpanded ? 'frappe-ai-tool-expand-btn--open' : '',
-					]"
-					:aria-expanded="resultExpanded"
-					aria-label="Tool result"
-					type="button"
-					@click.stop="resultExpanded = !resultExpanded"
-				>
-					<!-- eslint-disable vue/no-v-html -- frappeIcon returns the desk's own <svg><use> markup -->
-					<span aria-hidden="true" v-html="frappeIcon('chevron-right', 'xs')" />
-					<!-- eslint-enable vue/no-v-html -->
-					Result
-				</button>
-				<div v-if="resultExpanded">
-					<pre class="frappe-ai-tool-result-pre">{{ formattedResult }}</pre>
-				</div>
-			</div>
 		</div>
 	</div>
 </template>
@@ -87,7 +68,6 @@ import type { ToolCall } from "../types/messages";
 const props = defineProps<{ toolCall: ToolCall }>();
 const emit = defineEmits<{ allow: [id: string]; deny: [id: string] }>();
 const expanded = ref(false);
-const resultExpanded = ref(false);
 
 // only a card the server minted an id for can be answered; every other card keeps its ordinary header
 const confirming = computed(
@@ -113,17 +93,6 @@ const formattedArgs = computed(() => {
 		return JSON.stringify(props.toolCall.arguments, null, 2);
 	} catch {
 		return String(props.toolCall.arguments);
-	}
-});
-
-const formattedResult = computed(() => {
-	const r = props.toolCall.result;
-	if (r === null || r === undefined) return "";
-	if (typeof r === "string") return r;
-	try {
-		return JSON.stringify(r, null, 2);
-	} catch {
-		return String(r);
 	}
 });
 
