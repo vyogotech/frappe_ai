@@ -4,6 +4,10 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
+# every test class in this folder inherits make_test_records("AI Chat Session"); without this the `user` Link
+# is walked into User and 20 rows of framework test records are committed that no test here reads
+IGNORE_TEST_RECORD_DEPENDENCIES = ["User"]
+
 
 class TestAIChatSession(IntegrationTestCase):
 	"""AI Chat Session lists for a non-admin, and locks user and context_json after insert."""
