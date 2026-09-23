@@ -93,6 +93,22 @@ def _validate_agent_url(url: str) -> None:
 			)
 
 
+def _check_agent_url(url: str) -> None:
+	"""Throw unless url is set and safe; only a System Manager is told which address or setting is wrong."""
+	try:
+		if not url:
+			frappe.throw(_("AI agent URL is not configured. Set frappe_ai_agent_url in site_config."))
+		_validate_agent_url(url)
+	except frappe.ValidationError:
+		if "System Manager" in frappe.get_roles():
+			raise
+		# the resolved address and the site_config key names would otherwise be rendered in the chat bubble
+		frappe.clear_last_message()
+	else:
+		return
+	frappe.throw(_("The AI assistant is not set up yet. Contact your administrator."))
+
+
 _CANCEL_KEY_PREFIX = "frappe_ai:cancel:"
 # Short TTL: cancellation should propagate within a few seconds. If the worker
 # never sees the flag (already done), the key just expires.
@@ -273,9 +289,7 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 			session_id = str(uuid.uuid4())
 
 		agent_url = _agent_url()
-		if not agent_url:
-			frappe.throw(_("AI agent URL is not configured. Set frappe_ai_agent_url in site_config."))
-		_validate_agent_url(agent_url)
+		_check_agent_url(agent_url)
 
 		# a Stop that landed after the previous answer's last line would otherwise cancel this one
 		frappe.cache.delete_value(_cancel_key(session_id))
@@ -310,6 +324,28 @@ def start_stream(message: str, session_id: str | None = None, page_context=None)
 
 
 _SID_KEY_PREFIX = "frappe_ai:sid:"
+
+# one line per way the relay can fail; the address, the status and the stack stay in the Error Log
+_SIGNED_OUT = "Session expired. Please sign in again."
+_TOO_MANY_QUESTIONS = "Too many questions in a short time. Wait a minute, then try again."
+_STOPPED_PART_WAY = "The assistant stopped part-way through the answer. Send your message again."
+_UNREACHABLE = "The assistant is unreachable. Try again in a few minutes."
+_CUT_OFF = "The answer was cut off. Send your message again."
+_FAILED = "Failed to get response"
+
+
+def _failure_message(exc: Exception, streaming: bool) -> str:
+	"""The line the user reads for this failure; streaming is True once the agent had accepted the request."""
+	status = getattr(getattr(exc, "response", None), "status_code", None)
+	if status == 401:
+		return _SIGNED_OUT
+	if status == 429:
+		return _TOO_MANY_QUESTIONS
+	if status is not None:
+		return _FAILED
+	if isinstance(exc, requests.exceptions.ChunkedEncodingError):
+		return _CUT_OFF
+	return _STOPPED_PART_WAY if streaming else _UNREACHABLE
 
 
 def _take_sid(sid_key: str) -> str:
@@ -354,6 +390,7 @@ def _stream_to_agent(
 	chunk_count = 0
 	stream_start = time.monotonic()
 	done_source = "fallback"  # set to "agent" when the agent emits the done chunk
+	streaming = False  # the agent accepted the request, so a later failure is an answer that broke off
 
 	logger.info(
 		"stream.start session=%s user=%s agent=%s timeout=%ds context_keys=%s msg_len=%d",
@@ -379,6 +416,7 @@ def _stream_to_agent(
 			stream=True,
 		) as response:
 			response.raise_for_status()
+			streaming = True
 
 			for line in response.iter_lines(decode_unicode=True):
 				if _is_stream_cancelled(session_id):
@@ -444,7 +482,7 @@ def _stream_to_agent(
 		frappe.log_error(title="AI Agent Stream Failed", message=frappe.get_traceback())
 		frappe.publish_realtime(
 			event_name,
-			{"type": "error", "message": "Failed to connect to AI agent."},
+			{"type": "error", "message": _failure_message(e, streaming)},
 			user=user,
 			after_commit=False,
 		)
@@ -455,7 +493,7 @@ def _stream_to_agent(
 		frappe.log_error(title="AI Agent Stream Failed", message=frappe.get_traceback())
 		frappe.publish_realtime(
 			event_name,
-			{"type": "error", "message": "Failed to connect to AI agent."},
+			{"type": "error", "message": _FAILED},
 			user=user,
 			after_commit=False,
 		)
