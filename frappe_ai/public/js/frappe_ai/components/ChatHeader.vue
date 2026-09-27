@@ -5,18 +5,22 @@ const emit = defineEmits<{
 	clear: [];
 	close: [];
 }>();
+
+const appName = __("Frappe AI");
+const newConversation = __("New conversation");
+const closeSidebar = __("Close sidebar");
 </script>
 
 <template>
 	<div class="frappe-ai-header">
 		<div class="frappe-ai-header-left">
-			<span class="frappe-ai-header-title">Frappe AI</span>
+			<span class="frappe-ai-header-title">{{ appName }}</span>
 		</div>
 		<div class="frappe-ai-header-actions">
 			<button
 				class="frappe-ai-icon-btn"
-				title="New conversation"
-				aria-label="New conversation"
+				:title="newConversation"
+				:aria-label="newConversation"
 				@click="emit('clear')"
 			>
 				<!-- eslint-disable-next-line vue/no-v-html -->
@@ -24,8 +28,8 @@ const emit = defineEmits<{
 			</button>
 			<button
 				class="frappe-ai-icon-btn"
-				title="Close sidebar"
-				aria-label="Close sidebar"
+				:title="closeSidebar"
+				:aria-label="closeSidebar"
 				@click="emit('close')"
 			>
 				<!-- eslint-disable-next-line vue/no-v-html -->

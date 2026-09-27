@@ -5,23 +5,18 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-# Fields that must never change after the session row is created. The DocType
-# JSON allows System Manager to write everything, but BUG-010 showed that lets
-# an admin reassign a session to another user or rewrite its grounding
-# context_json — both serious integrity holes that the API would never
-# generate. We enforce immutability here so the Python layer is the floor,
-# regardless of role.
+# the DocType lets System Manager write every field; this is the only guard against reassigning a session
+# or rewriting its grounding context after insert
 _IMMUTABLE_AFTER_INSERT = ("user", "context_json")
 
 
 class AIChatSession(Document):
 	def before_insert(self):
-		if not self.user:
-			self.user = frappe.session.user
-		if not self.started_at:
-			self.started_at = frappe.utils.now_datetime()
+		# a caller-supplied user would put this chat in someone else's sidebar
+		self.user = frappe.session.user
 		if not self.last_activity:
-			self.last_activity = self.started_at
+			# the chat list orders on this, so a session without one would sort last from the moment it opens
+			self.last_activity = frappe.utils.now_datetime()
 
 	def validate(self):
 		# `self.get_doc_before_save()` returns None on insert and the persisted
@@ -37,3 +32,8 @@ class AIChatSession(Document):
 					_("Field '{0}' on AI Chat Session is read-only after creation.").format(fieldname),
 					frappe.ValidationError,
 				)
+
+	def on_trash(self):
+		# messages link to their session, so they go first; whoever may delete the chat may delete them
+		for name in frappe.get_all("AI Chat Message", filters={"session": self.name}, pluck="name"):
+			frappe.delete_doc("AI Chat Message", name, ignore_permissions=True)

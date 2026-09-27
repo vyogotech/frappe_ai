@@ -1,13 +1,4 @@
-"""Realtime broadcast hooks for cross-tab message synchronisation.
-
-BUG-004: a second tab opened on the same conversation never sees messages
-posted from the first tab. This module's `broadcast_message_added` hook
-fires on every AI Chat Message insert and publishes the new message via
-Frappe realtime, scoped to the owning user. Each tab subscribes to
-`frappe_ai:msg_added` on mount; the handler in
-`composables/useChat.ts` appends the message if it belongs to the
-conversation currently shown and the tab isn't already mid-stream.
-"""
+"""Cross-tab sync: each new AI Chat Message is published to its owner's other open tabs."""
 
 from __future__ import annotations
 
@@ -17,21 +8,12 @@ import frappe
 
 
 def broadcast_message_added(doc: Any, method: str | None = None) -> None:
-	"""`doc_events` after_insert hook for AI Chat Message.
-
-	Fans the new message out via `frappe.publish_realtime` so any
-	sidebar tabs subscribed to ``frappe_ai:msg_added`` can update their
-	bubble list without polling. Best-effort: any failure is logged and
-	swallowed so the message insert itself is not aborted.
-	"""
+	"""Publish frappe_ai:msg_added to the chat's owner; it logs and swallows errors so the insert stands."""
 	try:
 		user = frappe.db.get_value("AI Chat Session", doc.session, "user")
 		if not user:
 			return
-		# `doc.creation` may be a datetime (in-process insert) or a string
-		# (resource-API insert path) depending on the caller; both are
-		# serialised through `_to_iso_utc` so the wire format matches what
-		# the FE expects (Z-suffixed UTC).
+		# creation is a datetime from an in-process insert but a string from the REST API; _to_iso_utc takes both
 		from frappe_ai.api.chat import _to_iso_utc
 
 		payload = {
@@ -49,8 +31,10 @@ def broadcast_message_added(doc: Any, method: str | None = None) -> None:
 			user=user,
 			after_commit=False,
 		)
-	except Exception as exc:
+	except Exception:  # noqa: BLE001 - runs in the message's after_insert hook, so anything raised loses the saved message
 		frappe.log_error(
 			title="frappe_ai broadcast_message_added failed",
-			message=str(exc),
+			message=frappe.get_traceback(),
+			reference_doctype="AI Chat Session",
+			reference_name=getattr(doc, "session", None),
 		)

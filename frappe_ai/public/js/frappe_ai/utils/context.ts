@@ -1,59 +1,48 @@
 /** Extract current page context from Frappe globals. */
 
 export interface PageContext {
-  route: string;
-  doctype: string;
-  docname: string;
-  currency: string;
+	route: string;
+	doctype: string;
+	docname: string;
+	currency: string;
 }
 
 export function getPageContext(): PageContext {
-  const ctx: PageContext = {
-    route: "",
-    doctype: "",
-    docname: "",
-    currency: "",
-  };
+	const ctx: PageContext = {
+		route: "",
+		doctype: "",
+		docname: "",
+		currency: "",
+	};
 
-  try {
-    if (typeof frappe === "undefined") {
-      return ctx;
-    }
+	try {
+		if (typeof frappe === "undefined") {
+			return ctx;
+		}
 
-    const route = frappe?.router?.current_route;
-    if (Array.isArray(route)) {
-      ctx.route = route.join("/");
-    }
+		const route = frappe?.router?.current_route;
+		if (!Array.isArray(route)) {
+			return ctx;
+		}
+		ctx.route = route.join("/");
 
-    if (typeof cur_frm !== "undefined" && cur_frm?.doc) {
-      ctx.doctype = cur_frm.doc.doctype || "";
-      ctx.docname = cur_frm.doc.name || "";
-    } else if (typeof cur_list !== "undefined" && cur_list?.doctype) {
-      ctx.doctype = cur_list.doctype;
-    }
+		// the route, never cur_frm or cur_list: frappe assigns cur_frm in one place (form.js:407) and clears
+		// it only when a Page route shows, so on a list it still names the last form the user opened
+		if (route[0] === "Form" && route[1]) {
+			ctx.doctype = route[1];
+			ctx.docname = route.slice(2).join("/");
+			// the open document's own currency only: frappe.boot.sysdefaults holds the site-wide default, not the
+			// user's company's, and sending it here would hide the company's from the server, which fills this in
+			const currency = frappe.get_doc?.(ctx.doctype, ctx.docname)?.currency;
+			if (typeof currency === "string") {
+				ctx.currency = currency.toUpperCase();
+			}
+		} else if (route[0] === "List" && route[1]) {
+			ctx.doctype = route[1];
+		}
+	} catch {
+		// Silently fail in dev mode without frappe
+	}
 
-    // Currency: derived in priority order from
-    //   1. the bound document (if it carries a `currency` field, e.g.
-    //      Sales Invoice, Purchase Order — most accurate per-document)
-    //   2. the system default (Company.default_currency, exposed via
-    //      frappe.boot.sysdefaults)
-    //   3. frappe.defaults.get_default — older Frappe versions
-    // The agent uses this to render prose currency consistently with the
-    // table/kpi cell formatter (which also defaults to INR).
-    let currency = "";
-    if (typeof cur_frm !== "undefined" && cur_frm?.doc?.currency) {
-      currency = cur_frm.doc.currency;
-    } else if (frappe?.boot?.sysdefaults?.currency) {
-      currency = frappe.boot.sysdefaults.currency;
-    } else if (frappe?.defaults?.get_default) {
-      currency = frappe.defaults.get_default("currency") || "";
-    }
-    if (typeof currency === "string") {
-      ctx.currency = currency.toUpperCase();
-    }
-  } catch {
-    // Silently fail in dev mode without frappe
-  }
-
-  return ctx;
+	return ctx;
 }

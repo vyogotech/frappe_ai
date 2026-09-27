@@ -1,0 +1,21 @@
+[importlinter]
+root_packages =
+    frappe_ai
+include_external_packages = True
+
+[importlinter:contract:layers]
+name = The API is built on the doctypes, and never the other way round
+type = layers
+layers =
+    frappe_ai.api
+    frappe_ai.ai_assistant
+
+[importlinter:contract:erpnext]
+name = Only the chat endpoint reaches into ERPNext, which a site need not have installed
+type = forbidden
+source_modules =
+    frappe_ai
+forbidden_modules =
+    erpnext
+ignore_imports =
+    frappe_ai.api.chat -> erpnext

@@ -8,8 +8,7 @@ const props = defineProps<{ message: Message }>();
 
 const renderError = ref(false);
 
-onErrorCaptured((err) => {
-	console.error("[Frappe AI] Block render error:", err);
+onErrorCaptured(() => {
 	renderError.value = true;
 	return false;
 });
@@ -19,6 +18,16 @@ const timeStr = computed(() =>
 		? props.message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 		: "",
 );
+
+// which side of the panel a bubble sits on, and what colour it is, say this to a sighted
+// user and to nobody else; an error bubble is nobody's utterance, so it stays unattributed
+const speaker = computed(() => {
+	if (props.message.role === "user") return __("You said:");
+	if (props.message.role === "assistant") return __("Frappe AI said:");
+	return "";
+});
+
+const renderFailed = __("Could not render response");
 
 const isPendingEmpty = computed(
 	() =>
@@ -31,6 +40,7 @@ const isPendingEmpty = computed(
 
 <template>
 	<div :class="`frappe-ai-bubble frappe-ai-bubble--${message.role}`">
+		<span v-if="speaker" class="frappe-ai-sr-only">{{ speaker }}</span>
 		<!-- User message -->
 		<div v-if="message.role === 'user'" class="frappe-ai-bubble-content">
 			{{ message.content }}
@@ -41,10 +51,11 @@ const isPendingEmpty = computed(
          normal render path. -->
 		<div v-else-if="message.role === 'assistant'" class="frappe-ai-bubble-content">
 			<div v-if="renderError" class="frappe-ai-error frappe-ai-error--info">
-				<div class="frappe-ai-error-message">Could not render response</div>
+				<div class="frappe-ai-error-message">{{ renderFailed }}</div>
 			</div>
 			<template v-else-if="isPendingEmpty">
-				<div class="frappe-ai-bubble-status">
+				<!-- the panel's role=status region says "Thinking..." instead (ChatSidebar.vue) -->
+				<div class="frappe-ai-bubble-status" aria-hidden="true">
 					<span class="frappe-ai-bubble-status-dot"></span>
 					<span class="frappe-ai-bubble-status-dot"></span>
 					<span class="frappe-ai-bubble-status-dot"></span>
@@ -62,12 +73,13 @@ const isPendingEmpty = computed(
              below, which puts everything in a single text block. -->
 				<template v-if="message.parts && message.parts.length > 0">
 					<template v-for="(part, i) in message.parts" :key="i">
-						<!-- eslint-disable-next-line vue/no-v-html -->
+						<!-- eslint-disable vue/no-v-html -- renderMarkdown runs markdown-it with html:false -->
 						<div
 							v-if="part.kind === 'text'"
 							class="frappe-ai-markdown"
 							v-html="renderMarkdown(part.text)"
 						/>
+						<!-- eslint-enable vue/no-v-html -->
 						<component
 							v-else-if="part.kind === 'block'"
 							:is="getBlockComponent(part.block.type)"
@@ -76,12 +88,13 @@ const isPendingEmpty = computed(
 					</template>
 				</template>
 				<template v-else>
-					<!-- eslint-disable-next-line vue/no-v-html -->
+					<!-- eslint-disable vue/no-v-html -- renderMarkdown runs markdown-it with html:false -->
 					<div
 						v-if="message.content"
 						class="frappe-ai-markdown"
 						v-html="renderMarkdown(message.content)"
 					/>
+					<!-- eslint-enable vue/no-v-html -->
 					<template v-if="message.blocks && message.blocks.length > 0">
 						<component
 							v-for="(block, i) in message.blocks"

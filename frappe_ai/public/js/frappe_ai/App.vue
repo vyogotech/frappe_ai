@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import ChatSidebar from "./components/ChatSidebar.vue";
 
-const props = defineProps<{
+defineProps<{
 	sidebarWidth: number;
 	keyboardShortcut: string;
 }>();
@@ -42,8 +42,5 @@ onUnmounted(() => {
 			:keyboard-shortcut="keyboardShortcut"
 			@close="handleClose"
 		/>
-	</Transition>
-	<Transition name="frappe-ai-fade">
-		<div v-show="visible" class="frappe-ai-overlay" @click="handleClose"></div>
 	</Transition>
 </template>

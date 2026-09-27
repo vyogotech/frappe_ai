@@ -3,10 +3,15 @@ name: CI
 on:
   push:
     branches: ['**']
+  pull_request:
+
+# Nothing here writes to the repository; each job asks for the read it needs.
+permissions: {}
 
 concurrency:
-  # Cancel older runs of the same branch when a newer commit arrives.
-  group: ci-${{ github.ref }}
+  # Cancel older runs of the same branch when a newer commit arrives. head_ref first: a pushed branch
+  # that also has a PR open fires both triggers, and only the branch name is the same in both.
+  group: ci-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -18,53 +23,61 @@ jobs:
     name: Lint & type-check
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
-          # Frappe v16 (16.18+) requires Python 3.14.
+          # Every frappe v16 release, from v16.0.0, declares requires-python >=3.14,<3.15.
           python-version: '3.14'
 
+      # setup-node reads the yarn cache before any later step runs, so yarn has to exist first.
+      # corepack ships with node and installs the version package.json names, which keeps this
+      # working on any runner rather than only on images that happen to preinstall yarn.
+      - name: Enable corepack
+        run: corepack enable
+
       - name: Set up Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           # Frappe v16 frontend declares engines.node >= 24.
           node-version: '24'
-          cache: 'npm'
+          cache: 'yarn'
 
       - name: Install uv
-        # v8 doesn't ship a major-version tag yet (only v8.0.0 / v8.1.0),
-        # and v7 is the latest rolling major tag. Both target Node 24.
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           enable-cache: true
 
       - name: Install Python deps (runtime + dev group)
-        run: uv sync --group dev
+        run: uv sync --locked --group dev
 
       - name: Install Node deps
-        run: npm ci
+        # yarn, not npm: bench installs an app's JS with `yarn install --check-files`
+        # (bench 5.29.1 app.py:960), so yarn.lock is the lockfile production actually uses.
+        run: yarn install --frozen-lockfile
 
-      - name: ruff check
-        run: uvx ruff check
+      # The Makefile is the one definition of these checks, so CI and a developer cannot drift apart.
+      - name: make lint
+        run: make lint
 
-      - name: ruff format --check
-        run: uvx ruff format --check
+      - name: make typecheck
+        run: make typecheck
 
-      - name: pyrefly check
-        run: uvx pyrefly check
+      - name: make boundaries
+        run: make boundaries
 
-      - name: TypeScript type-check
-        run: npm run type-check
-
-      - name: Vitest (frontend unit tests)
-        run: npm test
+      - name: make test-js
+        run: make test-js
 
       - name: markdownlint
-        run: npx --yes markdownlint-cli README.md QUICKSTART.md INSTALLATION.md APP_STRUCTURE.md
+        run: npx --yes markdownlint-cli@0.49.1 README.md QUICKSTART.md INSTALLATION.md APP_STRUCTURE.md CONTRIBUTING.md SECURITY.md
 
       - name: Strict JSON validity
         run: |
@@ -96,10 +109,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: lint
+    permissions:
+      contents: read
 
     services:
       mariadb:
-        image: mariadb:10.6
+        # 10.6 left community support on 2026-07-06; 11.8 LTS is what frappe's own CI runs.
+        image: mariadb:11.8
         env:
           MARIADB_ROOT_PASSWORD: travis
         ports:
@@ -111,24 +127,31 @@ jobs:
           --health-retries 10
 
       redis-cache:
-        image: redis:alpine
+        image: redis:8-alpine
         ports:
           - 13000:6379
 
       redis-queue:
-        image: redis:alpine
+        image: redis:8-alpine
         ports:
           - 11000:6379
 
     steps:
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      # The directory name becomes the app name: bench derives it from the
+      # basename of the path it clones (bench 5.29.1 app.py:113).
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
-          # Frappe v16 (16.18+) requires Python 3.14.
+          path: frappe_ai
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          # Every frappe v16 release, from v16.0.0, declares requires-python >=3.14,<3.15.
           python-version: '3.14'
 
       - name: Set up Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           # Frappe v16 frontend declares engines.node >= 24.
           node-version: '24'
@@ -153,7 +176,7 @@ jobs:
             FLUSH PRIVILEGES;"
 
       - name: Install frappe-bench
-        run: pip install frappe-bench
+        run: pip install frappe-bench==5.31.0
 
       - name: bench init (Frappe v16)
         run: |
@@ -173,27 +196,10 @@ jobs:
 
       - name: Install this app via `bench get-app` (production install path)
         working-directory: frappe-bench
-        env:
-          # Pass GITHUB_TOKEN so `git clone` works even if the repo is
-          # private. The token has read access to the current repository
-          # automatically.
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Pass ref_name and repository through env vars so a maliciously
-          # named branch (e.g. `;rm -rf /`) cannot break out of the
-          # `bench get-app` command. With on.push.branches: ['**'] the
-          # trigger fires on any pushed branch including PRs from forks
-          # via the same actor — direct interpolation into a `run:` block
-          # would let the branch name execute as shell.
-          BRANCH: ${{ github.ref_name }}
-          REPO: ${{ github.repository }}
         run: |
           git config --global user.email "ci@example.com"
           git config --global user.name "CI"
-          git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
-          bench get-app \
-            --branch "$BRANCH" \
-            --skip-assets \
-            "https://github.com/$REPO.git"
+          bench get-app --skip-assets "$GITHUB_WORKSPACE/frappe_ai"
 
       - name: Create test site
         working-directory: frappe-bench

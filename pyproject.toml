@@ -4,22 +4,21 @@ authors = [
     { name = "Vyogo", email = "developers@vyogo.com"}
 ]
 description = "In-desk AI assistant for Frappe/ERPNext — streams responses from a configured AI agent into a chat sidebar."
-requires-python = ">=3.10"
+requires-python = ">=3.14,<3.15"
 readme = "README.md"
 dynamic = ["version"]
 dependencies = [
-    # Frappe itself is provided by the bench at runtime (`bench get-app` clones
-    # this app into a bench that already has frappe installed). We pin the
-    # supported framework range here purely as documentation — pip/uv won't
-    # see frappe in the venv, but the value tells humans + tooling which
-    # major-version line this app targets.
-    # "frappe>=16.0.0,<17"
-    "requests",
+    # the bound frappe version-16 puts on the same package, whose venv this app is installed into
+    "requests~=2.33.0",
 ]
 
 [build-system]
 requires = ["flit_core >=3.4,<4"]
 build-backend = "flit_core.buildapi"
+
+# the table bench reads (bench 5.29.1 app.py:547, get_required_frappe_version); a comment is not read
+[tool.bench.frappe-dependencies]
+frappe = ">=16.0.0,<17.0.0"
 
 # These dependencies are only installed when developer mode is enabled
 [tool.bench.dev-dependencies]
@@ -28,11 +27,16 @@ build-backend = "flit_core.buildapi"
 [tool.pyrefly]
 # `frappe` is provided by the bench at runtime, not installed in the local venv.
 # Treat it as Any only when the import cannot be resolved.
-ignore-missing-imports = ["frappe", "frappe.*"]
+# erpnext is the same: present on a site that has it, never in this venv (see api/chat.py, _default_currency).
+ignore-missing-imports = ["frappe", "frappe.*", "erpnext", "erpnext.*"]
 
 [tool.ruff]
 line-length = 110
-target-version = "py310"
+# one below requires-python on purpose: at py314 the formatter writes PEP 758 `except A, B:`, which
+# every analyser on an older interpreter (uvx defaults to 3.13) refuses to parse
+target-version = "py313"
+# 0.15 reads a tab-indented "word: text" comment as commented-out code (ERA001)
+required-version = ">=0.16"
 
 [tool.ruff.lint]
 select = [
@@ -43,6 +47,14 @@ select = [
     "UP",
     "B",
     "RUF",
+    "S110",   # try-except-pass: a failure swallowed with no log
+    "BLE001", # blind `except Exception`; a deliberate one carries a noqa saying why nothing may escape
+    "E722",   # bare `except:`
+    "T20",    # print() instead of the site logger
+    "G",      # an f-string or .format() in a logging call, which breaks log aggregation by message
+    "ERA001", # commented-out code
+    "TD003",  # a TODO with no issue link
+    "FIX002", # a TODO left in the tree
 ]
 ignore = [
     "B017", # assertRaises(Exception) - should be more specific
@@ -67,6 +79,10 @@ indent-style = "tab"
 docstring-code-format = true
 
 [dependency-groups]
+# the checks, in the lockfile, so CI and a developer run the same versions
 dev = [
+    "import-linter>=2.15,<3",
+    "pyrefly>=1.3.1,<2",
+    "ruff>=0.16,<0.17",
     "types-requests>=2.33.0.20260513",
 ]

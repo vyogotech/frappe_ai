@@ -3,30 +3,38 @@
 # this file is for app-local checks that don't need a bench (lint, audit,
 # scanner suite).
 
-.PHONY: help lint format typecheck test-js audit audit-clean
+.PHONY: help lint format typecheck boundaries test-js audit audit-clean
 
 AUDIT_DIR ?= audit-out
+# --locked, not --frozen: a lockfile that no longer matches pyproject must fail, not be used
+UVRUN = uv run --locked
 
 help:
 	@echo "Available targets:"
-	@echo "  lint       - ruff check + ruff format --check + TypeScript type-check"
-	@echo "  format     - ruff format (in-place)"
+	@echo "  lint       - ruff check + ruff format --check + eslint + prettier --check"
+	@echo "  format     - ruff format + prettier --write (in-place)"
 	@echo "  typecheck  - pyrefly (Python) + tsc --noEmit (TS)"
+	@echo "  boundaries - import-linter contracts from .importlinter"
 	@echo "  test-js    - vitest run"
-	@echo "  audit      - Full scanner suite: ruff, bandit, pip-audit, npm audit, trivy, gitleaks"
+	@echo "  audit      - Full scanner suite: ruff, bandit, pip-audit, yarn audit, trivy, gitleaks"
 	@echo "  audit-clean - Remove $(AUDIT_DIR)/"
 
 lint:
-	uvx ruff check
-	uvx ruff format --check
-	npm run type-check
+	$(UVRUN) ruff check
+	$(UVRUN) ruff format --check
+	npm run lint
+	npm run format:check
 
 format:
-	uvx ruff format
+	$(UVRUN) ruff format
+	npm run format
 
 typecheck:
-	uvx pyrefly check
-	npm run type-check
+	$(UVRUN) pyrefly check
+	npm run typecheck
+
+boundaries:
+	$(UVRUN) lint-imports
 
 test-js:
 	npm test -- --run
@@ -38,7 +46,7 @@ test-js:
 audit:
 	@mkdir -p $(AUDIT_DIR)
 	@echo "==> ruff (lint)"
-	@uvx ruff check --output-format json frappe_ai > $(AUDIT_DIR)/ruff.json 2>&1 || true
+	@$(UVRUN) ruff check --output-format json frappe_ai > $(AUDIT_DIR)/ruff.json 2>&1 || true
 	@echo "==> bandit (Python AST security)"
 	@if command -v bandit >/dev/null 2>&1; then \
 		bandit -r frappe_ai -f json -o $(AUDIT_DIR)/bandit.json -q || true; \
@@ -53,9 +61,9 @@ audit:
 	else \
 		echo "  SKIP: pip-audit not installed (pipx install pip-audit)"; \
 	fi
-	@echo "==> npm audit (JS deps)"
+	@echo "==> yarn audit (JS deps)"
 	@if [ -f package.json ]; then \
-		npm audit --json > $(AUDIT_DIR)/npm-audit.json 2>/dev/null || true; \
+		yarn audit --json > $(AUDIT_DIR)/yarn-audit.json 2>/dev/null || true; \
 	fi
 	@echo "==> trivy fs (vuln + misconfig)"
 	@if command -v trivy >/dev/null 2>&1; then \

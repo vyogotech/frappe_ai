@@ -4,15 +4,13 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
+# every test class in this folder inherits make_test_records("AI Chat Session"); without this the `user` Link
+# is walked into User and 20 rows of framework test records are committed that no test here reads
+IGNORE_TEST_RECORD_DEPENDENCIES = ["User"]
+
 
 class TestAIChatSession(IntegrationTestCase):
-	"""Regression tests for AI Chat Session — tenant-isolation column gap (BUG-018).
-
-	The saas_platform `permission_query_conditions` hook injects
-	`tabAI Chat Session.tenant_id = <value>` into every list query made by a
-	non-admin user. If the DocType has no `tenant_id` column, the query raises
-	MySQL 1054 "Unknown column" and the user sees a Server Error modal.
-	"""
+	"""AI Chat Session lists for a non-admin, and locks user and context_json after insert."""
 
 	def setUp(self):
 		# Ensure a known non-admin user exists.
@@ -35,13 +33,6 @@ class TestAIChatSession(IntegrationTestCase):
 		frappe.set_user(self.user)
 		# Should not raise — was MySQLdb.OperationalError before BUG-018 fix.
 		frappe.get_list("AI Chat Session", limit=1)
-
-	def test_doctype_has_tenant_id_column(self):
-		# The saas_platform tenant filter requires this column to exist on the table.
-		self.assertTrue(
-			frappe.db.has_column("AI Chat Session", "tenant_id"),
-			"AI Chat Session must have a tenant_id column for tenant-isolation queries to work",
-		)
 
 	def test_user_field_locked_after_insert(self):
 		# BUG-010: pre-fix, System Manager could reassign a session's user via

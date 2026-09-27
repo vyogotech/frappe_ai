@@ -9,11 +9,7 @@ from frappe.model.document import Document
 
 class AIAssistantSettings(Document):
 	def onload(self):
-		# Populate the read-only agent_url display from site_config on every
-		# form load. Without this, the field is empty on first open and
-		# Frappe applies `hide-control` to empty read-only fields — the
-		# admin can never see what URL the agent is wired to until they
-		# click Save once. Refreshing on load keeps display + truth aligned.
+		# Frappe hides an empty read-only field, so without this the agent URL shows only after a Save
 		self._sync_agent_url_from_conf()
 
 	def before_save(self):
@@ -25,6 +21,14 @@ class AIAssistantSettings(Document):
 	def _sync_agent_url_from_conf(self) -> None:
 		conf_url = frappe.local.conf.get("frappe_ai_agent_url", "")
 		self.agent_url = conf_url.rstrip("/") if conf_url else ""
+
+	def field_or_default(self, fieldname: str):
+		"""The stored value, or the field's own default while it is unset — so no default is written twice."""
+		return self.get(fieldname) or self.meta.get_field(fieldname).default
+
+	def agent_timeout(self) -> int:
+		"""Seconds the relay gives the agent: this setting, or the field's own default while it is unset."""
+		return int(self.field_or_default("timeout"))
 
 	def validate(self):
 		if self.timeout is not None and (self.timeout < 1 or self.timeout > 300):
@@ -48,12 +52,7 @@ _RESERVED_SHORTCUTS = {
 
 
 def _validate_shortcut(shortcut: str) -> None:
-	"""Accept modifier+key combos: e.g. Alt+/, Mod+Shift+A, Alt+;
-
-	Rejects shortcuts already claimed by Frappe v16 (Ctrl+/, Ctrl+K, etc.) —
-	the OS still delivers the keystroke, but Frappe's handler runs first and
-	the AI toggle never fires.
-	"""
+	"""Throw unless shortcut is modifiers plus one key (Alt+/, Mod+Shift+A) and not one the desk binds."""
 	pattern = r"^(Mod|Ctrl|Alt|Shift)(\+(Mod|Ctrl|Alt|Shift))*\+\S$"
 	if not re.match(pattern, shortcut, re.IGNORECASE):
 		frappe.throw(frappe._("Invalid keyboard shortcut format. Use e.g. Alt+/ or Mod+Shift+A."))
@@ -63,3 +62,15 @@ def _validate_shortcut(shortcut: str) -> None:
 				shortcut
 			)
 		)
+
+
+def boot_settings(bootinfo) -> None:
+	"""extend_bootinfo hook: put the sidebar's settings on the desk boot, so it needs no call of its own."""
+	settings = frappe.get_single("AI Assistant Settings")
+	bootinfo["frappe_ai"] = {
+		"enabled": bool(settings.enabled),
+		# the sidebar sizes its own limit from this, so it never gives up while the relay is still reading
+		"timeout": settings.agent_timeout(),
+		"sidebar_width": int(settings.field_or_default("sidebar_width")),
+		"keyboard_shortcut": settings.field_or_default("keyboard_shortcut"),
+	}

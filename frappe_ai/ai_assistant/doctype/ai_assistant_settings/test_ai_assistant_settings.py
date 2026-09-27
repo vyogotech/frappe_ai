@@ -7,14 +7,7 @@ import frappe
 
 
 def _reload_settings():
-	"""Fetch a fresh copy of the singleton.
-
-	Each call to `doc.save()` bumps `modified` on the in-memory document,
-	and Frappe v16's `check_if_latest()` then refuses subsequent saves
-	with TimestampMismatchError. Reloading between saves is the cheapest
-	way to keep these unit tests deterministic without disabling the
-	version check.
-	"""
+	"""A fresh copy of the singleton: saving a stale one raises TimestampMismatchError."""
 	return frappe.get_single("AI Assistant Settings")
 
 

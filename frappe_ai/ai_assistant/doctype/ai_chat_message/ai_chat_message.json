@@ -11,8 +11,7 @@
   "tool_name",
   "tool_args_json",
   "tool_result_json",
-  "created_at",
-  "tenant_id"
+  "created_at"
  ],
  "fields": [
   {
@@ -20,7 +19,8 @@
    "fieldtype": "Link",
    "label": "Session",
    "options": "AI Chat Session",
-   "reqd": 1
+   "reqd": 1,
+   "search_index": 1
   },
   {
    "fieldname": "role",
@@ -53,20 +53,10 @@
    "fieldname": "created_at",
    "fieldtype": "Datetime",
    "label": "Created At"
-  },
-  {
-   "fieldname": "tenant_id",
-   "fieldtype": "Data",
-   "label": "Tenant ID",
-   "read_only": 1,
-   "hidden": 1,
-   "no_copy": 1,
-   "print_hide": 1,
-   "description": "Tenant scope for multi-tenant isolation. Populated by saas_platform.utils.tenant.set_tenant_id on insert."
   }
  ],
  "links": [],
- "modified": "2026-04-14 00:00:00.000000",
+ "modified": "2026-09-23 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "AI Assistant",
  "name": "AI Chat Message",
@@ -77,8 +67,7 @@
    "delete": 1,
    "if_owner": 1,
    "read": 1,
-   "role": "All",
-   "write": 1
+   "role": "All"
   },
   {
    "create": 1,

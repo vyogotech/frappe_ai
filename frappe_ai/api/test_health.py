@@ -1,29 +1,23 @@
 # Copyright (c) 2026, Vyogo and contributors
 # For license information, please see license.txt
 
-"""Tests for frappe_ai.api.health.test_connection — the Settings page's
-'Test Connection' button. Mocks the outbound requests.get call so CI
-doesn't depend on a reachable agent."""
+"""Tests for the Settings page's Test Connection (api.health.test_connection), with requests.get mocked."""
 
-import unittest
 from unittest.mock import MagicMock, patch
 
 import frappe
 import requests
+from frappe.tests import IntegrationTestCase
 
 from frappe_ai.api import health
 
 
-class TestHealthEndpoint(unittest.TestCase):
+class TestHealthEndpoint(IntegrationTestCase):
 	def setUp(self):
+		super().setUp()
 		self._original_url = frappe.local.conf.get("frappe_ai_agent_url")
 		frappe.local.conf["frappe_ai_agent_url"] = "http://localhost:8484"
-		# The SSRF guard in _validate_agent_url rejects loopback addresses
-		# (::1, 127.0.0.0/8) outside the explicit escape hatch. These tests
-		# mock requests.get, so the URL is only validated, never reached —
-		# but the validation still runs. Set the escape hatch in setUp so
-		# the test url passes validation and the mocked requests.get is
-		# what determines the test outcome.
+		# the SSRF guard rejects loopback without the hatch, and it runs even though requests.get is mocked
 		self._original_escape = frappe.local.conf.get("frappe_ai_agent_url_unsafe_ok")
 		frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = 1
 
@@ -70,9 +64,9 @@ class TestHealthEndpoint(unittest.TestCase):
 		self.assertTrue(out["success"])
 		self.assertEqual(out["details"]["health"], {"status": "ok", "build": "abc123"})
 		self.assertEqual(out["details"]["user"], frappe.session.user)
-		# sid cookie forwarded.
+		# the agent's /health reads no cookie, so the user's session id must not travel with it
 		_, kwargs = mock_get.call_args
-		self.assertEqual(kwargs["cookies"], {"sid": frappe.session.sid})
+		self.assertNotIn("cookies", kwargs)
 		self.assertEqual(kwargs["timeout"], 10)
 
 	@patch("requests.get")
@@ -97,7 +91,7 @@ class TestHealthEndpoint(unittest.TestCase):
 		self.assertFalse(out["success"])
 		self.assertIn("Cannot connect", out["message"])
 
-	@patch("requests.get", side_effect=RuntimeError("unexpected"))
+	@patch("requests.get", side_effect=requests.exceptions.TooManyRedirects("unexpected"))
 	def test_unexpected_error_is_caught_and_logged(self, _mock_get):
 		# Should not raise — endpoint always returns a structured response.
 		out = health.test_connection()

@@ -1,463 +1,436 @@
-/**
- * Message state with socketio-relay streaming support.
- *
- * Flow:
- *   1. Browser subscribes frappe.realtime.on("frappe_ai:chunk:<session_id>", handler)
- *   2. Browser calls frappe_ai.api.chat.start_stream — server enqueues the relay
- *      and returns {session_id} immediately, freeing the gunicorn worker.
- *   3. Background worker (queue=long) consumes the agent SSE stream and publishes
- *      each chunk via frappe.publish_realtime("frappe_ai:chunk:<session_id>", chunk).
- *   4. Browser receives chunks via the existing realtime subscription.
- *
- * Chunk types from the relay:
- *   {type:"content",  text:"..."}          – plain-text token
- *   {type:"done",     tools_called:[]}     – stream complete
- *   {type:"error",    message:"..."}       – agent or relay error
- */
+/** Chat state; a reply streams from the server's relay (api.chat.start_stream) over frappe.realtime. */
 
 import { ref, readonly } from "vue";
-import type { AssistantMessage, Message } from "../types/messages";
+import type { AssistantMessage, Message, ToolCall } from "../types/messages";
 import { getPageContext } from "../utils/context";
+import { setAgentCurrency } from "../utils/formatters";
+import { readBootSettings } from "../utils/boot-settings";
 
 interface Chunk {
-  type: "content" | "content_block" | "tool_call" | "done" | "error" | "session";
-  text?: string;
-  message?: string;
-  tools_called?: string[];
-  // For chunk.type === "session" the agent echoes back the canonical id it
-  // wants the client to use for subsequent turns in this conversation.
-  id?: string;
-  // For chunk.type === "content_block" the parsed block payload
-  // (table | chart | kpi | status | text) the FE will render via the block
-  // component registry.
-  block?: Record<string, unknown> & { type: string };
-  // For chunk.type === "tool_call" — name + arguments of the agent's invocation.
-  name?: string;
-  arguments?: Record<string, unknown>;
+	type:
+		"content" | "content_block" | "tool_call" | "tool_confirm" | "done" | "error" | "session";
+	text?: string;
+	message?: string;
+	tools_called?: string[];
+	// For chunk.type === "session" the agent echoes back the canonical id it
+	// wants the client to use for subsequent turns in this conversation; for
+	// chunk.type === "tool_confirm" it is the id of the paused write.
+	id?: string;
+	// For chunk.type === "content_block" the parsed block payload
+	// (table | chart | kpi | status | text) the FE will render via the block
+	// component registry.
+	block?: Record<string, unknown> & { type: string };
+	// For chunk.type === "tool_call" — name + arguments of the agent's invocation.
+	name?: string;
+	arguments?: Record<string, unknown>;
 }
 
 interface StreamResult {
-  session_id: string;
+	session_id: string;
+	currency: string;
 }
 
-// Frontend safety-net: bound how long sendMessage() can hang before
-// settle("reject") fires. Keep this generous (and >= the server-side
-// `AI Assistant Settings.timeout` so the relay surfaces its own error
-// first when it can), since chart prompts that fan out to multiple
-// tools routinely take 60–90s end-to-end. A user-visible "timed out"
-// is preferable to a never-resolving spinner if everything else
-// breaks; 2 minutes is the upper bound we want to wait.
-const CLIENT_TIMEOUT_MS = 120_000;
+// the buffer chat.py gives the worker over the agent's budget (timeout + 30), so the relay's own error
+// reaches the user before the sidebar gives up on a silent stream
+const SILENCE_MARGIN_MS = 30_000;
 
-// Frappe's `frappe.call` rejects with a plain object (not Error) shaped like
-//   { exc_type, _server_messages, exception, message? }
-// where `_server_messages` is a JSON-encoded array of JSON-encoded message
-// objects (yes, double-encoded). The naive `new Error(String(err))` then
-// renders as the literal string "[object Object]" in the error bubble.
-// _toError normalises any of these shapes into an Error with a human-readable
-// message — see BUG-012 regression test.
+// frappe.call rejects with a plain object whose _server_messages is double-encoded JSON; String(err) is "[object Object]"
 function _toError(err: unknown): Error {
-  if (err instanceof Error) return err;
-  if (typeof err === "string") return new Error(err);
-  if (err && typeof err === "object") {
-    const e = err as Record<string, unknown>;
-    // Frappe surfaces validation errors via _server_messages: JSON array of
-    // JSON-encoded {message, indicator} objects. Try the first one.
-    const sm = e._server_messages;
-    if (typeof sm === "string") {
-      try {
-        const arr = JSON.parse(sm);
-        if (Array.isArray(arr) && arr.length > 0) {
-          const first = typeof arr[0] === "string" ? JSON.parse(arr[0]) : arr[0];
-          if (first && typeof first === "object" && typeof (first as { message?: unknown }).message === "string") {
-            return new Error((first as { message: string }).message);
-          }
-        }
-      } catch {
-        // fall through to other extraction paths
-      }
-    }
-    if (typeof e.message === "string" && e.message) return new Error(e.message);
-    if (typeof e.exception === "string" && e.exception) {
-      // "frappe.exceptions.ValidationError: actual message" — strip the prefix.
-      return new Error(e.exception.replace(/^[\w.]+Error:\s*/, ""));
-    }
-    if (typeof e.exc_type === "string" && e.exc_type) return new Error(e.exc_type);
-  }
-  return new Error("Failed to get response");
+	if (err instanceof Error) return err;
+	if (typeof err === "string") return new Error(err);
+	if (err && typeof err === "object") {
+		const e = err as Record<string, unknown>;
+		// Frappe surfaces validation errors via _server_messages: JSON array of
+		// JSON-encoded {message, indicator} objects. Try the first one.
+		const sm = e._server_messages;
+		if (typeof sm === "string") {
+			try {
+				const arr = JSON.parse(sm);
+				if (Array.isArray(arr) && arr.length > 0) {
+					const first = typeof arr[0] === "string" ? JSON.parse(arr[0]) : arr[0];
+					if (
+						first &&
+						typeof first === "object" &&
+						typeof (first as { message?: unknown }).message === "string"
+					) {
+						return new Error((first as { message: string }).message);
+					}
+				}
+			} catch {
+				// fall through to other extraction paths
+			}
+		}
+		if (typeof e.message === "string" && e.message) return new Error(e.message);
+		if (typeof e.exception === "string" && e.exception) {
+			// "frappe.exceptions.ValidationError: actual message" — strip the prefix.
+			return new Error(e.exception.replace(/^[\w.]+Error:\s*/, ""));
+		}
+		if (typeof e.exc_type === "string" && e.exc_type) return new Error(e.exc_type);
+	}
+	return new Error(__("Failed to get response"));
 }
 
 export function useChat() {
-  const messages = ref<Message[]>([]);
-  const isLoading = ref(false);
-  const canCancel = ref(false);
-  const lastError = ref<string | null>(null);
+	const messages = ref<Message[]>([]);
+	const isLoading = ref(false);
+	const canCancel = ref(false);
 
-  // Holds a resolve callback so cancelMessage() can cleanly settle the stream promise.
-  let _resolveStream: (() => void) | null = null;
-  let _activeEventName: string | null = null;
+	// Holds a resolve callback so cancelMessage() can cleanly settle the stream promise.
+	let _resolveStream: (() => void) | null = null;
 
-  // Conversation-scoped session id. Reused across sendMessage() calls so
-  // Frappe groups all turns under the same AI Chat Session row, and so
-  // the agent's FrappeHistoryClient can pull prior messages back into
-  // the LLM context for that session. Cleared by clearMessages()
-  // ("New conversation") to start a fresh row.
-  let _conversationId: string | null = null;
+	// reused across turns, or the agent loses the conversation's history
+	let _conversationId: string | null = null;
 
-  async function sendMessage(content: string): Promise<void> {
-    if (!content.trim() || isLoading.value) return;
+	// `begin` runs only after the realtime listener exists: a chunk published before it is lost
+	/** Stream one turn into a new assistant bubble; `begin` asks the server to start it, `fail` reports a bad start. */
+	async function _runTurn(
+		begin: (sessionId: string, fail: (err: Error) => void) => void,
+	): Promise<void> {
+		isLoading.value = true;
 
-    const userMessage: Message = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content,
-      timestamp: new Date(),
-    };
-    messages.value.push(userMessage);
-    isLoading.value = true;
-    lastError.value = null;
+		const assistantId = crypto.randomUUID();
+		const assistantMessage: Message = {
+			id: assistantId,
+			role: "assistant",
+			content: "",
+			// Initialise the ordered fragment list so chunk handlers can append
+			// text/block fragments without first checking presence.
+			parts: [],
+			pending: true,
+			timestamp: null,
+		};
+		messages.value.push(assistantMessage);
 
-    const assistantId = crypto.randomUUID();
-    const assistantMessage: Message = {
-      id: assistantId,
-      role: "assistant",
-      content: "",
-      // Initialise the ordered fragment list so chunk handlers can append
-      // text/block fragments without first checking presence.
-      parts: [],
-      pending: true,
-      timestamp: null,
-    };
-    messages.value.push(assistantMessage);
+		// every ending (done, error chunk, call error, timeout, cancel) goes through settle(), or two error bubbles appear
+		let settled = false;
+		let timerId: ReturnType<typeof setTimeout> | undefined;
+		const silenceMs = readBootSettings().timeout * 1000 + SILENCE_MARGIN_MS;
 
-    // Per-call settlement guard. Every path that finalises the stream
-    // (done chunk, error chunk, frappe.call error, client timeout, cancel)
-    // sets this true and short-circuits any later attempts. Two error
-    // bubbles can otherwise appear when, for example, an "error" chunk
-    // arrives just before the client timeout fires and both rejection
-    // paths run their side effects before Promise.race could disambiguate.
-    let settled = false;
-    let timerId: ReturnType<typeof setTimeout> | undefined;
+		try {
+			const sessionId = _conversationId ?? crypto.randomUUID();
+			_conversationId = sessionId;
+			const eventName = `frappe_ai:chunk:${sessionId}`;
 
-    try {
-      // Reuse the conversation's session id if we already have one so the
-      // agent loads prior turns for the same AI Chat Session row. First
-      // message in a conversation mints a fresh id; subsequent ones reuse
-      // it. The agent's "session" chunk (below) may override with the
-      // canonical id it persisted.
-      const sessionId = _conversationId ?? crypto.randomUUID();
-      _conversationId = sessionId;
-      const eventName = `frappe_ai:chunk:${sessionId}`;
-      _activeEventName = eventName;
+			await new Promise<void>((resolve, reject) => {
+				const settle = (kind: "resolve" | "reject", payload?: unknown) => {
+					if (settled) return;
+					settled = true;
+					if (timerId !== undefined) {
+						clearTimeout(timerId);
+						timerId = undefined;
+					}
+					frappe.realtime.off(eventName);
+					canCancel.value = false;
+					_resolveStream = null;
+					if (kind === "resolve") {
+						resolve();
+					} else {
+						reject(payload as Error);
+					}
+				};
 
-      await new Promise<void>((resolve, reject) => {
-        // Centralised teardown so every settlement path looks identical:
-        // unsubscribe, clear the safety-net timer, drop the cancel
-        // affordance, mark settled. Subsequent calls (from a late chunk,
-        // a stale timer, a duplicate frappe.call error) become no-ops.
-        const settle = (kind: "resolve" | "reject", payload?: unknown) => {
-          if (settled) return;
-          settled = true;
-          if (timerId !== undefined) {
-            clearTimeout(timerId);
-            timerId = undefined;
-          }
-          frappe.realtime.off(eventName);
-          canCancel.value = false;
-          _resolveStream = null;
-          _activeEventName = null;
-          if (kind === "resolve") {
-            resolve();
-          } else {
-            reject(payload as Error);
-          }
-        };
+				// a worker that dies without "done" or "error" would leave the promise pending forever;
+				// the window is silence, not the whole reply, or a long answer is cut off while it streams
+				const armSilenceTimer = () => {
+					if (timerId !== undefined) clearTimeout(timerId);
+					timerId = setTimeout(() => {
+						_serverCancelInFlight(); // the worker would otherwise go on calling tools for an answer nobody waits for
+						settle("reject", new Error(__("Response timed out. Please try again.")));
+					}, silenceMs);
+				};
 
-        // Expose cancel capability before the realtime listener is registered
-        // so the stop button can appear as soon as the request is in-flight.
-        _resolveStream = () => {
-          _updateMessage(assistantId, (m) => {
-            m.pending = false;
-            if (!m.timestamp) m.timestamp = new Date();
-          });
-          settle("resolve");
-        };
-        canCancel.value = true;
+				// Expose cancel capability before the realtime listener is registered
+				// so the stop button can appear as soon as the request is in-flight.
+				_resolveStream = () => {
+					_updateMessage(assistantId, (m) => {
+						m.pending = false;
+						if (!m.timestamp) m.timestamp = new Date();
+					});
+					settle("resolve");
+				};
+				canCancel.value = true;
 
-        frappe.realtime.on(eventName, (chunk: Chunk) => {
-          if (settled) return;
-          if (chunk.type === "session" && chunk.id) {
-            // The agent persisted the conversation under this canonical id
-            // (which may differ from the optimistic UUID we minted). Adopt
-            // it so subsequent turns continue saving against the same row.
-            _conversationId = chunk.id;
-          } else if (chunk.type === "content" && chunk.text) {
-            _updateMessage(assistantId, (m) => {
-              m.content += chunk.text;
-              // Merge consecutive text chunks into the same fragment so a
-              // streaming reply still renders as one markdown block. Only
-              // start a new text part when the last fragment was a block —
-              // that's what preserves the arrival order in the renderer.
-              if (!m.parts) m.parts = [];
-              const last = m.parts[m.parts.length - 1];
-              if (last && last.kind === "text") {
-                last.text += chunk.text;
-              } else {
-                m.parts.push({ kind: "text", text: chunk.text as string });
-              }
-              m.pending = false;
-            });
-          } else if (chunk.type === "content_block" && chunk.block) {
-            // Structured blocks (table/chart/kpi/status) — append to the
-            // message so MessageBubble.vue renders them via getBlockComponent.
-            // The fragment is also pushed onto `parts` at its arrival
-            // position so subsequent text chunks render BELOW it instead
-            // of being silently inserted above (the historical bug where
-            // late text "jumped over" an already-rendered table).
-            const block = chunk.block as unknown as import("../types").ContentBlock;
-            _updateMessage(assistantId, (m) => {
-              if (!m.blocks) m.blocks = [];
-              m.blocks.push(block);
-              if (!m.parts) m.parts = [];
-              m.parts.push({ kind: "block", block });
-              m.pending = false;
-            });
-          } else if (chunk.type === "tool_call" && chunk.name) {
-            // Surface tool invocations as their own bubble so the user can
-            // see what the agent looked up. The relay only emits the call
-            // (no separate result event today); render in "done" state so
-            // the card isn't stuck in a perpetual "running" spinner.
-            //
-            // Insert just before the assistant placeholder so the visible
-            // order matches the agent's actual sequence. If the placeholder
-            // isn't found (e.g. an error path removed it before a late tool
-            // chunk arrived), drop the card rather than appending out of
-            // order — the `settled` short-circuit above should normally
-            // prevent reaching this branch in that state.
-            const assistantIdx = messages.value.findIndex((m) => m.id === assistantId);
-            if (assistantIdx < 0) return;
-            const toolCallMessage: Message = {
-              id: crypto.randomUUID(),
-              role: "tool_call",
-              content: "",
-              toolCall: {
-                call_id: crypto.randomUUID(),
-                name: chunk.name,
-                arguments: chunk.arguments ?? {},
-                status: "done",
-                timestamp: new Date(),
-              },
-              timestamp: new Date(),
-            };
-            messages.value.splice(assistantIdx, 0, toolCallMessage);
-          } else if (chunk.type === "done") {
-            _updateMessage(assistantId, (m) => {
-              m.pending = false;
-              m.timestamp = new Date();
-            });
-            settle("resolve");
-          } else if (chunk.type === "error") {
-            settle("reject", new Error(chunk.message ?? "Agent error"));
-          }
-        });
+				frappe.realtime.on(eventName, (chunk: Chunk) => {
+					if (settled) return;
+					armSilenceTimer();
+					if (chunk.type === "session" && chunk.id) {
+						// The agent persisted the conversation under this canonical id
+						// (which may differ from the optimistic UUID we minted). Adopt
+						// it so subsequent turns continue saving against the same row.
+						_conversationId = chunk.id;
+					} else if (chunk.type === "content" && chunk.text) {
+						_updateMessage(assistantId, (m) => {
+							m.content += chunk.text;
+							// one text part per run of chunks, so markdown split across chunks still renders as one block
+							if (!m.parts) m.parts = [];
+							const last = m.parts[m.parts.length - 1];
+							if (last && last.kind === "text") {
+								last.text += chunk.text;
+							} else {
+								m.parts.push({ kind: "text", text: chunk.text as string });
+							}
+							m.pending = false;
+						});
+					} else if (chunk.type === "content_block" && chunk.block) {
+						// also pushed onto parts in arrival order, or text that comes later renders above the block
+						const block = chunk.block as unknown as import("../types").ContentBlock;
+						_updateMessage(assistantId, (m) => {
+							if (!m.blocks) m.blocks = [];
+							m.blocks.push(block);
+							if (!m.parts) m.parts = [];
+							m.parts.push({ kind: "block", block });
+							m.pending = false;
+						});
+					} else if (chunk.type === "tool_call" && chunk.name) {
+						// status "done": the relay sends no tool-result event, so "running" would spin forever
+						_insertToolCard(assistantId, {
+							name: chunk.name,
+							arguments: chunk.arguments ?? {},
+							status: "done",
+							timestamp: new Date(),
+						});
+					} else if (chunk.type === "tool_confirm" && chunk.name && chunk.id) {
+						// the agent ran nothing: this card is the question, and allow()/deny() is the answer
+						_insertToolCard(assistantId, {
+							name: chunk.name,
+							arguments: chunk.arguments ?? {},
+							status: "waiting",
+							confirm: { id: chunk.id },
+							timestamp: new Date(),
+						});
+					} else if (chunk.type === "done") {
+						_updateMessage(assistantId, (m) => {
+							m.pending = false;
+							m.timestamp = new Date();
+						});
+						settle("resolve");
+					} else if (chunk.type === "error") {
+						settle("reject", new Error(chunk.message ?? __("Agent error")));
+					}
+				});
 
-        frappe.call<StreamResult>({
-          method: "frappe_ai.api.chat.start_stream",
-          args: {
-            message: content,
-            session_id: sessionId,
-            // Inject route/doctype/docname/currency so the agent prompt
-            // can ground answers in the user's current page. The relay
-            // forwards this dict into the agent's `context` payload.
-            page_context: getPageContext(),
-          },
-          error: (err: unknown) => settle("reject", _toError(err)),
-        });
+				begin(sessionId, (err: Error) => settle("reject", err));
 
-        // Safety net: if the RQ worker dies without emitting "done" or
-        // "error", the promise above never settles. Schedule a hard
-        // timeout that flows through `settle()` like every other
-        // settlement path, so a late chunk arriving after the timer
-        // can't add a second error bubble.
-        timerId = setTimeout(
-          () => settle("reject", new Error("Response timed out. Please try again.")),
-          CLIENT_TIMEOUT_MS,
-        );
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to get response";
-      lastError.value = msg;
-      // Remove the empty assistant placeholder and add a typed error message.
-      messages.value = messages.value.filter((m) => m.id !== assistantId);
-      _addErrorMessage(msg);
-    } finally {
-      isLoading.value = false;
-      canCancel.value = false;
-      _resolveStream = null;
-    }
-  }
+				armSilenceTimer();
+			});
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : __("Failed to get response");
+			// Remove the empty assistant placeholder and add a typed error message.
+			messages.value = messages.value.filter((m) => m.id !== assistantId);
+			_addErrorMessage(msg);
+		} finally {
+			isLoading.value = false;
+			canCancel.value = false;
+			_resolveStream = null;
+		}
+	}
 
-  function _serverCancelInFlight(): void {
-    // Fire-and-forget signal to the worker so it stops relaying chunks and
-    // stops burning Ollama cycles for a turn the user no longer wants.
-    // See BUG-003 + BUG-008. Client-side settle handles the bubble cleanup;
-    // this is the server-side counterpart.
-    if (!_conversationId) return;
-    frappe.call({
-      method: "frappe_ai.api.chat.cancel_stream",
-      args: { session_id: _conversationId },
-    });
-  }
+	async function sendMessage(content: string): Promise<void> {
+		if (!content.trim() || isLoading.value) return;
 
-  function cancelMessage(): void {
-    _serverCancelInFlight();
-    if (_resolveStream) _resolveStream();
-  }
+		messages.value.push({
+			id: crypto.randomUUID(),
+			role: "user",
+			content,
+			timestamp: new Date(),
+		});
 
-  function clearMessages(): void {
-    // If a stream is in flight, settle it cleanly first. settle() calls
-    // frappe.realtime.off(eventName), clears the safety timer, drops
-    // _resolveStream / _activeEventName, and resolves the awaited promise.
-    // Without this, the listener leaked (OBS-006) and a follow-up
-    // sendMessage could race the orphan listener (BUG-009: stray chunks
-    // routed at the previous message's assistantId that no longer exists,
-    // leaving the new assistant bubble empty).
-    if (isLoading.value) _serverCancelInFlight();
-    if (_resolveStream) _resolveStream();
-    messages.value = [];
-    isLoading.value = false;
-    lastError.value = null;
-    // "New conversation" — drop the session id so the next message opens
-    // a fresh AI Chat Session row.
-    _conversationId = null;
-  }
+		await _runTurn((sessionId, fail) => {
+			frappe.call<StreamResult>({
+				method: "frappe_ai.api.chat.start_stream",
+				args: {
+					message: content,
+					session_id: sessionId,
+					// Inject route/doctype/docname/currency so the agent prompt
+					// can ground answers in the user's current page. The relay
+					// forwards this dict into the agent's `context` payload.
+					page_context: getPageContext(),
+				},
+				// the currency the server told the agent to answer in; the blocks it sends carry none
+				callback: (r) => setAgentCurrency(r.message?.currency ?? ""),
+				error: (err: unknown) => fail(_toError(err)),
+			});
+		});
+	}
 
-  // Stop the worker if the tab is closing or navigating away mid-stream.
-  // Uses sendBeacon when available so the request survives unload. See
-  // BUG-003: without this, the worker kept relaying SSE chunks to a defunct
-  // channel and the agent kept generating tokens for no consumer.
-  if (typeof window !== "undefined") {
-    window.addEventListener("beforeunload", () => {
-      if (!isLoading.value || !_conversationId) return;
-      try {
-        const blob = new Blob(
-          [JSON.stringify({ session_id: _conversationId })],
-          { type: "application/json" },
-        );
-        navigator.sendBeacon(
-          "/api/method/frappe_ai.api.chat.cancel_stream",
-          blob,
-        );
-      } catch {
-        // best-effort
-      }
-    });
-  }
+	/** Run the write this card is waiting on: the server starts the turn, so the answer streams in as usual. */
+	async function allow(confirmationId: string): Promise<void> {
+		if (isLoading.value) return;
+		await _runTurn((_sessionId, fail) => {
+			frappe.call({
+				method: "frappe_ai.api.confirm.respond",
+				args: { confirmation_id: confirmationId, decision: "allow" },
+				// the buttons go once the answer is on its way; a throw leaves them, because nothing ran
+				callback: () => _setConfirmStatus(confirmationId, "done"),
+				error: (err: unknown) => fail(_toError(err)),
+			});
+		});
+	}
 
-  interface RecentMessagesResponse {
-    session_id: string | null;
-    messages: Array<{ id: string; role: string; content: string; timestamp: string | null }>;
-  }
+	/** Drop the write this card is waiting on; nothing is sent to the agent and no turn follows. */
+	function deny(confirmationId: string): void {
+		frappe.call({
+			method: "frappe_ai.api.confirm.respond",
+			args: { confirmation_id: confirmationId, decision: "deny" },
+			callback: () => _setConfirmStatus(confirmationId, "cancelled"),
+			error: (err: unknown) => _addErrorMessage(_toError(err).message),
+		});
+	}
 
-  async function loadRecentConversation(): Promise<void> {
-    // Hydrate the sidebar on mount so a page reload doesn't throw away the
-    // user's last chat. Best-effort: any failure leaves the bubble list
-    // empty so the user can simply start a new conversation.
-    try {
-      const result = await new Promise<RecentMessagesResponse>((resolve, reject) => {
-        frappe.call<RecentMessagesResponse>({
-          method: "frappe_ai.api.chat.get_recent_messages",
-          args: { limit: 50 },
-          callback: (r) => resolve(r?.message ?? { session_id: null, messages: [] }),
-          error: reject,
-        });
-      });
+	function _setConfirmStatus(confirmationId: string, status: ToolCall["status"]): void {
+		const target = messages.value.find(
+			(m) => m.role === "tool_call" && m.toolCall.confirm?.id === confirmationId,
+		);
+		if (target?.role === "tool_call") target.toolCall.status = status;
+	}
 
-      if (!result || !result.session_id || result.messages.length === 0) return;
+	/** Put a tool card just above the streaming bubble; no bubble left means an error removed it. */
+	function _insertToolCard(assistantId: string, toolCall: ToolCall): void {
+		const assistantIdx = messages.value.findIndex((m) => m.id === assistantId);
+		if (assistantIdx < 0) return;
+		messages.value.splice(assistantIdx, 0, {
+			id: crypto.randomUUID(),
+			role: "tool_call",
+			content: "",
+			toolCall,
+			timestamp: new Date(),
+		});
+	}
 
-      _conversationId = result.session_id;
-      // Skip rows whose role we can't faithfully render (e.g. persisted
-      // "tool" messages — we don't have the toolCall metadata in the
-      // hydrated row). Better to omit than to mislabel them as user input.
-      messages.value = result.messages
-        .filter((m) => m.role === "user" || m.role === "assistant")
-        .map((m) => ({
-          id: m.id,
-          role: m.role as "user" | "assistant",
-          content: m.content,
-          timestamp: m.timestamp ? new Date(m.timestamp) : null,
-        }));
-    } catch (err) {
-      // Swallow — restoring history is a nice-to-have, not a blocker.
-      console.warn("[Frappe AI] loadRecentConversation failed", err);
-    }
-  }
+	function _serverCancelInFlight(): void {
+		// settle() only ends the stream in this tab; without this the worker keeps relaying and the model keeps generating
+		if (!_conversationId) return;
+		frappe.call({
+			method: "frappe_ai.api.chat.cancel_stream",
+			args: { session_id: _conversationId },
+		});
+	}
 
-  /** Update an assistant message in-place by id.
-   *
-   * Restricted to assistant messages because that's the only role that
-   * receives streamed chunks. Tightening the callback parameter type
-   * means callers can write `m.blocks` / `m.pending` without manual
-   * narrowing.
-   */
-  function _updateMessage(id: string, updater: (m: AssistantMessage) => void): void {
-    const idx = messages.value.findIndex((m) => m.id === id);
-    if (idx < 0) return;
-    const target = messages.value[idx];
-    if (target.role !== "assistant") return;
-    // Mutate in place. Vue 3's reactive proxy detects nested property
-    // writes, so the splice-clone pattern used previously was wasteful:
-    // for a long streamed response it copied the message object on every
-    // chunk and triggered a deep watch in ChatMessages.vue (O(N²) over
-    // message length). In-place mutation drops both costs.
-    updater(target);
-  }
+	function cancelMessage(): void {
+		_serverCancelInFlight();
+		if (_resolveStream) _resolveStream();
+	}
 
-  // Cross-tab sync: server publishes `frappe_ai:msg_added` whenever an AI
-  // Chat Message row is inserted (see the `doc_events` hook in
-  // frappe_ai.api.realtime). The handler appends the new message if it
-  // belongs to the conversation this tab is currently showing AND we're not
-  // mid-stream (the streaming tab already renders these via chunk events;
-  // appending again would duplicate the bubble).
-  interface MsgAddedPayload {
-    session_id: string;
-    id: string;
-    role: "user" | "assistant" | "tool";
-    content: string;
-    timestamp: string | null;
-  }
-  frappe.realtime.on("frappe_ai:msg_added", (payload: MsgAddedPayload) => {
-    if (!payload || payload.session_id !== _conversationId) return;
-    if (isLoading.value) return; // active tab handles its own turn via chunks
-    if (payload.role !== "user" && payload.role !== "assistant") return;
-    if (messages.value.some((m) => m.id === payload.id)) return;
-    messages.value.push({
-      id: payload.id,
-      role: payload.role,
-      content: payload.content,
-      timestamp: payload.timestamp ? new Date(payload.timestamp) : null,
-    });
-  });
+	function clearMessages(): void {
+		// settle an in-flight stream first, or its orphaned chunk listener races the next sendMessage and empties its bubble
+		if (isLoading.value) _serverCancelInFlight();
+		if (_resolveStream) _resolveStream();
+		messages.value = [];
+		isLoading.value = false;
+		// "New conversation" — drop the session id so the next message opens
+		// a fresh AI Chat Session row.
+		_conversationId = null;
+	}
 
-  function _addErrorMessage(message: string): void {
-    lastError.value = message;
-    messages.value.push({
-      id: crypto.randomUUID(),
-      role: "error",
-      content: message,
-      error: { code: "REQUEST_FAILED", message },
-      timestamp: new Date(),
-    });
-  }
+	// sendBeacon survives the unload, so a tab closed mid-stream still stops the worker
+	if (typeof window !== "undefined") {
+		window.addEventListener("beforeunload", () => {
+			if (!isLoading.value || !_conversationId) return;
+			try {
+				const blob = new Blob(
+					[
+						JSON.stringify({
+							session_id: _conversationId,
+							csrf_token: frappe.csrf_token,
+						}),
+					],
+					{ type: "application/json" },
+				);
+				navigator.sendBeacon("/api/method/frappe_ai.api.chat.cancel_stream", blob);
+			} catch {
+				// best-effort
+			}
+		});
+	}
 
-  return {
-    messages,
-    isLoading: readonly(isLoading),
-    canCancel: readonly(canCancel),
-    lastError: readonly(lastError),
-    sendMessage,
-    cancelMessage,
-    clearMessages,
-    loadRecentConversation,
-  };
+	interface RecentMessagesResponse {
+		session_id: string | null;
+		messages: Array<{ id: string; role: string; content: string; timestamp: string | null }>;
+	}
+
+	async function loadRecentConversation(): Promise<void> {
+		// Hydrate the sidebar on mount so a page reload doesn't throw away the
+		// user's last chat.
+		try {
+			const result = await new Promise<RecentMessagesResponse>((resolve, reject) => {
+				frappe.call<RecentMessagesResponse>({
+					method: "frappe_ai.api.chat.get_recent_messages",
+					args: { limit: 50 },
+					callback: (r) => resolve(r?.message ?? { session_id: null, messages: [] }),
+					error: reject,
+				});
+			});
+
+			if (!result || !result.session_id || result.messages.length === 0) return;
+
+			_conversationId = result.session_id;
+			// Skip rows whose role we can't faithfully render (e.g. persisted
+			// "tool" messages — we don't have the toolCall metadata in the
+			// hydrated row). Better to omit than to mislabel them as user input.
+			messages.value = result.messages
+				.filter((m) => m.role === "user" || m.role === "assistant")
+				.map((m) => ({
+					id: m.id,
+					role: m.role as "user" | "assistant",
+					content: m.content,
+					timestamp: m.timestamp ? new Date(m.timestamp) : null,
+				}));
+		} catch {
+			// an empty thread would read as "you have no chats", and the user would think theirs was lost
+			_addErrorMessage(__("Failed to load chat"));
+		}
+	}
+
+	/** Update the assistant message with this id in place; no-op for another role, which gets no chunks. */
+	function _updateMessage(id: string, updater: (m: AssistantMessage) => void): void {
+		const idx = messages.value.findIndex((m) => m.id === id);
+		if (idx < 0) return;
+		const target = messages.value[idx];
+		if (target.role !== "assistant") return;
+		// in place: Vue tracks nested writes, and copying the message on every chunk is quadratic over a long reply
+		updater(target);
+	}
+
+	interface MsgAddedPayload {
+		session_id: string;
+		id: string;
+		role: "user" | "assistant" | "tool";
+		content: string;
+		timestamp: string | null;
+	}
+	frappe.realtime.on("frappe_ai:msg_added", (payload: MsgAddedPayload) => {
+		if (!payload || payload.session_id !== _conversationId) return;
+		if (isLoading.value) return; // active tab handles its own turn via chunks
+		if (payload.role !== "user" && payload.role !== "assistant") return;
+		if (messages.value.some((m) => m.id === payload.id)) return;
+		messages.value.push({
+			id: payload.id,
+			role: payload.role,
+			content: payload.content,
+			timestamp: payload.timestamp ? new Date(payload.timestamp) : null,
+		});
+	});
+
+	function _addErrorMessage(message: string): void {
+		messages.value.push({
+			id: crypto.randomUUID(),
+			role: "error",
+			content: message,
+			error: { code: "REQUEST_FAILED", message },
+			timestamp: new Date(),
+		});
+	}
+
+	return {
+		messages,
+		isLoading: readonly(isLoading),
+		canCancel: readonly(canCancel),
+		sendMessage,
+		allow,
+		deny,
+		cancelMessage,
+		clearMessages,
+		loadRecentConversation,
+		showError: _addErrorMessage,
+	};
 }

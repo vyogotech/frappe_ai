@@ -7,13 +7,14 @@
 					v-model="text"
 					class="frappe-ai-textarea"
 					rows="1"
-					placeholder="Ask anything..."
-					aria-label="Chat input"
+					:placeholder="askAnything"
+					:aria-label="chatInput"
 					@keydown="handleKeydown"
 					@input="autoResize"
 				/>
 			</div>
 			<button
+				ref="buttonEl"
 				:class="[
 					'frappe-ai-send-btn',
 					showStop
@@ -23,8 +24,8 @@
 							: '',
 				]"
 				:disabled="sendDisabled"
-				:title="showStop ? 'Stop generating' : 'Send message'"
-				:aria-label="showStop ? 'Stop generating' : 'Send message'"
+				:title="buttonLabel"
+				:aria-label="buttonLabel"
 				@click="onButtonClick"
 			>
 				<span v-if="showStop" class="frappe-ai-stop-icon" aria-hidden="true"></span>
@@ -57,6 +58,10 @@ const emit = defineEmits<{
 
 const text = ref("");
 const inputEl = ref<HTMLTextAreaElement>();
+const buttonEl = ref<HTMLButtonElement>();
+
+const askAnything = __("Ask anything...");
+const chatInput = __("Chat input");
 
 // NOTE-005: keep the textarea's unsent content across hard reloads.
 // `useDraft` debounces writes and scopes by user.
@@ -68,17 +73,9 @@ watch(text, (v) => {
 	draft.save(v);
 });
 
-/** Stop button is shown only when busy AND cancel is possible. */
 const showStop = computed(() => props.busy && props.canCancel);
+const buttonLabel = computed(() => (showStop.value ? __("Stop generating") : __("Send message")));
 
-/**
- * Send button is disabled when:
- *   - busy but the turn can't be cancelled (no point in clicking)
- *   - idle but no text typed
- * It is enabled when:
- *   - showStop (so the user can click to abort)
- *   - idle with non-empty text
- */
 const sendDisabled = computed(() => {
 	if (showStop.value) return false;
 	if (props.busy) return true;
@@ -94,15 +91,21 @@ function onButtonClick() {
 	send();
 }
 
+// A turn ending disables the button that Stop had put under the keyboard user, and a
+// disabled element cannot hold focus. Move first, or focus falls to BODY (SC 2.4.3).
+// `watch` flushes before the render, so the button is still focusable here.
+watch(sendDisabled, (disabled) => {
+	if (disabled && document.activeElement === buttonEl.value) inputEl.value?.focus();
+});
+
+defineExpose({ focus: () => inputEl.value?.focus() });
+
 function send() {
 	const content = text.value.trim();
 	if (!content) return;
 	emit("send", content);
 	text.value = "";
-	// Clear the persisted draft immediately so a refresh between the send
-	// and the assistant reply doesn't re-populate the textarea with what
-	// the user just sent. The watch above would also fire (debounced), but
-	// the explicit clear avoids the 500ms window of staleness.
+	// now, not via the debounced watch: a refresh in its 500ms window would restore the sent text
 	draft.clear();
 	nextTick(() => {
 		if (inputEl.value) inputEl.value.style.height = "auto";

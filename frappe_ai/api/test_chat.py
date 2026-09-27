@@ -1,14 +1,15 @@
 # Copyright (c) 2026, Vyogo and contributors
 # For license information, please see license.txt
 
-"""Tests for frappe_ai.api.chat — both the pure-Python sanitiser and the
-whitelisted endpoints (with the agent + RQ enqueue mocked out)."""
+"""Tests for frappe_ai.api.chat, with the agent and the RQ enqueue mocked out."""
 
 import json
+import pickle
 import unittest
 from unittest.mock import patch
 
 import frappe
+from frappe.tests import IntegrationTestCase
 
 from frappe_ai.api import chat
 
@@ -88,6 +89,8 @@ class TestSanitizePageContext(unittest.TestCase):
 
 class TestValidateAgentUrl(unittest.TestCase):
 	def setUp(self):
+		# the previous turn's claim on this user's one answer ends with that turn (S13)
+		chat._release_the_answer(frappe.session.user)
 		self._original_escape = frappe.local.conf.get("frappe_ai_agent_url_unsafe_ok")
 		frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = 0
 
@@ -98,10 +101,7 @@ class TestValidateAgentUrl(unittest.TestCase):
 			frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = self._original_escape
 
 	def test_accepts_https_url(self):
-		chat._validate_agent_url("https://agent.example.com")
-
-	def test_accepts_http_url(self):
-		chat._validate_agent_url("http://agent.example.com:8484")
+		chat._validate_agent_url("https://1.1.1.1")
 
 	def test_accepts_localhost_with_escape(self):
 		# Localhost is technically a private name; allow it when the
@@ -134,12 +134,6 @@ class TestValidateAgentUrl(unittest.TestCase):
 	def test_rejects_unspecified_address(self):
 		with self.assertRaises(frappe.ValidationError):
 			chat._validate_agent_url("http://0.0.0.0:8484")
-
-	def test_escape_hatch_allows_metadata_too(self):
-		# Operators who genuinely need internal-network targets opt-in
-		# via site_config. We don't second-guess them.
-		frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = 1
-		chat._validate_agent_url("http://169.254.169.254/")
 
 	def test_rejects_rfc1918_private_addresses(self):
 		# The worker forwards the user's sid; a misconfigured agent URL on a
@@ -178,11 +172,13 @@ class TestValidateAgentUrl(unittest.TestCase):
 
 	def test_accepts_public_ip_literal(self):
 		# Sanity: a publicly-allocated IPv4 (Cloudflare DNS) is fine.
-		chat._validate_agent_url("http://1.1.1.1:8484")
+		chat._validate_agent_url("https://1.1.1.1:8484")
 
 
 class TestAgentUrl(unittest.TestCase):
 	def setUp(self):
+		# the previous turn's claim on this user's one answer ends with that turn (S13)
+		chat._release_the_answer(frappe.session.user)
 		self._original = frappe.local.conf.get("frappe_ai_agent_url")
 
 	def tearDown(self):
@@ -213,16 +209,15 @@ class TestAgentUrl(unittest.TestCase):
 # ──────────────────────────────────────────────────────────────────────────
 
 
-class TestStartStream(unittest.TestCase):
+class TestStartStream(IntegrationTestCase):
 	def setUp(self):
+		super().setUp()
+		# the previous turn's claim on this user's one answer ends with that turn (S13)
+		chat._release_the_answer(frappe.session.user)
 		# Establish a known-good baseline for the singleton + site_config.
 		self._original_url = frappe.local.conf.get("frappe_ai_agent_url")
 		frappe.local.conf["frappe_ai_agent_url"] = "http://localhost:8484"
-		# _validate_agent_url rejects loopback (::1, 127.0.0.0/8) outside
-		# the explicit escape hatch. These tests use a localhost URL and
-		# mock frappe.enqueue, so the URL is only validated, never reached.
-		# Setting the hatch keeps validation permissive without changing
-		# what the tests actually exercise.
+		# _validate_agent_url rejects loopback without the hatch; enqueue is mocked, so the URL is never reached
 		self._original_escape = frappe.local.conf.get("frappe_ai_agent_url_unsafe_ok")
 		frappe.local.conf["frappe_ai_agent_url_unsafe_ok"] = 1
 
@@ -300,9 +295,11 @@ class TestStartStream(unittest.TestCase):
 
 
 class TestCancelStream(unittest.TestCase):
-	"""BUG-003 + BUG-008: client must be able to signal cancel to the worker."""
+	"""The client can signal a cancel to the worker."""
 
 	def setUp(self):
+		# the previous turn's claim on this user's one answer ends with that turn (S13)
+		chat._release_the_answer(frappe.session.user)
 		self._sid = "test-cancel-session-id"
 		# Ensure clean state.
 		frappe.cache().delete_value(f"frappe_ai:cancel:{self._sid}")
@@ -331,96 +328,81 @@ class TestCancelStream(unittest.TestCase):
 		# Second call returns False (flag consumed).
 		self.assertFalse(chat._is_stream_cancelled(self._sid))
 
+	def test_cancel_from_another_process_reaches_the_worker(self):
+		# The worker checks before Stop is clicked, and Frappe memoises that miss in
+		# frappe.local.cache; Stop then sets the flag from a web process, in Redis only.
+		self.assertFalse(chat._is_stream_cancelled(self._sid))
+		cache = frappe.cache()
+		cache.set(cache.make_key(chat._cancel_key(self._sid)), pickle.dumps("1"))
+		self.assertTrue(chat._is_stream_cancelled(self._sid))
+
 
 # ──────────────────────────────────────────────────────────────────────────
 # get_recent_messages — hydrates the sidebar
 # ──────────────────────────────────────────────────────────────────────────
 
 
-class TestGetRecentMessages(unittest.TestCase):
+RECENT_MESSAGES_USER = "recent_messages_user@example.com"
+
+
+class TestGetRecentMessages(IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
-		cls._user = frappe.session.user
+		super().setUpClass()
+		if not frappe.db.exists("User", RECENT_MESSAGES_USER):
+			user = {
+				"doctype": "User",
+				"email": RECENT_MESSAGES_USER,
+				"first_name": "Recent",
+				"send_welcome_email": 0,
+			}
+			frappe.get_doc(user | {"roles": [{"role": "All"}]}).insert(ignore_permissions=True)
 
-	def tearDown(self):
-		# Clean up any AI Chat Session / Message rows the test created.
-		for s in frappe.get_all("AI Chat Session", filters={"user": frappe.session.user}, pluck="name"):
-			frappe.delete_doc("AI Chat Session", s, ignore_permissions=True, force=True)
-		# Cascade for orphan messages just in case.
-		for m in frappe.get_all("AI Chat Message", pluck="name"):
-			frappe.delete_doc("AI Chat Message", m, ignore_permissions=True, force=True)
+	def setUp(self):
+		super().setUp()
+		# its own user: test_empty_when_no_session must not depend on whose chats the site already holds
+		frappe.set_user(RECENT_MESSAGES_USER)
+		self.addCleanup(frappe.set_user, "Administrator")
+
+	def _session(self, name: str) -> str:
+		doc = frappe.get_doc(
+			{"doctype": "AI Chat Session", "name": name, "user": frappe.session.user}
+		).insert(ignore_permissions=True)
+		# on_trash takes the chat's messages with it, so this clears what this test inserted and nothing else
+		self.addCleanup(frappe.delete_doc, "AI Chat Session", doc.name, ignore_permissions=True, force=True)
+		return doc.name
+
+	def _message(self, session: str, content: str, role: str = "user") -> None:
+		frappe.get_doc(
+			{"doctype": "AI Chat Message", "session": session, "role": role, "content": content}
+		).insert(ignore_permissions=True)
 
 	def test_empty_when_no_session(self):
 		out = chat.get_recent_messages()
 		self.assertEqual(out, {"session_id": None, "messages": []})
 
 	def test_returns_messages_for_most_recent_session(self):
-		session = frappe.get_doc(
-			{
-				"doctype": "AI Chat Session",
-				"name": "test-session-1",
-				"user": frappe.session.user,
-			}
-		).insert(ignore_permissions=True)
+		session = self._session("test-session-1")
 		for i, role in enumerate(["user", "assistant"]):
-			frappe.get_doc(
-				{
-					"doctype": "AI Chat Message",
-					"session": session.name,
-					"role": role,
-					"content": f"msg-{i}",
-				}
-			).insert(ignore_permissions=True)
+			self._message(session, f"msg-{i}", role)
 		out = chat.get_recent_messages()
-		self.assertEqual(out["session_id"], session.name)
+		self.assertEqual(out["session_id"], session)
 		self.assertEqual(len(out["messages"]), 2)
 		self.assertEqual(out["messages"][0]["role"], "user")
 		self.assertEqual(out["messages"][0]["content"], "msg-0")
 
 	def test_timestamps_are_iso8601_with_explicit_utc_suffix(self):
-		# BUG-002 regression: pre-fix the API returned Frappe's naive datetime
-		# str (e.g. "2026-05-16 17:12:35.041386") which JS parses as LOCAL,
-		# producing a different display time after reload vs. fresh send.
-		# Fix: emit ISO 8601 with explicit "Z" so `new Date(ts)` is unambiguous.
-		session = frappe.get_doc(
-			{
-				"doctype": "AI Chat Session",
-				"name": "test-session-ts",
-				"user": frappe.session.user,
-			}
-		).insert(ignore_permissions=True)
-		frappe.get_doc(
-			{
-				"doctype": "AI Chat Message",
-				"session": session.name,
-				"role": "user",
-				"content": "ts probe",
-			}
-		).insert(ignore_permissions=True)
+		# JS parses Frappe's naive datetime string as local time, so the API must send ISO 8601 with a "Z"
+		self._message(self._session("test-session-ts"), "ts probe")
 		out = chat.get_recent_messages()
 		ts = out["messages"][0]["timestamp"]
 		self.assertIsNotNone(ts)
-		# ISO 8601 with "T" separator and trailing "Z" (UTC):
-		# "YYYY-MM-DDTHH:MM:SS[.ffffff]Z"
 		self.assertRegex(ts, r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$")
 
 	def test_limit_clamped_to_safe_range(self):
-		session = frappe.get_doc(
-			{
-				"doctype": "AI Chat Session",
-				"name": "test-session-limit",
-				"user": frappe.session.user,
-			}
-		).insert(ignore_permissions=True)
+		session = self._session("test-session-limit")
 		for i in range(5):
-			frappe.get_doc(
-				{
-					"doctype": "AI Chat Message",
-					"session": session.name,
-					"role": "user",
-					"content": f"msg-{i}",
-				}
-			).insert(ignore_permissions=True)
+			self._message(session, f"msg-{i}")
 		# limit=0 → clamped to 1
 		out = chat.get_recent_messages(limit=0)
 		self.assertEqual(len(out["messages"]), 1)
@@ -429,25 +411,8 @@ class TestGetRecentMessages(unittest.TestCase):
 		self.assertLessEqual(len(out["messages"]), 200)
 
 	def test_string_limit_coerced_by_frappe_typing(self):
-		# Frappe v16 wraps whitelisted endpoints in pydantic-based type
-		# validation. A numeric string from the HTTP query layer is
-		# coerced to int before the function runs, so a caller-supplied
-		# "100" works identically to an integer 100.
-		session = frappe.get_doc(
-			{
-				"doctype": "AI Chat Session",
-				"name": "test-session-str-limit",
-				"user": frappe.session.user,
-			}
-		).insert(ignore_permissions=True)
-		frappe.get_doc(
-			{
-				"doctype": "AI Chat Message",
-				"session": session.name,
-				"role": "user",
-				"content": "ok",
-			}
-		).insert(ignore_permissions=True)
+		self._message(self._session("test-session-str-limit"), "ok")
+		# v16's @whitelist type validation coerces the query-string "100" to int before the endpoint runs
 		out = chat.get_recent_messages(limit="100")  # type: ignore[arg-type]
 		self.assertEqual(len(out["messages"]), 1)
 

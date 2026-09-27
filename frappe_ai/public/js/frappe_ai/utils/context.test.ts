@@ -4,101 +4,101 @@ import { getPageContext } from "./context";
 const g = globalThis as Record<string, unknown>;
 
 function setFrappe(value: unknown) {
-  g.frappe = value;
+	g.frappe = value;
 }
 function setCurFrm(value: unknown) {
-  g.cur_frm = value;
+	g.cur_frm = value;
 }
 function setCurList(value: unknown) {
-  g.cur_list = value;
+	g.cur_list = value;
+}
+
+/** The desk with one document open: the route names it, locals holds it, cur_frm points at it (form.js:407,415). */
+function openDocument(
+	doc: { doctype: string; name: string; currency?: string },
+	rest: object = {},
+) {
+	setFrappe({
+		...rest,
+		router: { current_route: ["Form", doc.doctype, doc.name] },
+		get_doc: (doctype: string, name: string) =>
+			doctype === doc.doctype && name === doc.name ? doc : null,
+	});
+	setCurFrm({ doctype: doc.doctype, docname: doc.name, doc });
 }
 
 describe("getPageContext", () => {
-  let originalFrappe: unknown;
-  let originalCurFrm: unknown;
-  let originalCurList: unknown;
+	let originalFrappe: unknown;
+	let originalCurFrm: unknown;
+	let originalCurList: unknown;
 
-  beforeEach(() => {
-    originalFrappe = g.frappe;
-    originalCurFrm = g.cur_frm;
-    originalCurList = g.cur_list;
-  });
+	beforeEach(() => {
+		originalFrappe = g.frappe;
+		originalCurFrm = g.cur_frm;
+		originalCurList = g.cur_list;
+	});
 
-  afterEach(() => {
-    setFrappe(originalFrappe);
-    setCurFrm(originalCurFrm);
-    setCurList(originalCurList);
-  });
+	afterEach(() => {
+		setFrappe(originalFrappe);
+		setCurFrm(originalCurFrm);
+		setCurList(originalCurList);
+	});
 
-  it("returns an empty context when frappe is undefined", () => {
-    setFrappe(undefined);
-    setCurFrm(undefined);
-    setCurList(undefined);
-    expect(getPageContext()).toEqual({ route: "", doctype: "", docname: "", currency: "" });
-  });
+	it("returns an empty context when frappe is undefined", () => {
+		setFrappe(undefined);
+		setCurFrm(undefined);
+		setCurList(undefined);
+		expect(getPageContext()).toEqual({ route: "", doctype: "", docname: "", currency: "" });
+	});
 
-  it("derives route from frappe.router.current_route", () => {
-    setFrappe({ router: { current_route: ["app", "user", "Administrator"] } });
-    expect(getPageContext().route).toBe("app/user/Administrator");
-  });
+	it("derives route from frappe.router.current_route", () => {
+		setFrappe({ router: { current_route: ["app", "user", "Administrator"] } });
+		expect(getPageContext().route).toBe("app/user/Administrator");
+	});
 
-  it("ignores non-array route", () => {
-    setFrappe({ router: { current_route: "not-an-array" } });
-    expect(getPageContext().route).toBe("");
-  });
+	it("ignores non-array route", () => {
+		setFrappe({ router: { current_route: "not-an-array" } });
+		expect(getPageContext().route).toBe("");
+	});
 
-  it("reads doctype + docname from cur_frm", () => {
-    setFrappe({});
-    setCurFrm({ doc: { doctype: "Sales Invoice", name: "SINV-001" } });
-    const ctx = getPageContext();
-    expect(ctx.doctype).toBe("Sales Invoice");
-    expect(ctx.docname).toBe("SINV-001");
-  });
+	it("reads doctype + docname from the open document", () => {
+		openDocument({ doctype: "Sales Invoice", name: "SINV-001" });
+		const ctx = getPageContext();
+		expect(ctx.doctype).toBe("Sales Invoice");
+		expect(ctx.docname).toBe("SINV-001");
+	});
 
-  it("falls back to cur_list.doctype when no form is open", () => {
-    setFrappe({});
-    setCurFrm(undefined);
-    setCurList({ doctype: "Item" });
-    expect(getPageContext().doctype).toBe("Item");
-  });
+	it("falls back to the list's doctype when no document is open", () => {
+		setFrappe({ router: { current_route: ["List", "Item", "List"] } });
+		setCurFrm(undefined);
+		setCurList({ doctype: "Item" });
+		expect(getPageContext().doctype).toBe("Item");
+	});
 
-  it("prefers cur_frm currency when present", () => {
-    setFrappe({ boot: { sysdefaults: { currency: "INR" } } });
-    setCurFrm({ doc: { doctype: "SI", name: "X", currency: "USD" } });
-    expect(getPageContext().currency).toBe("USD");
-  });
+	it("prefers the open document's currency over the site default", () => {
+		openDocument(
+			{ doctype: "SI", name: "X", currency: "USD" },
+			{ boot: { sysdefaults: { currency: "INR" } } },
+		);
+		expect(getPageContext().currency).toBe("USD");
+	});
 
-  it("falls back to sysdefaults currency when cur_frm has none", () => {
-    setFrappe({ boot: { sysdefaults: { currency: "EUR" } } });
-    setCurFrm({ doc: { doctype: "SI", name: "X" } });
-    expect(getPageContext().currency).toBe("EUR");
-  });
+	it("uppercases the currency code", () => {
+		openDocument({ doctype: "SI", name: "X", currency: "inr" });
+		expect(getPageContext().currency).toBe("INR");
+	});
 
-  it("falls back to frappe.defaults.get_default('currency') as last resort", () => {
-    setFrappe({
-      boot: {},
-      defaults: { get_default: (key: string) => (key === "currency" ? "GBP" : null) },
-    });
-    setCurFrm(undefined);
-    expect(getPageContext().currency).toBe("GBP");
-  });
+	it("treats a malformed desk state gracefully", () => {
+		setFrappe({});
+		setCurFrm({ doc: null });
+		expect(getPageContext().doctype).toBe("");
+		expect(getPageContext().docname).toBe("");
+	});
 
-  it("uppercases the currency code", () => {
-    setFrappe({ boot: { sysdefaults: { currency: "inr" } } });
-    expect(getPageContext().currency).toBe("INR");
-  });
-
-  it("treats malformed cur_frm gracefully", () => {
-    setFrappe({});
-    setCurFrm({ doc: null });
-    expect(getPageContext().doctype).toBe("");
-    expect(getPageContext().docname).toBe("");
-  });
-
-  it("never throws even when every global is malformed", () => {
-    setFrappe({ router: null, boot: null, defaults: null });
-    setCurFrm({ doc: { /* missing fields */ } });
-    setCurList({ /* no doctype */ });
-    expect(() => getPageContext()).not.toThrow();
-  });
+	it("never throws even when every global is malformed", () => {
+		setFrappe({ router: null, boot: null, defaults: null });
+		setCurFrm({ doc: {/* missing fields */} });
+		setCurList({/* no doctype */});
+		expect(() => getPageContext()).not.toThrow();
+	});
 });
